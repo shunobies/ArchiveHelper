@@ -274,9 +274,11 @@ if TK_AVAILABLE:
             self.run_password: str = ""
             self.run_screen_name: str = ""
             self.run_log_path: str = ""
+            self.run_remote_start_epoch: int = 0
 
             self._stop_requested = threading.Event()
             self._done_emitted = False
+            self._done_handled = False
 
             # Connection
             self.var_host = StringVar(value="")
@@ -1314,6 +1316,14 @@ if TK_AVAILABLE:
             self.log_text.see(END)
             self.log_text.configure(state="disabled")
 
+        def _clear_log(self) -> None:
+            try:
+                self.log_text.configure(state="normal")
+                self.log_text.delete("1.0", END)
+                self.log_text.configure(state="disabled")
+            except Exception:
+                pass
+
         def _tick_elapsed(self) -> None:
             try:
                 if self.state.running and self.state.run_started_ts > 0:
@@ -1948,10 +1958,14 @@ if TK_AVAILABLE:
             self._remote_run(self.run_target, self.run_port, self.run_keyfile, self.run_password, cmd)
 
         def _find_latest_remote_log(self) -> str:
+            min_ts = int(self.run_remote_start_epoch or 0)
             cmd = (
-                "for i in $(seq 1 25); do "
+                "for i in $(seq 1 50); do "
                 "f=$(ls -t \"$HOME\"/.archive_helper_for_jellyfin/logs/rip_and_encode_v2_*.log \"$HOME\"/rip_and_encode_v2_*.log 2>/dev/null | head -n1); "
-                "if [ -n \"$f\" ]; then echo \"$f\"; exit 0; fi; "
+                "if [ -n \"$f\" ]; then "
+                "  mt=$(stat -c %Y \"$f\" 2>/dev/null || echo 0); "
+                f"  if [ \"$mt\" -ge {min_ts} ]; then echo \"$f\"; exit 0; fi; "
+                "fi; "
                 "sleep 0.2; "
                 "done; exit 1"
             )
@@ -2017,6 +2031,10 @@ if TK_AVAILABLE:
                 self._append_log("(Info) Stopped log tail.\n")
 
         def _on_done(self, payload: str) -> None:
+            if self._done_handled:
+                return
+            self._done_handled = True
+
             # Ensure any background tail process is stopped.
             try:
                 self._stop_requested.set()
@@ -2059,8 +2077,15 @@ if TK_AVAILABLE:
                 )
                 if do_cleanup:
                     self.cleanup_mkvs()
+                return
+
+            # Any non-ok terminal state: show message and clear the visible log so a restart
+            # does not look/feel stuck on previous errors.
+            if str(payload).strip().lower() == "stopped":
+                messagebox.showinfo("Stopped", "Stopped.")
             else:
                 messagebox.showerror("Stopped", payload)
+            self._clear_log()
 
         def cleanup_mkvs(self) -> None:
             if self.state.running:
@@ -2398,6 +2423,9 @@ if TK_AVAILABLE:
                 return
 
             try:
+                # Fresh run: clear the visible log so prior MakeMKV/ERROR lines don't confuse recovery.
+                self._clear_log()
+
                 target, remote_script, port, keyfile = self._validate()
                 self._persist_state()
                 password = (self.var_password.get() or "").strip()
@@ -2518,6 +2546,8 @@ if TK_AVAILABLE:
                 self.run_log_path = ""
                 self._stop_requested.clear()
                 self._done_emitted = False
+                self._done_handled = False
+                self.run_remote_start_epoch = 0
 
                 # Ensure screen exists.
                 code, out = self._remote_run(target, port, keyfile, password, "command -v screen >/dev/null 2>&1")
@@ -2528,6 +2558,15 @@ if TK_AVAILABLE:
                     f"screen -S {shlex.quote(self.run_screen_name)} -dm "
                     f"bash -lc {shlex.quote(remote_cmd)}"
                 )
+
+                # Capture remote time so we can pick the correct (new) log file for this run.
+                try:
+                    code_ts, out_ts = self._remote_run(target, port, keyfile, password, "date +%s")
+                    if code_ts == 0:
+                        self.run_remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 1)
+                except Exception:
+                    self.run_remote_start_epoch = 0
+
                 code, out = self._remote_run(target, port, keyfile, password, screen_cmd)
                 if code != 0:
                     raise ValueError("Failed to start remote job in screen: " + (out or "").strip())
@@ -2758,6 +2797,16 @@ if TK_AVAILABLE:
                 self._replay_stop.set()
                 return
 
+            # If we're not running, still reset UI to a known-good idle state.
+            if not self.state.running:
+                self._stop_requested.set()
+                try:
+                    self._stop_tail(quiet=True)
+                except Exception:
+                    pass
+                self._on_done("Stopped")
+                return
+
             self._stop_requested.set()
 
             # Stop remote job if we launched it in screen.
@@ -2778,6 +2827,9 @@ if TK_AVAILABLE:
                     self._stop_tail(quiet=True)
                 except Exception:
                     pass
+
+                # Ensure the UI transitions back to idle even if the reader thread never emits "done".
+                self._on_done("Stopped")
                 return
 
             if self.ssh_channel is not None:
@@ -2789,9 +2841,11 @@ if TK_AVAILABLE:
                     self.ssh_channel.close()
                 except Exception:
                     pass
+                self._on_done("Stopped")
                 return
 
             if not self.proc:
+                self._on_done("Stopped")
                 return
             try:
                 # Send Ctrl-C over the PTY, then fall back to terminate.
@@ -2810,6 +2864,8 @@ if TK_AVAILABLE:
                     pass
 
             threading.Thread(target=_kill_later, daemon=True).start()
+
+            self._on_done("Stopped")
 
         def start_replay(self, log_path: str) -> None:
             if self.state.running:

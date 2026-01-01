@@ -512,7 +512,7 @@ if TK_AVAILABLE:
 
             self.btn_cleanup = ttk.Button(controls, text="Cleanup", command=self.cleanup_mkvs)
             self.btn_cleanup.pack(side=LEFT, padx=8)
-            Tooltip(self.btn_cleanup, "Optionally delete leftover MKVs on the server (safe and confirmed).")
+            Tooltip(self.btn_cleanup, "Optionally delete leftover work folders (temporary MKVs/staging) on the server (safe and confirmed).")
 
             self.btn_toggle_log = ttk.Button(controls, text="Show Log", command=self.toggle_log)
             self.btn_toggle_log.pack(side=RIGHT)

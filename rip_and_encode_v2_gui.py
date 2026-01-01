@@ -2051,7 +2051,14 @@ if TK_AVAILABLE:
             self.run_log_path = ""
 
             if payload == "ok":
-                messagebox.showinfo("Complete", "Processing complete.")
+                do_cleanup = messagebox.askyesno(
+                    "Complete",
+                    "Processing complete.\n\n"
+                    "Would you like to cleanup the leftover MKVs / temporary work folders now?\n\n"
+                    "This will not delete your final MP4s in the configured Movies/Series directories.",
+                )
+                if do_cleanup:
+                    self.cleanup_mkvs()
             else:
                 messagebox.showerror("Stopped", payload)
 

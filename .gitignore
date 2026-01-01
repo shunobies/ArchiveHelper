@@ -1,0 +1,8 @@
+rip_and_encode_v2_gui.py:Zone.Identifier
+rip_and_encode_v2.py:Zone.Identifier
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.DS_Store

@@ -1609,16 +1609,36 @@ def _human_bytes(n: int) -> str:
     return f"{int(n)} B"
 
 
-def cleanup_mkvs(home: Path, *, dry_run: bool) -> int:
-    """Conservatively remove MKVs under script work directories.
+def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str) -> int:
+    """Conservatively remove *work directories* created by this script.
 
     Work dirs are created as direct children of $HOME named "<Title> (<Year>)".
-    To avoid deleting unrelated folders, we only consider directories that either:
-      - include a marker file created by this script, OR
-      - appear to be legacy script output (Extras/extras.nfo or __series_stage).
+
+    Safety rails:
+    - Only directories that contain a MKVs/ subfolder are even considered.
+    - Candidates must either include a marker file created by this script, OR
+      appear to be legacy script output (Extras/extras.nfo or __series_stage).
+    - Candidates must be exactly one path segment under $HOME.
+
+    IMPORTANT: this deletes the entire work directory (including MKVs/ and any
+    staging/log artifacts) but it does not delete anything in Jellyfin final
+    storage directories.
     """
 
-    candidates: list[tuple[Path, Path, bool]] = []
+    # Best-effort guard to avoid deleting user-configured final storage
+    # directories if they happen to live under $HOME.
+    exclude_roots: list[Path] = []
+    for raw in (movies_dir, series_dir):
+        if not raw:
+            continue
+        if is_remote_dest(raw):
+            continue
+        try:
+            exclude_roots.append(Path(raw).resolve())
+        except Exception:
+            pass
+
+    candidates: list[tuple[Path, bool, int]] = []
     try:
         children = list(home.iterdir())
     except Exception as e:
@@ -1641,20 +1661,30 @@ def cleanup_mkvs(home: Path, *, dry_run: bool) -> int:
         if not is_safe_work_dir(home, work_dir):
             continue
 
-        candidates.append((work_dir, mkv_root, marker.exists()))
+        # Never delete anything that is (or sits under) the configured local
+        # Movies/Series directories.
+        try:
+            resolved = work_dir.resolve()
+            if any(str(resolved) == str(root) or str(resolved).startswith(str(root) + os.sep) for root in exclude_roots):
+                continue
+        except Exception:
+            continue
+
+        # Compute size for reporting (best-effort).
+        size_b = _dir_size_bytes(work_dir)
+        candidates.append((work_dir, marker.exists(), size_b))
 
     if not candidates:
         print("No managed MKV folders found to clean.")
         print("Hint: only work directories created by this script are eligible for cleanup.")
         return 0
 
-    print("MKV cleanup candidates:")
+    print("Work directory cleanup candidates:")
     total_bytes = 0
-    for work_dir, mkv_root, has_marker in sorted(candidates, key=lambda t: str(t[0])):
-        size_b = _dir_size_bytes(mkv_root)
+    for work_dir, has_marker, size_b in sorted(candidates, key=lambda t: str(t[0])):
         total_bytes += size_b
         tag = "managed" if has_marker else "legacy"
-        print(f"  - {mkv_root} ({_human_bytes(size_b)}) [{tag}]")
+        print(f"  - {work_dir} ({_human_bytes(size_b)}) [{tag}]")
 
     print(f"Total candidates: {len(candidates)}")
     print(f"Total size: {_human_bytes(total_bytes)}")
@@ -1664,14 +1694,19 @@ def cleanup_mkvs(home: Path, *, dry_run: bool) -> int:
         return 0
 
     deleted = 0
-    for work_dir, mkv_root, _has_marker in candidates:
+    failures = 0
+    for work_dir, _has_marker, _size_b in candidates:
         try:
-            shutil.rmtree(mkv_root)
+            shutil.rmtree(work_dir)
             deleted += 1
         except Exception as e:
-            print(f"ERROR: failed to remove {mkv_root}: {e}", file=sys.stderr)
+            failures += 1
+            print(f"ERROR: failed to remove {work_dir}: {e}", file=sys.stderr)
 
-    print(f"Deleted MKV folders: {deleted}")
+    print(f"Deleted work directories: {deleted}")
+    if failures:
+        print(f"Failures: {failures}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -1685,7 +1720,7 @@ def main(argv: list[str]) -> int:
 
     if ns.cleanup_mkvs:
         home = Path.home()
-        return cleanup_mkvs(home, dry_run=bool(ns.dry_run))
+        return cleanup_mkvs(home, dry_run=bool(ns.dry_run), movies_dir=ns.movies_dir, series_dir=ns.series_dir)
 
     # Normalize implied flags.
     if ns.continuous:

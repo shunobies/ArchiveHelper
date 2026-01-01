@@ -2076,6 +2076,10 @@ if TK_AVAILABLE:
                         remote_script,
                         "--cleanup-mkvs",
                         "--dry-run",
+                        "--movies-dir",
+                        self.var_movies_dir.get().strip(),
+                        "--series-dir",
+                        self.var_series_dir.get().strip(),
                     ]
                 )
                 code, out = self._remote_run(target, port, keyfile, password, preview_cmd)
@@ -2096,8 +2100,9 @@ if TK_AVAILABLE:
 
                 confirm = messagebox.askyesno(
                     "Cleanup",
-                    f"This will delete {candidates} MKV folder(s) from the remote host.\n\n"
-                    "This does not delete your final MP4s in Movies/Series.\n\n"
+                    f"This will delete {candidates} work folder(s) from the remote host.\n\n"
+                    "This deletes temporary MKVs and other per-title staging artifacts under the user's home directory.\n"
+                    "It does not delete your final MP4s in the configured Movies/Series directories.\n\n"
                     "Continue?",
                 )
                 if not confirm:
@@ -2111,6 +2116,10 @@ if TK_AVAILABLE:
                         "python3",
                         remote_script,
                         "--cleanup-mkvs",
+                        "--movies-dir",
+                        self.var_movies_dir.get().strip(),
+                        "--series-dir",
+                        self.var_series_dir.get().strip(),
                     ]
                 )
                 code2, out2 = self._remote_run(target, port, keyfile, password, run_cmd)

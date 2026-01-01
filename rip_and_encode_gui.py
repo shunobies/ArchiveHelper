@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""rip_and_encode_v2_gui.py
+"""rip_and_encode_gui.py
 
-Tkinter GUI for rip_and_encode_v2.py (Option B: full workflow).
+Tkinter GUI for rip_and_encode.py (Option B: full workflow).
 
 Goal:
 - Run on Windows/macOS/Linux.
 - Hide terminal usage from the operator.
 - Connect to the rip host over SSH, upload a generated CSV schedule (or use a selected CSV),
-  run rip_and_encode_v2.py in --csv mode, and drive the "press Enter to continue" prompts.
+    run rip_and_encode.py in --csv mode, and drive the "press Enter to continue" prompts.
 
 Requirements implemented:
 - Collapsible log window (collapsed by default).
@@ -15,10 +15,10 @@ Requirements implemented:
 
 Assumptions:
 - The ripping/transcoding tools (makemkvcon, HandBrakeCLI, ffprobe, eject) live on the remote host.
-- The remote host has rip_and_encode_v2.py available at the provided remote path.
+- The remote host has rip_and_encode.py available at the provided remote path.
 - The client has OpenSSH `ssh` and `scp` available (Windows 10+ usually does).
 
-This GUI does not implement interactive (non-CSV) mode; instead it always drives rip_and_encode_v2.py
+This GUI does not implement interactive (non-CSV) mode; instead it always drives rip_and_encode.py
 using --csv for determinism.
 """
 
@@ -159,6 +159,26 @@ class UiState:
     run_started_ts: float = 0.0
 
 
+@dataclass(frozen=True)
+class ConnectionInfo:
+    target: str
+    remote_script: str
+    port: str
+    keyfile: str
+    password: str
+
+
+@dataclass
+class RunContext:
+    target: str = ""
+    port: str = ""
+    keyfile: str = ""
+    password: str = ""
+    screen_name: str = ""
+    log_path: str = ""
+    remote_start_epoch: int = 0
+
+
 MAKE_MKV_PROGRESS_RE = re.compile(r"MakeMKV progress:\s*([0-9]+\.[0-9]+)%")
 MAKEMKV_CURRENT_PROGRESS_RE = re.compile(r"Current progress\s*-\s*([0-9]{1,3})%")
 MAKEMKV_TOTAL_PROGRESS_RE = re.compile(r"Total progress\s*-\s*([0-9]{1,3})%")
@@ -233,13 +253,13 @@ def _build_scp_base_args(port: str, keyfile: str) -> list[str]:
 def _normalize_remote_script_path(remote_script: str) -> str:
     s = (remote_script or "").strip()
     if not s:
-        return "rip_and_encode_v2.py"
+        return "rip_and_encode.py"
     if "/" in s or s.startswith("~"):
         return s
     return f"~/{s}"
 
 
-REMOTE_SCRIPT_RUN_PATH = "~/.archive_helper_for_jellyfin/rip_and_encode_v2.py"
+REMOTE_SCRIPT_RUN_PATH = "~/.archive_helper_for_jellyfin/rip_and_encode.py"
 
 
 if TK_AVAILABLE:
@@ -268,13 +288,7 @@ if TK_AVAILABLE:
             self.tail_client = None
             self.tail_channel = None
 
-            self.run_target: str = ""
-            self.run_port: str = ""
-            self.run_keyfile: str = ""
-            self.run_password: str = ""
-            self.run_screen_name: str = ""
-            self.run_log_path: str = ""
-            self.run_remote_start_epoch: int = 0
+            self.run_ctx: RunContext | None = None
 
             self._stop_requested = threading.Event()
             self._done_emitted = False
@@ -1938,30 +1952,43 @@ if TK_AVAILABLE:
             )
             return res.returncode, res.stdout or ""
 
+        def _get_run_ctx(self) -> RunContext:
+            if self.run_ctx is None:
+                raise RuntimeError("No active run context.")
+            return self.run_ctx
+
         def _screen_exists(self) -> bool:
-            if not self.run_screen_name:
+            if self.run_ctx is None or not self.run_ctx.screen_name:
                 return False
+            ctx = self.run_ctx
             code, _out = self._remote_run(
-                self.run_target,
-                self.run_port,
-                self.run_keyfile,
-                self.run_password,
-                f"screen -S {shlex.quote(self.run_screen_name)} -Q select .",
+                ctx.target,
+                ctx.port,
+                ctx.keyfile,
+                ctx.password,
+                f"screen -S {shlex.quote(ctx.screen_name)} -Q select .",
             )
             return code == 0
 
         def _screen_stuff(self, payload: str) -> None:
-            if not self.run_screen_name:
+            if self.run_ctx is None or not self.run_ctx.screen_name:
                 return
+            ctx = self.run_ctx
             # payload is a bash $'..' string like $'\n' or $'\003'
-            cmd = f"screen -S {shlex.quote(self.run_screen_name)} -p 0 -X stuff {payload}"
-            self._remote_run(self.run_target, self.run_port, self.run_keyfile, self.run_password, cmd)
+            cmd = f"screen -S {shlex.quote(ctx.screen_name)} -p 0 -X stuff {payload}"
+            self._remote_run(ctx.target, ctx.port, ctx.keyfile, ctx.password, cmd)
 
         def _find_latest_remote_log(self) -> str:
-            min_ts = int(self.run_remote_start_epoch or 0)
+            ctx = self._get_run_ctx()
+            min_ts = int(ctx.remote_start_epoch or 0)
             cmd = (
                 "for i in $(seq 1 50); do "
-                "f=$(ls -t \"$HOME\"/.archive_helper_for_jellyfin/logs/rip_and_encode_v2_*.log \"$HOME\"/rip_and_encode_v2_*.log 2>/dev/null | head -n1); "
+                "f=$(ls -t "
+                "\"$HOME\"/.archive_helper_for_jellyfin/logs/rip_and_encode_*.log "
+                "\"$HOME\"/rip_and_encode_*.log "
+                "\"$HOME\"/.archive_helper_for_jellyfin/logs/rip_and_encode_v2_*.log "
+                "\"$HOME\"/rip_and_encode_v2_*.log "
+                "2>/dev/null | head -n1); "
                 "if [ -n \"$f\" ]; then "
                 "  mt=$(stat -c %Y \"$f\" 2>/dev/null || echo 0); "
                 f"  if [ \"$mt\" -ge {min_ts} ]; then echo \"$f\"; exit 0; fi; "
@@ -1969,28 +1996,29 @@ if TK_AVAILABLE:
                 "sleep 0.2; "
                 "done; exit 1"
             )
-            code, out = self._remote_run(self.run_target, self.run_port, self.run_keyfile, self.run_password, cmd)
+            code, out = self._remote_run(ctx.target, ctx.port, ctx.keyfile, ctx.password, cmd)
             if code != 0:
                 raise ValueError("Unable to locate remote log file after starting the job.")
             return (out or "").strip().splitlines()[-1].strip()
 
         def _start_tail(self) -> None:
-            if not self.run_log_path:
+            ctx = self._get_run_ctx()
+            if not ctx.log_path:
                 raise ValueError("Missing remote log path.")
-            tail_cmd = f"tail -n +1 -F {shlex.quote(self.run_log_path)}"
+            tail_cmd = f"tail -n +1 -F {shlex.quote(ctx.log_path)}"
 
             # Close any existing tail first.
             self._stop_tail(quiet=True)
 
-            if self.run_password:
-                self.tail_client = self._connect_paramiko(self.run_target, self.run_port, self.run_keyfile, self.run_password)
+            if ctx.password:
+                self.tail_client = self._connect_paramiko(ctx.target, ctx.port, ctx.keyfile, ctx.password)
                 chan = self.tail_client.get_transport().open_session()
                 chan.get_pty()
                 chan.exec_command("bash -lc " + shlex.quote(tail_cmd))
                 self.tail_channel = chan
                 self.tail_proc = None
             else:
-                ssh_base = self._ssh_args(self.run_target, self.run_port, self.run_keyfile, tty=False)
+                ssh_base = self._ssh_args(ctx.target, ctx.port, ctx.keyfile, tty=False)
                 ssh_cmd = ssh_base + ["bash", "-lc", shlex.quote(tail_cmd)]
                 self.tail_proc = subprocess.Popen(
                     ssh_cmd,
@@ -2065,8 +2093,7 @@ if TK_AVAILABLE:
             self._set_inputs_enabled(True)
 
             # Clear run context.
-            self.run_screen_name = ""
-            self.run_log_path = ""
+            self.run_ctx = None
 
             if payload == "ok":
                 do_cleanup = messagebox.askyesno(
@@ -2093,12 +2120,11 @@ if TK_AVAILABLE:
                 return
 
             try:
-                target, remote_script, port, keyfile = self._validate()
+                cfg = self._validate()
                 self._persist_state()
-                password = (self.var_password.get() or "").strip()
 
                 # Ensure the remote script exists (bootstrap upload if needed).
-                remote_script = self._ensure_remote_script(target, port, keyfile, remote_script)
+                remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
 
                 self._append_log("Starting MKV cleanup preview (dry run)...\n")
                 preview_cmd = " ".join(
@@ -2114,7 +2140,7 @@ if TK_AVAILABLE:
                         self.var_series_dir.get().strip(),
                     ]
                 )
-                code, out = self._remote_run(target, port, keyfile, password, preview_cmd)
+                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, preview_cmd)
                 if out:
                     self._append_log(out.rstrip() + "\n")
                 if code != 0:
@@ -2154,7 +2180,7 @@ if TK_AVAILABLE:
                         self.var_series_dir.get().strip(),
                     ]
                 )
-                code2, out2 = self._remote_run(target, port, keyfile, password, run_cmd)
+                code2, out2 = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, run_cmd)
                 if out2:
                     self._append_log(out2.rstrip() + "\n")
                 if code2 != 0:
@@ -2164,7 +2190,7 @@ if TK_AVAILABLE:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-        def _validate(self) -> tuple[str, str, str, str]:
+        def _validate(self) -> ConnectionInfo:
             target = _ssh_target(self.var_user.get(), self.var_host.get())
             if not target:
                 raise ValueError("Host is required.")
@@ -2214,7 +2240,13 @@ if TK_AVAILABLE:
                 if shutil.which("scp") is None:
                     raise ValueError("OpenSSH 'scp' was not found on this machine.")
 
-            return target, REMOTE_SCRIPT_RUN_PATH, self.var_port.get(), keyfile
+            return ConnectionInfo(
+                target=target,
+                remote_script=REMOTE_SCRIPT_RUN_PATH,
+                port=self.var_port.get(),
+                keyfile=keyfile,
+                password=password,
+            )
 
         def _parse_target(self, target: str) -> tuple[str, str]:
             # target is either "user@host" or "host"
@@ -2378,7 +2410,11 @@ if TK_AVAILABLE:
 
             self._ensure_remote_dir(target, port, keyfile, password, remote_dir)
 
-            local_script = Path(__file__).resolve().parent / "rip_and_encode_v2.py"
+            script_dir = Path(__file__).resolve().parent
+            local_script = script_dir / "rip_and_encode.py"
+            if not local_script.exists():
+                # Backward compatibility if the script is still named with v2.
+                local_script = script_dir / "rip_and_encode_v2.py"
             if not local_script.exists():
                 raise ValueError(f"Local script not found: {local_script}")
 
@@ -2426,12 +2462,11 @@ if TK_AVAILABLE:
                 # Fresh run: clear the visible log so prior MakeMKV/ERROR lines don't confuse recovery.
                 self._clear_log()
 
-                target, remote_script, port, keyfile = self._validate()
+                cfg = self._validate()
                 self._persist_state()
-                password = (self.var_password.get() or "").strip()
 
                 # Ensure the remote script exists (bootstrap upload if needed).
-                remote_script = self._ensure_remote_script(target, port, keyfile, remote_script)
+                remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
 
                 # Build local CSV schedule (manual or selected CSV).
                 local_csv = None
@@ -2480,8 +2515,8 @@ if TK_AVAILABLE:
                 # Upload CSV to remote.
                 remote_csv = f"/tmp/rip_and_encode_schedule_{int(time.time())}.csv"
                 self._append_log("Uploading schedule via SCP...\n")
-                if password:
-                    client = self._connect_paramiko(target, port, keyfile, password)
+                if cfg.password:
+                    client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
                     try:
                         self._sftp_put(client, str(local_csv), remote_csv)
                     finally:
@@ -2490,8 +2525,8 @@ if TK_AVAILABLE:
                         except Exception:
                             pass
                 else:
-                    scp_args = self._scp_args(target, port, keyfile)
-                    scp_cmd = scp_args + [str(local_csv), f"{target}:{remote_csv}"]
+                    scp_args = self._scp_args(cfg.target, cfg.port, cfg.keyfile)
+                    scp_cmd = scp_args + [str(local_csv), f"{cfg.target}:{remote_csv}"]
                     try:
                         res = subprocess.run(
                             scp_cmd,
@@ -2506,7 +2541,7 @@ if TK_AVAILABLE:
                         detail = ((e.stdout or "").strip())
                         raise ValueError(
                             "Failed to upload schedule to the remote host.\n\n"
-                            f"Target: {target}\n"
+                            f"Target: {cfg.target}\n"
                             f"Remote path: {remote_csv}\n\n"
                             + (detail if detail else "(No additional details.)")
                         )
@@ -2538,42 +2573,44 @@ if TK_AVAILABLE:
                 self._append_log("Starting remote job (screen)...\n")
 
                 # Store run context for reconnect.
-                self.run_target = target
-                self.run_port = port
-                self.run_keyfile = keyfile
-                self.run_password = password
-                self.run_screen_name = f"archive_helper_for_jellyfin_{int(time.time())}"
-                self.run_log_path = ""
+                self.run_ctx = RunContext(
+                    target=cfg.target,
+                    port=cfg.port,
+                    keyfile=cfg.keyfile,
+                    password=cfg.password,
+                    screen_name=f"archive_helper_for_jellyfin_{int(time.time())}",
+                    log_path="",
+                    remote_start_epoch=0,
+                )
                 self._stop_requested.clear()
                 self._done_emitted = False
                 self._done_handled = False
-                self.run_remote_start_epoch = 0
 
                 # Ensure screen exists.
-                code, out = self._remote_run(target, port, keyfile, password, "command -v screen >/dev/null 2>&1")
+                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "command -v screen >/dev/null 2>&1")
                 if code != 0:
                     raise ValueError("Remote host is missing 'screen'. Install it and try again.\n" + (out or "").strip())
 
                 screen_cmd = (
-                    f"screen -S {shlex.quote(self.run_screen_name)} -dm "
+                    f"screen -S {shlex.quote(self.run_ctx.screen_name)} -dm "
                     f"bash -lc {shlex.quote(remote_cmd)}"
                 )
 
                 # Capture remote time so we can pick the correct (new) log file for this run.
                 try:
-                    code_ts, out_ts = self._remote_run(target, port, keyfile, password, "date +%s")
+                    code_ts, out_ts = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "date +%s")
                     if code_ts == 0:
-                        self.run_remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 1)
+                        self.run_ctx.remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 1)
                 except Exception:
-                    self.run_remote_start_epoch = 0
+                    self.run_ctx.remote_start_epoch = 0
 
-                code, out = self._remote_run(target, port, keyfile, password, screen_cmd)
+                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, screen_cmd)
                 if code != 0:
                     raise ValueError("Failed to start remote job in screen: " + (out or "").strip())
 
                 # Find the log file path and begin tailing it.
-                self.run_log_path = self._find_latest_remote_log()
-                self._append_log(f"(Info) Following remote log: {self.run_log_path}\n")
+                self.run_ctx.log_path = self._find_latest_remote_log()
+                self._append_log(f"(Info) Following remote log: {self.run_ctx.log_path}\n")
                 self._start_tail()
 
                 # Clear legacy direct-stream handles (we tail logs instead).
@@ -2616,8 +2653,13 @@ if TK_AVAILABLE:
             backoff = 1.0
 
             while self.state.running and not self._stop_requested.is_set():
+                if self.run_ctx is None:
+                    self.ui_queue.put(("done", "Lost connection and the remote job is no longer running."))
+                    return
+
+                ctx = self.run_ctx
                 # OpenSSH tail path
-                if self.run_password == "":
+                if ctx.password == "":
                     if self.tail_proc is None:
                         try:
                             self._start_tail()
@@ -2701,7 +2743,7 @@ if TK_AVAILABLE:
 
         def send_enter(self) -> None:
             try:
-                if self.run_screen_name:
+                if self.run_ctx is not None and self.run_ctx.screen_name:
                     # Send Enter into the remote screen session.
                     self._screen_stuff("$'\\n'")
                 else:
@@ -2810,17 +2852,12 @@ if TK_AVAILABLE:
             self._stop_requested.set()
 
             # Stop remote job if we launched it in screen.
-            if self.run_screen_name:
+            if self.run_ctx is not None and self.run_ctx.screen_name:
                 try:
                     self._screen_stuff("$'\\003'")
                     time.sleep(0.2)
-                    self._remote_run(
-                        self.run_target,
-                        self.run_port,
-                        self.run_keyfile,
-                        self.run_password,
-                        f"screen -S {shlex.quote(self.run_screen_name)} -X quit",
-                    )
+                    ctx = self.run_ctx
+                    self._remote_run(ctx.target, ctx.port, ctx.keyfile, ctx.password, f"screen -S {shlex.quote(ctx.screen_name)} -X quit")
                 except Exception:
                     pass
                 try:

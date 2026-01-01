@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""rip_and_encode_v2.py
+"""rip_and_encode.py
 
-Python port of rip_and_encode_v2.sh.
+Python port of the original rip_and_encode shell workflow.
 
 This script orchestrates external tools:
 - MakeMKV (makemkvcon) to rip DVDs to MKV files
@@ -9,7 +9,7 @@ This script orchestrates external tools:
 - ffprobe to read MKV metadata/duration/chapters
 - optional ssh/scp for remote copy destinations (host:/path)
 
-It aims to match the Bash v2 behavior:
+It aims to match the original behavior:
 - strict fail-safe (keep artifacts on error; resumable)
 - overlap mode to encode in the background while you insert the next disc
 - continuous mode to batch multiple titles before final copy/cleanup
@@ -774,7 +774,13 @@ def _gzip_compress(src: Path, dst: Path) -> None:
 
 def rotate_logs(log_dir: Path, *, keep: int = 30, compress: bool = True, exclude: Optional[Path] = None) -> None:
     try:
-        logs = sorted(log_dir.glob("rip_and_encode_v2_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        candidates: list[Path] = []
+        for pat in ("rip_and_encode_*.log", "rip_and_encode_v2_*.log"):
+            try:
+                candidates.extend(list(log_dir.glob(pat)))
+            except Exception:
+                pass
+        logs = sorted(set(candidates), key=lambda p: p.stat().st_mtime, reverse=True)
     except Exception:
         return
 
@@ -867,8 +873,11 @@ def hb_encode_with_progress(input_: Path, output: Path, preset: str) -> None:
         raise RuntimeError(f"HandBrakeCLI failed (exit {code}) for output: {output}")
 
 
-WORKDIR_MARKER_NAME = ".rip_and_encode_v2_workdir"
-DISC_MANIFEST_NAME = ".rip_and_encode_v2_disc_manifest.json"
+WORKDIR_MARKER_NAME = ".rip_and_encode_workdir"
+WORKDIR_MARKER_NAMES = (WORKDIR_MARKER_NAME, ".rip_and_encode_v2_workdir")
+
+DISC_MANIFEST_NAME = ".rip_and_encode_disc_manifest.json"
+DISC_MANIFEST_NAMES = (DISC_MANIFEST_NAME, ".rip_and_encode_v2_disc_manifest.json")
 DISC_MANIFEST_VERSION = 1
 
 
@@ -1008,6 +1017,10 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, wait_for_enter: bool = T
 
 
 def _disc_manifest_path(disc_dir: Path) -> Path:
+    for name in DISC_MANIFEST_NAMES:
+        p = disc_dir / name
+        if p.exists():
+            return p
     return disc_dir / DISC_MANIFEST_NAME
 
 
@@ -1535,7 +1548,7 @@ def usage_text() -> str:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        prog="rip_and_encode_v2.py",
+        prog="rip_and_encode.py",
         formatter_class=argparse.RawTextHelpFormatter,
         description=usage_text(),
     )
@@ -1671,9 +1684,10 @@ def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str)
         if not mkv_root.is_dir():
             continue
 
-        marker = work_dir / WORKDIR_MARKER_NAME
+        marker_paths = [work_dir / name for name in WORKDIR_MARKER_NAMES]
+        has_marker = any(p.exists() for p in marker_paths)
         legacy_hint = (work_dir / "Extras" / "extras.nfo").exists() or (work_dir / "__series_stage").exists()
-        if not marker.exists() and not legacy_hint:
+        if not has_marker and not legacy_hint:
             continue
 
         if not is_safe_work_dir(home, work_dir):
@@ -1690,7 +1704,7 @@ def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str)
 
         # Compute size for reporting (best-effort).
         size_b = _dir_size_bytes(work_dir)
-        candidates.append((work_dir, marker.exists(), size_b))
+        candidates.append((work_dir, has_marker, size_b))
 
     if not candidates:
         print("No managed MKV folders found to clean.")
@@ -1780,11 +1794,11 @@ def main(argv: list[str]) -> int:
 
         env = os.environ.copy()
         env["RIP_AND_ENCODE_IN_SCREEN"] = "1"
-        cmd = ["screen", "-S", "rip_and_encode_v2", sys.executable, str(Path(__file__).resolve()), *argv]
+        cmd = ["screen", "-S", "rip_and_encode", sys.executable, str(Path(__file__).resolve()), *argv]
         os.execvpe(cmd[0], cmd, env)
 
     log_dir = _ensure_log_dir(home_base)
-    log_file = log_dir / f"rip_and_encode_v2_{time.strftime('%Y%m%d_%H%M%S')}.log"
+    log_file = log_dir / f"rip_and_encode_{time.strftime('%Y%m%d_%H%M%S')}.log"
     try:
         rotate_logs(log_dir, keep=30, compress=True, exclude=log_file)
     except Exception:

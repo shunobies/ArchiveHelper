@@ -442,8 +442,26 @@ def clean_title(s: str) -> str:
 
 
 def sanitize_title_for_dir(title_raw: str) -> str:
-    # Match Bash v2: spaces -> underscores, '/' -> '_'
-    return title_raw.replace(" ", "_").replace("/", "_")
+    # Linux/shell-friendly folder name: avoid spaces/quotes and other special chars.
+    # Goal: user can `cd` into folders without needing quoting.
+    s = (title_raw or "").strip()
+    if not s:
+        return "Untitled"
+
+    # Normalize obvious path separators.
+    s = s.replace("/", "_").replace(os.sep, "_")
+
+    # Replace anything outside a conservative allowlist.
+    # Allowed: letters, digits, dot, underscore, dash, space (space -> underscore below).
+    s = re.sub(r"[^A-Za-z0-9._\- ]+", "_", s)
+
+    # Spaces -> underscores (consistent with the existing behavior).
+    s = s.replace(" ", "_")
+
+    # Collapse repeated separators and trim edges.
+    s = re.sub(r"_+", "_", s)
+    s = s.strip("._-_")
+    return s or "Untitled"
 
 
 def is_safe_work_dir(home: Path, work_dir: Path) -> bool:

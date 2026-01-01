@@ -1,16 +1,6 @@
 Archive Helper for Jellyfin Task List
 --------------------------------------
 
-Can you explain how the cleanup function works?
-
-Please make all temporary mkv files be stored in a tmp directory in the user's area so that if something fails cleanup for the user if it requires manual cleanup can be done easily.
-
-After successful Encoding Ask the user if they would like to cleanup the left over mkv files.
-
-When creating the directories for movies and naming Movies make sure that these are Linux safe not requiring '' in the directory name making it easier for user if they have to manually go in and make modifications.
-
-
--------------------------
 Look into OMDB API Key
 
 ------------------------
@@ -18,9 +8,6 @@ Create a settings menu
 Allow for Entry of Connection SSH being it's own menu
 Allow Directories to be it's own menu
 
----------------------------
-
-The Stop button does not actually allow the application to start over. If an error occurs the stop button does nothing and you have to close the application and reopen it to attempt to recover from an error. Also if the application errors out during the MakeMKV process the log needs to be cleared otherwise the application can not recover from the error and start copying the DVD from the beginning.
 
 -------------------
 

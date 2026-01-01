@@ -470,6 +470,7 @@ if TK_AVAILABLE:
             Tooltip(ent_season, "Season number (used when Type is series).")
 
             r2 = ttk.Frame(self.manual_frame)
+            self.disc_row = r2
             r2.pack(fill=X, pady=(6, 0))
             ttk.Label(r2, text="Current disc in drive:").pack(side=LEFT)
             sp_start = ttk.Spinbox(r2, from_=1, to=20, textvariable=self.var_start_disc, width=4)
@@ -1293,14 +1294,19 @@ if TK_AVAILABLE:
             if not hasattr(self, "season_row"):
                 return
             if self.var_mode.get() != "manual":
+                # Always hide Season row in CSV mode.
+                self.season_row.pack_forget()
                 return
 
             if self.var_kind.get() == "series":
-                if not self.season_row.winfo_ismapped():
+                # Ensure consistent placement above the disc row.
+                try:
+                    self.season_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
+                except Exception:
                     self.season_row.pack(fill=X, pady=(6, 0))
             else:
-                if self.season_row.winfo_ismapped():
-                    self.season_row.pack_forget()
+                # Unconditionally hide so startup doesn't depend on Tk mapping state.
+                self.season_row.pack_forget()
 
         def _browse_key(self) -> None:
             p = filedialog.askopenfilename(title="Select SSH private key")

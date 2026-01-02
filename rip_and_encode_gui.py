@@ -61,6 +61,9 @@ from archive_helper_gui.parser import parse_for_progress
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
 from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
+from archive_helper_gui.tailer import reader_loop as tailer_reader_loop
+from archive_helper_gui.tailer import start_tail as tailer_start_tail
+from archive_helper_gui.tailer import stop_tail as tailer_stop_tail
 from archive_helper_gui.tooltip import Tooltip
 
 try:
@@ -1905,64 +1908,10 @@ if TK_AVAILABLE:
             return (out or "").strip().splitlines()[-1].strip()
 
         def _start_tail(self, *, from_start: bool = True, tail_lines: int = 2000) -> None:
-            ctx = self._get_run_ctx()
-            if not ctx.log_path:
-                raise ValueError("Missing remote log path.")
-            if from_start:
-                tail_cmd = f"tail -n +1 -F {shlex.quote(ctx.log_path)}"
-            else:
-                tail_cmd = f"tail -n {int(tail_lines)} -F {shlex.quote(ctx.log_path)}"
-
-            # Close any existing tail first.
-            self._stop_tail(quiet=True)
-
-            if ctx.password:
-                self.tail_client = self._connect_paramiko(ctx.target, ctx.port, ctx.keyfile, ctx.password)
-                chan = self.tail_client.get_transport().open_session()
-                chan.get_pty()
-                chan.exec_command("bash -lc " + shlex.quote(tail_cmd))
-                self.tail_channel = chan
-                self.tail_proc = None
-            else:
-                ssh_base = self._ssh_args(ctx.target, ctx.port, ctx.keyfile, tty=False)
-                ssh_cmd = ssh_base + ["bash", "-lc", shlex.quote(tail_cmd)]
-                self.tail_proc = subprocess.Popen(
-                    ssh_cmd,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                )
-                self.tail_channel = None
-                self.tail_client = None
+            tailer_start_tail(self, from_start=from_start, tail_lines=tail_lines)
 
         def _stop_tail(self, *, quiet: bool = False) -> None:
-            try:
-                if self.tail_channel is not None:
-                    try:
-                        self.tail_channel.close()
-                    except Exception:
-                        pass
-                if self.tail_client is not None:
-                    try:
-                        self.tail_client.close()
-                    except Exception:
-                        pass
-            finally:
-                self.tail_channel = None
-                self.tail_client = None
-
-            if self.tail_proc is not None:
-                try:
-                    if self.tail_proc.poll() is None:
-                        self.tail_proc.terminate()
-                except Exception:
-                    pass
-                self.tail_proc = None
-
-            if not quiet:
-                self._append_log("(Info) Stopped log tail.\n")
+            tailer_stop_tail(self, quiet=quiet)
 
         def _on_done(self, payload: str) -> None:
             if self._done_handled:
@@ -2552,96 +2501,7 @@ if TK_AVAILABLE:
                 messagebox.showerror("Error", str(e))
 
         def _reader_loop(self) -> None:
-            backoff = 1.0
-
-            while self.state.running and not self._stop_requested.is_set():
-                if self.run_ctx is None:
-                    self.ui_queue.put(("done", "Lost connection and the remote job is no longer running."))
-                    return
-
-                ctx = self.run_ctx
-                # OpenSSH tail path
-                if ctx.password == "":
-                    if self.tail_proc is None:
-                        try:
-                            self._start_tail()
-                        except Exception as e:
-                            self.ui_queue.put(("log", f"(Info) Failed to start log tail: {e}\n"))
-                            time.sleep(min(backoff, 10.0))
-                            backoff = min(backoff * 2.0, 30.0)
-                            continue
-
-                    assert self.tail_proc is not None
-                    assert self.tail_proc.stdout is not None
-
-                    try:
-                        for line in self.tail_proc.stdout:
-                            if self._stop_requested.is_set() or not self.state.running:
-                                break
-                            self.ui_queue.put(("log", line))
-
-                        if self._stop_requested.is_set() or not self.state.running:
-                            break
-
-                        code = self.tail_proc.wait()
-                        self.ui_queue.put(("log", f"(Info) Disconnected from server (tail exit {code}). Reconnecting...\n"))
-                    except Exception as e:
-                        self.ui_queue.put(("log", f"(Info) Lost connection while reading log: {e}. Reconnecting...\n"))
-
-                    # Cleanup and attempt reconnect.
-                    self._stop_tail(quiet=True)
-                    if not self._screen_exists():
-                        self.ui_queue.put(("done", "Lost connection and the remote job is no longer running."))
-                        return
-                    time.sleep(min(backoff, 10.0))
-                    backoff = min(backoff * 2.0, 30.0)
-                    continue
-
-                # Paramiko tail path
-                if self.tail_channel is None:
-                    try:
-                        self._start_tail()
-                    except Exception as e:
-                        self.ui_queue.put(("log", f"(Info) Failed to start log tail: {e}\n"))
-                        time.sleep(min(backoff, 10.0))
-                        backoff = min(backoff * 2.0, 30.0)
-                        continue
-
-                assert self.tail_channel is not None
-                buf = ""
-                try:
-                    while self.state.running and not self._stop_requested.is_set():
-                        if self.tail_channel.recv_ready():
-                            data = self.tail_channel.recv(4096)
-                            if not data:
-                                break
-                            chunk = data.decode("utf-8", errors="replace")
-                            buf += chunk
-                            while "\n" in buf:
-                                line, buf = buf.split("\n", 1)
-                                self.ui_queue.put(("log", line + "\n"))
-
-                        if self.tail_channel.exit_status_ready():
-                            break
-                        time.sleep(0.03)
-
-                    if buf:
-                        self.ui_queue.put(("log", buf))
-
-                    self.ui_queue.put(("log", "(Info) Disconnected from server. Reconnecting...\n"))
-                except Exception as e:
-                    self.ui_queue.put(("log", f"(Info) Lost connection while reading log: {e}. Reconnecting...\n"))
-
-                # Cleanup and attempt reconnect.
-                self._stop_tail(quiet=True)
-                if not self._screen_exists():
-                    self.ui_queue.put(("done", "Lost connection and the remote job is no longer running."))
-                    return
-                time.sleep(min(backoff, 10.0))
-                backoff = min(backoff * 2.0, 30.0)
-
-            # Stop requested.
-            return
+            tailer_reader_loop(self)
 
         def send_enter(self) -> None:
             try:

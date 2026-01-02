@@ -80,6 +80,131 @@ def _run_root_cmd(argv: list[str], *, check: bool = True) -> subprocess.Complete
     raise RuntimeError("This step requires root privileges. Re-run as root or install/configure sudo.")
 
 
+def _has_passwordless_sudo() -> bool:
+    if os.geteuid() == 0:
+        return True
+    if not shutil.which("sudo"):
+        return False
+    cp = run_cmd(["sudo", "-n", "true"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return cp.returncode == 0
+
+
+def _makemkvcon_is_snap() -> bool:
+    path = shutil.which("makemkvcon") or ""
+    if "/snap/" in path:
+        return True
+    # Some installs may expose makemkvcon via PATH symlinks; check snap presence too.
+    if shutil.which("snap"):
+        cp = run_cmd(["snap", "list", "makemkv"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return cp.returncode == 0
+    return False
+
+
+def _parse_snap_connections_table(text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.lower().startswith("interface") and "plug" in line.lower() and "slot" in line.lower():
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        interface = parts[0]
+        plug = parts[1]
+        slot = parts[2]
+        notes = parts[3] if len(parts) > 3 else ""
+        rows.append({"interface": interface, "plug": plug, "slot": slot, "notes": notes})
+    return rows
+
+
+def maybe_ensure_makemkv_snap_interfaces() -> None:
+    """Best-effort MakeMKV Snap access improvements.
+
+    When MakeMKV is installed as a Snap, AppArmor confinement can block access to
+    /dev/sg* (SCSI generic) devices unless certain interfaces are connected.
+
+    This function:
+    - detects a Snap-based MakeMKV
+    - inspects `snap connections makemkv`
+    - attempts to connect a small set of low-risk interfaces when sudo is non-interactive
+    - otherwise prints the exact commands to run manually
+
+    It never hard-fails the run.
+    """
+
+    if not _makemkvcon_is_snap():
+        return
+    if not shutil.which("snap"):
+        print(
+            "(Info) MakeMKV appears to be installed via Snap, but the `snap` command was not found. "
+            "Skipping Snap interface checks.",
+            file=sys.stderr,
+        )
+        return
+
+    cp = run_cmd(["snap", "connections", "makemkv"], check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out = (cp.stdout or "")
+    if cp.returncode != 0:
+        print(
+            "(Info) Unable to read `snap connections makemkv`; skipping Snap interface checks.\n" + out.strip(),
+            file=sys.stderr,
+        )
+        return
+
+    rows = _parse_snap_connections_table(out)
+    # Map plug name (makemkv:<plug>) -> slot
+    plug_slot: dict[str, str] = {}
+    for r in rows:
+        plug = r.get("plug", "")
+        slot = r.get("slot", "")
+        if plug.startswith("makemkv:"):
+            plug_slot[plug.split(":", 1)[1]] = slot
+
+    # Only auto-connect conservative interfaces.
+    auto_plugs = ["optical-write", "removable-media"]
+    optional_plugs = ["process-control"]
+
+    missing_auto = [p for p in auto_plugs if p in plug_slot and plug_slot.get(p, "-") == "-"]
+    missing_optional = [p for p in optional_plugs if p in plug_slot and plug_slot.get(p, "-") == "-"]
+
+    if not missing_auto and not missing_optional:
+        return
+
+    print("--------------------------------------------")
+    print("MakeMKV (Snap) device access")
+    print("--------------------------------------------")
+    print(
+        "MakeMKV is installed via Snap. Some Snap interfaces may need to be connected so MakeMKV can fully access the optical drive (often via /dev/sg*)."
+    )
+
+    if missing_auto:
+        if _has_passwordless_sudo():
+            for plug in missing_auto:
+                print(f"(Info) Connecting Snap interface: makemkv:{plug}")
+                try:
+                    cp2 = _run_root_cmd(["snap", "connect", f"makemkv:{plug}"], check=False)
+                    msg = (cp2.stdout or "").strip()
+                    if msg:
+                        print(msg)
+                except Exception as e:
+                    print(f"(Warn) Unable to connect makemkv:{plug}: {e}", file=sys.stderr)
+        else:
+            print("(Info) Passwordless sudo is not available, so the script will not change Snap connections automatically.")
+            print("Run these commands manually on the server, then retry:")
+            for plug in missing_auto:
+                print(f"  sudo snap connect makemkv:{plug}")
+
+    if missing_optional:
+        print("(Info) Optional (advanced) Snap interfaces detected but not connected:")
+        for plug in missing_optional:
+            print(f"  makemkv:{plug}")
+        print("Only enable these if you understand the security impact. Example:")
+        for plug in missing_optional:
+            print(f"  sudo snap connect makemkv:{plug}")
+
+
 def jellyfin_is_installed() -> bool:
     if shutil.which("jellyfin"):
         return True
@@ -1855,6 +1980,13 @@ def main(argv: list[str]) -> int:
     except RuntimeError as e:
         print(str(e), file=sys.stderr)
         return 127
+
+    # If MakeMKV is installed via Snap, try to ensure the key interfaces are connected
+    # (best-effort; does not fail the run).
+    try:
+        maybe_ensure_makemkv_snap_interfaces()
+    except Exception:
+        pass
 
     # Simple mode: optional remote copy prompt (only if both dirs not overridden).
     keep_mkvs = bool(ns.keep_mkvs or ns.simple)

@@ -25,10 +25,7 @@ using --csv for determinism.
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
 import os
-import pickle
 import queue
 import re
 import stat
@@ -60,6 +57,7 @@ from archive_helper_gui.log_patterns import (
     PROMPT_NEXT_DISC_RE,
 )
 from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
+from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
 from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
 from archive_helper_gui.tooltip import Tooltip
@@ -181,6 +179,13 @@ if TK_AVAILABLE:
                 state_dir=self._state_dir(),
                 log=self._log_threadsafe,
                 default_user_getter=lambda: (self.var_user.get() or "").strip(),
+            )
+
+            # Local persistence (state file + optional keyring password).
+            self.persistence = PersistenceStore(
+                state_dir=self._state_dir(),
+                keyring_available=KEYRING_AVAILABLE,
+                keyring_module=(keyring if KEYRING_AVAILABLE else None),
             )
 
             # Script settings
@@ -846,7 +851,7 @@ if TK_AVAILABLE:
             return Path.home() / ".archive_helper_for_jellyfin"
 
         def _state_path(self) -> Path:
-            return self._state_dir() / "state.pkl"
+            return self.persistence.state_path()
 
         def _known_hosts_path(self) -> Path:
             return self.remote.known_hosts_path
@@ -873,58 +878,49 @@ if TK_AVAILABLE:
             return f"{user}@{host}:{port}" if user else f"{host}:{port}"
 
         def _load_persisted_state(self) -> None:
-            p = self._state_path()
-            if p.exists():
+            if self.persistence.state_file_exists():
                 self._state_file_existed = True
+
+            data = self.persistence.load_state_dict()
+            if isinstance(data, dict):
+                self.var_host.set(str(data.get("host", self.var_host.get())))
+                self.var_user.set(str(data.get("user", self.var_user.get())))
+                self.var_port.set(str(data.get("port", self.var_port.get())))
+                self.var_key.set(str(data.get("key", self.var_key.get())))
+
+                self.var_movies_dir.set(str(data.get("movies_dir", self.var_movies_dir.get())))
+                self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
+                self.var_books_dir.set(str(data.get("books_dir", self.var_books_dir.get())))
+                self.var_music_dir.set(str(data.get("music_dir", self.var_music_dir.get())))
+                self.var_preset.set(str(data.get("preset", self.var_preset.get())))
+                self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
+                self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
+
+                self.var_mode.set(str(data.get("mode", self.var_mode.get())))
+                self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
+                self.var_kind.set(str(data.get("kind", self.var_kind.get())))
+                self.var_title.set(str(data.get("title", self.var_title.get())))
+                self.var_year.set(str(data.get("year", self.var_year.get())))
+                self.var_season.set(str(data.get("season", self.var_season.get())))
+                self.var_start_disc.set(int(data.get("start_disc", int(self.var_start_disc.get()))))
+                self.var_disc_count.set(int(data.get("disc_count", int(self.var_disc_count.get()))))
+
+                # Last-run (reattach) metadata.
+                self.last_run_host = str(data.get("last_run_host", self.last_run_host))
+                self.last_run_user = str(data.get("last_run_user", self.last_run_user))
+                self.last_run_port = str(data.get("last_run_port", self.last_run_port))
+                self.last_run_screen_name = str(data.get("last_run_screen_name", self.last_run_screen_name))
+                self.last_run_log_path = str(data.get("last_run_log_path", self.last_run_log_path))
                 try:
-                    data = pickle.loads(p.read_bytes())
-                    if isinstance(data, dict):
-                        self.var_host.set(str(data.get("host", self.var_host.get())))
-                        self.var_user.set(str(data.get("user", self.var_user.get())))
-                        self.var_port.set(str(data.get("port", self.var_port.get())))
-                        self.var_key.set(str(data.get("key", self.var_key.get())))
-
-                        self.var_movies_dir.set(str(data.get("movies_dir", self.var_movies_dir.get())))
-                        self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
-                        self.var_books_dir.set(str(data.get("books_dir", self.var_books_dir.get())))
-                        self.var_music_dir.set(str(data.get("music_dir", self.var_music_dir.get())))
-                        self.var_preset.set(str(data.get("preset", self.var_preset.get())))
-                        self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
-                        self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
-
-                        self.var_mode.set(str(data.get("mode", self.var_mode.get())))
-                        self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
-                        self.var_kind.set(str(data.get("kind", self.var_kind.get())))
-                        self.var_title.set(str(data.get("title", self.var_title.get())))
-                        self.var_year.set(str(data.get("year", self.var_year.get())))
-                        self.var_season.set(str(data.get("season", self.var_season.get())))
-                        self.var_start_disc.set(int(data.get("start_disc", int(self.var_start_disc.get()))))
-                        self.var_disc_count.set(int(data.get("disc_count", int(self.var_disc_count.get()))))
-
-                        # Last-run (reattach) metadata.
-                        self.last_run_host = str(data.get("last_run_host", self.last_run_host))
-                        self.last_run_user = str(data.get("last_run_user", self.last_run_user))
-                        self.last_run_port = str(data.get("last_run_port", self.last_run_port))
-                        self.last_run_screen_name = str(data.get("last_run_screen_name", self.last_run_screen_name))
-                        self.last_run_log_path = str(data.get("last_run_log_path", self.last_run_log_path))
-                        try:
-                            self.last_run_remote_start_epoch = int(
-                                data.get("last_run_remote_start_epoch", int(self.last_run_remote_start_epoch))
-                            )
-                        except Exception:
-                            self.last_run_remote_start_epoch = 0
+                    self.last_run_remote_start_epoch = int(
+                        data.get("last_run_remote_start_epoch", int(self.last_run_remote_start_epoch))
+                    )
                 except Exception:
-                    # Ignore corrupt state; user can re-enter values.
-                    pass
+                    self.last_run_remote_start_epoch = 0
 
-            # Load password from OS keychain if available.
-            if KEYRING_AVAILABLE:
-                try:
-                    pw = keyring.get_password("ArchiveHelperForJellyfin", self._keyring_id())
-                    if pw:
-                        self.var_password.set(pw)
-                except Exception:
-                    pass
+            pw = self.persistence.load_password(self._keyring_id())
+            if pw:
+                self.var_password.set(pw)
 
         def _persist_state(self) -> None:
             data: dict[str, Any] = {
@@ -957,25 +953,8 @@ if TK_AVAILABLE:
                 "last_run_remote_start_epoch": int(self.last_run_remote_start_epoch or 0),
             }
 
-            sd = self._state_dir()
-            sd.mkdir(parents=True, exist_ok=True)
-            p = self._state_path()
-            p.write_bytes(pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL))
-            try:
-                os.chmod(p, 0o600)
-            except Exception:
-                pass
-
-            # Store password securely in OS keychain when possible.
-            if KEYRING_AVAILABLE:
-                try:
-                    pw = (self.var_password.get() or "").strip()
-                    if pw:
-                        keyring.set_password("ArchiveHelperForJellyfin", self._keyring_id(), pw)
-                    else:
-                        keyring.delete_password("ArchiveHelperForJellyfin", self._keyring_id())
-                except Exception:
-                    pass
+            self.persistence.save_state_dict(data)
+            self.persistence.save_password(self._keyring_id(), (self.var_password.get() or ""))
 
         def _on_close(self) -> None:
             # Best-effort stop and persist state.

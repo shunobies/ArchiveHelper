@@ -3,31 +3,22 @@ Archive Helper for Jellyfin Task List
 
 Look into OMDB API Key
 
-------------------------
-Create a settings menu
-Allow for Entry of Connection SSH being it's own menu
-Allow Directories to be it's own menu
-
-
 -------------------
 
 I have a few Movie DVD's that contain 4 movies on a Single DVD. I would like to add a check box for Multiple Titles for DVD. If it's checked allow the User to enter up to 4 movie titles and years and the MKV's extracted in order will be labeled with those titles.
 
 --------------------
 
-Add the ability to select Blu-ray instead of DVD would need to increase the cache from 128mb to 1024mb.
 Add the ability to upload Books - Integrate Good Reads data to see if some of the Meta data can be pulled. I wonder how Calibre gets the Meta data for books?
 --Subtask see if it's possible to pull books from Kindle and Convert them to epub and add them to the library.
+
 Add the ability to pull Audible Books from your personal Audible collection convert them to MP3 and add them to the Jellyfin Library.
+
 Add the ability to Rip and Classify Music CD's.
+
 Look into auto generating cover.jpg or cover.png
+
 Look into generating metadata.opf file for each book to help indexing.
-
----------------------
-
-If the GUI is accidentally closed or there is a power outage and MakeMKV is in the middle of reading a disc the GUI doesn't seem to reattach to the session or the progress of the session.
-
-If the power goes out on the server in the middle of a MakeMKV session will the GUI be able to restart the MakeMKV session or will the disc need to start from the beginning? If it needs to start over that's fine but some cleanup might be required to allow for the process to be restarted.
 
 -------------
 

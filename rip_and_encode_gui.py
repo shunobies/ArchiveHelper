@@ -383,19 +383,6 @@ if TK_AVAILABLE:
             settings = ttk.LabelFrame(main, text="Run settings", padding=10)
             settings.pack(fill=X, pady=(10, 0))
 
-            s0 = ttk.Frame(settings)
-            s0.pack(fill=X)
-            self.chk_ensure_jellyfin = ttk.Checkbutton(
-                s0,
-                text="Install Jellyfin if missing",
-                variable=self.var_ensure_jellyfin,
-            )
-            self.chk_ensure_jellyfin.pack(side=LEFT)
-            Tooltip(
-                self.chk_ensure_jellyfin,
-                "If Jellyfin is not installed on the server, try to install it (Debian/Ubuntu; requires sudo).",
-            )
-
             s1 = ttk.Frame(settings)
             s1.pack(fill=X)
             ttk.Label(s1, text="Disc type:").pack(side=LEFT)
@@ -1476,12 +1463,8 @@ if TK_AVAILABLE:
             try:
                 if installed:
                     self.var_ensure_jellyfin.set(False)
-                    if hasattr(self, "chk_ensure_jellyfin"):
-                        self.chk_ensure_jellyfin.configure(state="disabled")
                 else:
-                    if hasattr(self, "chk_ensure_jellyfin"):
-                        # Only enable if UI isn't currently running.
-                        self.chk_ensure_jellyfin.configure(state=("disabled" if self.state.running else "normal"))
+                    pass
             except Exception:
                 pass
 
@@ -1542,12 +1525,7 @@ if TK_AVAILABLE:
             except Exception:
                 pass
 
-            # If Jellyfin is installed, keep the checkbox disabled.
-            try:
-                if hasattr(self, "chk_ensure_jellyfin") and str(self.chk_ensure_jellyfin["state"]) != "disabled":
-                    self.chk_ensure_jellyfin.configure(state=("normal" if enabled else "disabled"))
-            except Exception:
-                pass
+            # Note: 'Install Jellyfin if missing' is now menu-driven only.
 
         def _apply_presets(self, presets: list[str]) -> None:
             if not presets:

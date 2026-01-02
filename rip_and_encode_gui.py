@@ -306,6 +306,7 @@ if TK_AVAILABLE:
             self.var_series_dir = StringVar(value="/storage/Series")
             self.var_preset = StringVar(value="HQ 1080p30 Surround")
             self.var_ensure_jellyfin = BooleanVar(value=False)
+            self.var_disc_type = StringVar(value="dvd")
 
             self._presets_loading = False
             self._presets_loaded = False
@@ -430,8 +431,15 @@ if TK_AVAILABLE:
 
             s2 = ttk.Frame(settings)
             s2.pack(fill=X, pady=(6, 0))
-            ttk.Label(s2, text="HandBrake preset:").pack(side=LEFT)
-            self.cbo_preset = ttk.Combobox(s2, textvariable=self.var_preset, width=33, state="normal")
+            ttk.Label(s2, text="Disc type:").pack(side=LEFT)
+            cbo_disc = ttk.Combobox(s2, textvariable=self.var_disc_type, values=["dvd", "bluray"], state="readonly", width=8)
+            cbo_disc.pack(side=LEFT, padx=5)
+            Tooltip(cbo_disc, "Select 'bluray' for Blu-ray discs (uses a larger MakeMKV cache: 1024MB vs 128MB).")
+
+            s3 = ttk.Frame(settings)
+            s3.pack(fill=X, pady=(6, 0))
+            ttk.Label(s3, text="HandBrake preset:").pack(side=LEFT)
+            self.cbo_preset = ttk.Combobox(s3, textvariable=self.var_preset, width=33, state="normal")
             self.cbo_preset.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_preset, "HandBrake preset name on the server (loaded from HandBrakeCLI --preset-list).")
 
@@ -1205,6 +1213,7 @@ if TK_AVAILABLE:
                         self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
                         self.var_preset.set(str(data.get("preset", self.var_preset.get())))
                         self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
+                        self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
 
                         self.var_mode.set(str(data.get("mode", self.var_mode.get())))
                         self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
@@ -1237,6 +1246,7 @@ if TK_AVAILABLE:
                 "series_dir": self.var_series_dir.get(),
                 "preset": self.var_preset.get(),
                 "ensure_jellyfin": bool(self.var_ensure_jellyfin.get()),
+                "disc_type": self.var_disc_type.get(),
                 "mode": self.var_mode.get(),
                 "csv_path": self.var_csv_path.get(),
                 "kind": self.var_kind.get(),
@@ -2563,6 +2573,8 @@ if TK_AVAILABLE:
                     self.var_movies_dir.get().strip(),
                     "--series-dir",
                     self.var_series_dir.get().strip(),
+                    "--disc-type",
+                    (self.var_disc_type.get().strip() or "dvd"),
                     "--preset",
                     self.var_preset.get().strip(),
                 ]

@@ -607,8 +607,14 @@ def file_size_mb(f: Path) -> int:
 # ----------------------------
 
 
-def run_makemkv_with_progress_to_dir(out_dir: Path) -> None:
+def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        cache_mb = int(cache_mb)
+    except Exception:
+        cache_mb = 128
+    cache_mb = max(16, min(8192, cache_mb))
 
     argv = [
         "stdbuf",
@@ -618,7 +624,7 @@ def run_makemkv_with_progress_to_dir(out_dir: Path) -> None:
         "mkv",
         "--progress=-stdout",
         "--decrypt",
-        "--cache=128",
+        f"--cache={cache_mb}",
         "--minlength=300",
         "disc:0",
         "all",
@@ -994,7 +1000,7 @@ def setup_title_context(
 # ----------------------------
 
 
-def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, wait_for_enter: bool = True) -> list[Path]:
+def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool = True, makemkv_cache_mb: int = 128) -> list[Path]:
     mkvs = find_mkvs_in_dir(disc_dir)
     if mkvs:
         print(f"Resume: found existing MKVs in {disc_dir}; skipping rip.")
@@ -1004,7 +1010,7 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, wait_for_enter: bool = T
     if wait_for_enter:
         input()
 
-    run_makemkv_with_progress_to_dir(disc_dir)
+    run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
     try:
         run_cmd(["eject", "/dev/sr0"], check=False)
     except Exception:
@@ -1558,6 +1564,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--keep-mkvs", "-k", action="store_true", help="Do not delete MKVs and do not delete the WORK_DIR")
 
     p.add_argument(
+        "--disc-type",
+        choices=["dvd", "bluray"],
+        default="dvd",
+        help="Disc type hint for ripping. 'bluray' increases MakeMKV cache (1024MB vs 128MB).",
+    )
+
+    p.add_argument(
         "--cleanup-mkvs",
         action="store_true",
         help="Delete leftover MKVs under managed work directories in $HOME (safe, opt-in)",
@@ -1820,6 +1833,8 @@ def main(argv: list[str]) -> int:
 
     failsafe = FailSafe()
 
+    makemkv_cache_mb = 1024 if (getattr(ns, "disc_type", "dvd") == "bluray") else 128
+
     def _handle_sigint(signum, frame):
         failsafe.mark_failed()
         print("\nInterrupted. Leaving files in place for resume.", file=sys.stderr)
@@ -2039,7 +2054,12 @@ def main(argv: list[str]) -> int:
                 disc_dir = ctx.mkv_root / f"Disc{row.disc:02d}"
                 prompt_msg = csv_disc_prompt_for_row(row)
 
-                mkvs = rip_disc_if_needed(disc_dir, prompt_msg, wait_for_enter=not csv_next_confirmed)
+                mkvs = rip_disc_if_needed(
+                    disc_dir,
+                    prompt_msg,
+                    wait_for_enter=not csv_next_confirmed,
+                    makemkv_cache_mb=makemkv_cache_mb,
+                )
                 csv_next_confirmed = False
 
                 if ctx.is_series:
@@ -2082,7 +2102,12 @@ def main(argv: list[str]) -> int:
                 disc_index = 1
                 while True:
                     disc_dir = ctx.mkv_root / f"Disc{disc_index:02d}"
-                    rip_disc_if_needed(disc_dir, "Insert disc now (then press Enter)", wait_for_enter=True)
+                    rip_disc_if_needed(
+                        disc_dir,
+                        "Insert disc now (then press Enter)",
+                        wait_for_enter=True,
+                        makemkv_cache_mb=makemkv_cache_mb,
+                    )
 
                     if ctx.is_series:
                         process_series_disc(ctx=ctx, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, submit_encode=submit_encode)

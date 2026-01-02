@@ -39,9 +39,29 @@ import tempfile
 import threading
 import time
 import webbrowser
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from archive_helper_gui.log_patterns import (
+    CSV_LOADED_RE,
+    ERROR_RE,
+    FINALIZING_RE,
+    HB_DONE_RE,
+    HB_PROGRESS_RE,
+    HB_START_RE,
+    HB_TASK_RE,
+    MAKEMKV_ACCESS_ERROR_RE,
+    MAKEMKV_ACTION_RE,
+    MAKEMKV_CURRENT_PROGRESS_RE,
+    MAKEMKV_OPERATION_RE,
+    MAKEMKV_TOTAL_PROGRESS_RE,
+    MAKE_MKV_PROGRESS_RE,
+    PROMPT_INSERT_RE,
+    PROMPT_NEXT_DISC_RE,
+)
+from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
+from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
+from archive_helper_gui.tooltip import Tooltip
 
 try:
     import keyring  # type: ignore
@@ -66,159 +86,6 @@ try:
 except ModuleNotFoundError:
     TK_AVAILABLE = False
 
-
-class Tooltip:
-    """Simple hover tooltip for Tk/ttk widgets (no external dependencies)."""
-
-    def __init__(self, widget, text: str, *, delay_ms: int = 650) -> None:
-        self.widget = widget
-        self.text = (text or "").strip()
-        self.delay_ms = int(delay_ms)
-        self._after_id = None
-        self._tip = None
-
-        if not self.text:
-            return
-
-        try:
-            widget.bind("<Enter>", self._on_enter, add=True)
-            widget.bind("<Leave>", self._on_leave, add=True)
-            widget.bind("<ButtonPress>", self._on_leave, add=True)
-        except Exception:
-            pass
-
-    def _on_enter(self, _event=None) -> None:
-        if not self.text:
-            return
-        try:
-            if self._after_id is None:
-                self._after_id = self.widget.after(self.delay_ms, self._show)
-        except Exception:
-            pass
-
-    def _on_leave(self, _event=None) -> None:
-        try:
-            if self._after_id is not None:
-                try:
-                    self.widget.after_cancel(self._after_id)
-                except Exception:
-                    pass
-                self._after_id = None
-        finally:
-            self._hide()
-
-    def _show(self) -> None:
-        self._after_id = None
-        if self._tip is not None:
-            return
-
-        try:
-            x = self.widget.winfo_rootx() + 10
-            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 8
-        except Exception:
-            return
-
-        try:
-            win = __import__("tkinter").Toplevel(self.widget)
-            win.wm_overrideredirect(True)
-            win.wm_geometry(f"+{x}+{y}")
-            lbl = ttk.Label(win, text=self.text, padding=(8, 5))
-            lbl.pack()
-            self._tip = win
-        except Exception:
-            self._tip = None
-
-    def _hide(self) -> None:
-        if self._tip is None:
-            return
-        try:
-            self._tip.destroy()
-        except Exception:
-            pass
-        self._tip = None
-
-
-@dataclass
-class UiState:
-    running: bool = False
-    waiting_for_enter: bool = False
-    total_titles: int = 0
-    finalized_titles: int = 0
-    makemkv_phase: str = ""  # "analyze" | "process" | ""
-    last_makemkv_total_pct: float = 0.0
-    encode_queued: int = 0
-    encode_started: int = 0
-    encode_finished: int = 0
-    encode_active_label: str = ""
-
-    eta_phase: str = ""  # e.g., "makemkv" | "handbrake" | ""
-    eta_last_pct: float = 0.0
-    eta_last_ts: float = 0.0
-    eta_rate_ewma: float = 0.0  # pct per second
-
-    run_started_ts: float = 0.0
-
-
-@dataclass(frozen=True)
-class ConnectionInfo:
-    target: str
-    remote_script: str
-    port: str
-    keyfile: str
-    password: str
-
-
-@dataclass
-class RunContext:
-    target: str = ""
-    port: str = ""
-    keyfile: str = ""
-    password: str = ""
-    screen_name: str = ""
-    log_path: str = ""
-    remote_start_epoch: int = 0
-
-
-MAKE_MKV_PROGRESS_RE = re.compile(r"MakeMKV progress:\s*([0-9]+\.[0-9]+)%")
-MAKEMKV_CURRENT_PROGRESS_RE = re.compile(r"Current progress\s*-\s*([0-9]{1,3})%")
-MAKEMKV_TOTAL_PROGRESS_RE = re.compile(r"Total progress\s*-\s*([0-9]{1,3})%")
-MAKEMKV_OPERATION_RE = re.compile(r"^Current operation:\s*(.+)$")
-MAKEMKV_ACTION_RE = re.compile(r"^Current action:\s*(.+)$")
-
-HB_PROGRESS_RE = re.compile(r"Encoding:.*?\s*([0-9]{1,3}(?:\.[0-9]+)?)\s*%")
-HB_TASK_RE = re.compile(r"^\[[0-9]{2}:[0-9]{2}:[0-9]{2}\]\s*Starting Task:\s*(.+)$")
-
-HB_START_RE = re.compile(r"^HandBrake start:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
-HB_DONE_RE = re.compile(r"^HandBrake done:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
-
-PROMPT_INSERT_RE = re.compile(r"Insert: ")
-PROMPT_NEXT_DISC_RE = re.compile(r"When the next disc is inserted, press Enter to start ripping\.\.\.")
-FINALIZING_RE = re.compile(r"^Finalizing: ")
-CSV_LOADED_RE = re.compile(r"^CSV schedule loaded:\s*(\d+)\s*discs")
-ERROR_RE = re.compile(r"^ERROR:")
-MAKEMKV_ACCESS_ERROR_RE = re.compile(r"Failed to get full access to drive")
-
-
-def _write_csv_rows(path: Path, rows: list[str]) -> None:
-    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-
-def _csv_rows_from_manual(kind: str, name: str, year: str, season: str, start_disc: int, total_discs: int) -> list[str]:
-    if "," in name:
-        raise ValueError("Title must not contain commas (CSV constraint).")
-
-    rows: list[str] = []
-    if kind == "movie":
-        md = "y" if total_discs > 1 else "n"
-        for d in range(start_disc, total_discs + 1):
-            rows.append(f"{name}, {year}, {md}, {d}")
-    else:
-        if not season.strip().isdigit() or int(season.strip()) < 1:
-            raise ValueError("Season must be an integer >= 1.")
-        s = str(int(season.strip())).zfill(2)
-        for d in range(start_disc, total_discs + 1):
-            rows.append(f"{name}, {year}, {s}, {d}")
-    return rows
 
 
 def _ssh_target(user: str, host: str) -> str:
@@ -2975,7 +2842,7 @@ if TK_AVAILABLE:
                     if start_disc < 1 or start_disc > total_discs:
                         raise ValueError("Current disc must be between 1 and Total discs.")
 
-                    rows = _csv_rows_from_manual(
+                    rows = csv_rows_from_manual(
                         kind=kind,
                         name=title,
                         year=year,
@@ -2985,7 +2852,7 @@ if TK_AVAILABLE:
                     )
 
                     tmp = Path(tempfile.gettempdir()) / f"rip_and_encode_gui_{int(time.time())}.csv"
-                    _write_csv_rows(tmp, rows)
+                    write_csv_rows(tmp, rows)
                     local_csv = tmp
 
                     # Best-effort title counting for finalize progress.

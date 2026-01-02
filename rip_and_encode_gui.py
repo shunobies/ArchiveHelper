@@ -1515,6 +1515,9 @@ if TK_AVAILABLE:
             except Exception:
                 pass
 
+        def run_setup_wizard(self, *, force: bool = False) -> None:
+            self._run_setup_wizard(force=force)
+
         def _maybe_run_first_launch_setup(self) -> None:
             # Run on first launch OR whenever required settings are missing.
             if self._is_setup_complete():
@@ -1527,31 +1530,47 @@ if TK_AVAILABLE:
                 self._apply_setup_gate()
                 return
 
-            self._run_setup_wizard()
+            self._run_setup_wizard(force=False)
 
-        def _run_setup_wizard(self) -> None:
+        def _run_setup_wizard(self, *, force: bool = False) -> None:
             # Block Start/Cleanup until both steps are complete.
             self._apply_setup_gate()
 
-            while not self._connection_ready():
+            if force:
+                # Always show both steps once for testing.
                 self._open_connection_settings(modal=True, next_label="Next")
                 try:
                     if self._connection_win is not None:
                         self.root.wait_window(self._connection_win)
                 except Exception:
-                    break
-                if self._connection_ready():
-                    break
+                    pass
 
-            while self._connection_ready() and not self._directories_ready():
                 self._open_directories_settings(modal=True, next_label="Finish")
                 try:
                     if self._directories_win is not None:
                         self.root.wait_window(self._directories_win)
                 except Exception:
-                    break
-                if self._directories_ready():
-                    break
+                    pass
+            else:
+                while not self._connection_ready():
+                    self._open_connection_settings(modal=True, next_label="Next")
+                    try:
+                        if self._connection_win is not None:
+                            self.root.wait_window(self._connection_win)
+                    except Exception:
+                        break
+                    if self._connection_ready():
+                        break
+
+                while self._connection_ready() and not self._directories_ready():
+                    self._open_directories_settings(modal=True, next_label="Finish")
+                    try:
+                        if self._directories_win is not None:
+                            self.root.wait_window(self._directories_win)
+                    except Exception:
+                        break
+                    if self._directories_ready():
+                        break
 
             self._apply_setup_gate()
 
@@ -2359,7 +2378,7 @@ if TK_AVAILABLE:
                 return
 
             if not self._is_setup_complete():
-                self._run_setup_wizard()
+                self._run_setup_wizard(force=False)
                 if not self._is_setup_complete():
                     return
 
@@ -2703,7 +2722,7 @@ if TK_AVAILABLE:
                 return
 
             if not self._is_setup_complete():
-                self._run_setup_wizard()
+                self._run_setup_wizard(force=False)
                 if not self._is_setup_complete():
                     return
 
@@ -3205,6 +3224,12 @@ def main() -> int:
         default="",
         help="Replay a local log file (no SSH) to test progress parsing.",
     )
+    parser.add_argument(
+        "--force-setup",
+        dest="force_setup",
+        action="store_true",
+        help="Force the first-launch Connection→Directories setup wizard on startup (testing).",
+    )
     args = parser.parse_args()
 
     if not TK_AVAILABLE:
@@ -3217,6 +3242,8 @@ def main() -> int:
     root = Tk()
     try:
         gui = RipGui(root)
+        if args.force_setup:
+            root.after(0, lambda: gui.run_setup_wizard(force=True))
         if args.replay_log:
             gui.start_replay(args.replay_log)
         root.mainloop()

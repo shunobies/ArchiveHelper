@@ -279,6 +279,14 @@ if TK_AVAILABLE:
 
             self._state_file_existed = False
 
+            # Persisted last-run metadata (for reattach after GUI crash/power loss).
+            self.last_run_host: str = ""
+            self.last_run_user: str = ""
+            self.last_run_port: str = ""
+            self.last_run_screen_name: str = ""
+            self.last_run_log_path: str = ""
+            self.last_run_remote_start_epoch: int = 0
+
             self.proc: subprocess.Popen[str] | None = None
             self.ssh_client = None
             self.ssh_channel = None
@@ -1188,6 +1196,19 @@ if TK_AVAILABLE:
                         self.var_season.set(str(data.get("season", self.var_season.get())))
                         self.var_start_disc.set(int(data.get("start_disc", int(self.var_start_disc.get()))))
                         self.var_disc_count.set(int(data.get("disc_count", int(self.var_disc_count.get()))))
+
+                        # Last-run (reattach) metadata.
+                        self.last_run_host = str(data.get("last_run_host", self.last_run_host))
+                        self.last_run_user = str(data.get("last_run_user", self.last_run_user))
+                        self.last_run_port = str(data.get("last_run_port", self.last_run_port))
+                        self.last_run_screen_name = str(data.get("last_run_screen_name", self.last_run_screen_name))
+                        self.last_run_log_path = str(data.get("last_run_log_path", self.last_run_log_path))
+                        try:
+                            self.last_run_remote_start_epoch = int(
+                                data.get("last_run_remote_start_epoch", int(self.last_run_remote_start_epoch))
+                            )
+                        except Exception:
+                            self.last_run_remote_start_epoch = 0
                 except Exception:
                     # Ignore corrupt state; user can re-enter values.
                     pass
@@ -1222,6 +1243,14 @@ if TK_AVAILABLE:
                 "season": self.var_season.get(),
                 "start_disc": int(self.var_start_disc.get()),
                 "disc_count": int(self.var_disc_count.get()),
+
+                # Last-run (reattach) metadata.
+                "last_run_host": self.last_run_host,
+                "last_run_user": self.last_run_user,
+                "last_run_port": self.last_run_port,
+                "last_run_screen_name": self.last_run_screen_name,
+                "last_run_log_path": self.last_run_log_path,
+                "last_run_remote_start_epoch": int(self.last_run_remote_start_epoch or 0),
             }
 
             sd = self._state_dir()
@@ -1252,7 +1281,19 @@ if TK_AVAILABLE:
                 pass
             try:
                 if self.state.running:
-                    self.stop()
+                    # Give the user a safe choice: stop remote job, or leave it running
+                    # so they can reattach later (useful if the GUI is being closed accidentally).
+                    choice = messagebox.askyesnocancel(
+                        "Quit",
+                        "A job is currently running.\n\n"
+                        "Yes: Stop the job, then quit.\n"
+                        "No: Quit the GUI but leave the job running on the server (you can reattach later).\n"
+                        "Cancel: Keep the GUI open.",
+                    )
+                    if choice is None:
+                        return
+                    if choice:
+                        self.stop()
             except Exception:
                 pass
             self.root.destroy()
@@ -1522,6 +1563,8 @@ if TK_AVAILABLE:
             # Run on first launch OR whenever required settings are missing.
             if self._is_setup_complete():
                 self._apply_setup_gate()
+                # If a remote job is still running (GUI was closed/crashed), offer to reattach.
+                self._maybe_offer_reattach()
                 return
 
             # If the user already has a state file, they might have intentionally left settings blank.
@@ -1531,6 +1574,171 @@ if TK_AVAILABLE:
                 return
 
             self._run_setup_wizard(force=False)
+
+            # After setup, offer to reattach if we can.
+            self._maybe_offer_reattach()
+
+        def _last_run_matches_current_connection(self) -> bool:
+            host = (self.var_host.get() or "").strip()
+            user = (self.var_user.get() or "").strip()
+            port = (self.var_port.get() or "").strip() or "22"
+            if not self.last_run_host or not self.last_run_port:
+                return False
+            if host != self.last_run_host:
+                return False
+            if (self.last_run_user or "").strip() != user:
+                return False
+            if (self.last_run_port or "").strip() != port:
+                return False
+            return True
+
+        def _remote_file_exists(self, path: str) -> bool:
+            ctx = self._get_run_ctx()
+            if not path:
+                return False
+            code, _out = self._remote_run(
+                ctx.target,
+                ctx.port,
+                ctx.keyfile,
+                ctx.password,
+                f"test -f {shlex.quote(path)}",
+            )
+            return code == 0
+
+        def _clear_last_run_metadata(self) -> None:
+            self.last_run_screen_name = ""
+            self.last_run_log_path = ""
+            self.last_run_remote_start_epoch = 0
+            self.last_run_host = ""
+            self.last_run_user = ""
+            self.last_run_port = ""
+            try:
+                self._persist_state()
+            except Exception:
+                pass
+
+        def _maybe_offer_reattach(self) -> None:
+            # Only offer if we're idle and have enough info to safely target the right host.
+            if self.state.running or self.run_ctx is not None:
+                return
+            if not self._is_setup_complete():
+                return
+            if not (self.last_run_screen_name or "").strip():
+                return
+            if not self._last_run_matches_current_connection():
+                return
+
+            try:
+                cfg = self._validate()
+            except Exception:
+                return
+
+            # Quick remote check: does the screen session still exist?
+            try:
+                code, _out = self._remote_run(
+                    cfg.target,
+                    cfg.port,
+                    cfg.keyfile,
+                    cfg.password,
+                    f"screen -S {shlex.quote(self.last_run_screen_name)} -Q select .",
+                )
+            except Exception:
+                return
+
+            if code != 0:
+                # Stale metadata (job completed or server rebooted). Clear it.
+                self._clear_last_run_metadata()
+                return
+
+            do_reattach = messagebox.askyesno(
+                "Reattach",
+                "A remote job appears to still be running.\n\n"
+                f"Screen session: {self.last_run_screen_name}\n\n"
+                "Would you like to reattach and resume following progress?",
+            )
+            if not do_reattach:
+                return
+
+            self._reattach_to_existing_run(cfg)
+
+        def _reattach_to_existing_run(self, cfg: "Config") -> None:
+            # Rebuild run context from persisted metadata.
+            self._clear_log()
+            self._append_log("(Info) Reattaching to existing remote job...\n")
+
+            self.run_ctx = RunContext(
+                target=cfg.target,
+                port=cfg.port,
+                keyfile=cfg.keyfile,
+                password=cfg.password,
+                screen_name=self.last_run_screen_name,
+                log_path=(self.last_run_log_path or ""),
+                remote_start_epoch=int(self.last_run_remote_start_epoch or 0),
+            )
+
+            # If remote start epoch is missing, capture now to scope log lookup.
+            if not self.run_ctx.remote_start_epoch:
+                try:
+                    code_ts, out_ts = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "date +%s")
+                    if code_ts == 0:
+                        self.run_ctx.remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 60)
+                except Exception:
+                    self.run_ctx.remote_start_epoch = 0
+
+            # Validate log path (it can rotate or differ). If missing, re-discover.
+            if self.run_ctx.log_path:
+                if not self._remote_file_exists(self.run_ctx.log_path):
+                    self.run_ctx.log_path = ""
+
+            if not self.run_ctx.log_path:
+                self.run_ctx.log_path = self._find_latest_remote_log()
+
+            # Persist refreshed metadata so a later crash still reattaches cleanly.
+            self.last_run_host = (self.var_host.get() or "").strip()
+            self.last_run_user = (self.var_user.get() or "").strip()
+            self.last_run_port = (self.var_port.get() or "").strip() or "22"
+            self.last_run_screen_name = self.run_ctx.screen_name
+            self.last_run_log_path = self.run_ctx.log_path
+            self.last_run_remote_start_epoch = int(self.run_ctx.remote_start_epoch or 0)
+            try:
+                self._persist_state()
+            except Exception:
+                pass
+
+            self._append_log(f"(Info) Following remote log: {self.run_ctx.log_path}\n")
+
+            # Reattach: tail from end to avoid re-reading huge logs.
+            self._stop_requested.clear()
+            self._done_emitted = False
+            self._done_handled = False
+            self._start_tail(from_start=False)
+
+            self.state.running = True
+            self.state.waiting_for_enter = False
+            self.state.makemkv_phase = ""
+            self.state.last_makemkv_total_pct = 0.0
+            self.state.encode_queued = 0
+            self.state.encode_started = 0
+            self.state.encode_finished = 0
+            self.state.encode_active_label = ""
+            self.state.eta_phase = ""
+            self.state.eta_last_pct = 0.0
+            self.state.eta_last_ts = 0.0
+            self.state.eta_rate_ewma = 0.0
+            self.state.run_started_ts = time.time()
+            self.var_step.set("Running")
+            self.var_prompt.set("")
+            self.var_eta.set("")
+            self.progress.configure(mode="indeterminate")
+            self.progress.start(10)
+
+            self.btn_start.configure(state="disabled")
+            self.btn_stop.configure(state="normal")
+            self.btn_continue.configure(state="disabled")
+            self._set_inputs_enabled(False)
+
+            self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self.reader_thread.start()
 
         def _run_setup_wizard(self, *, force: bool = False) -> None:
             # Block Start/Cleanup until both steps are complete.
@@ -2259,11 +2467,14 @@ if TK_AVAILABLE:
                 raise ValueError("Unable to locate remote log file after starting the job.")
             return (out or "").strip().splitlines()[-1].strip()
 
-        def _start_tail(self) -> None:
+        def _start_tail(self, *, from_start: bool = True, tail_lines: int = 2000) -> None:
             ctx = self._get_run_ctx()
             if not ctx.log_path:
                 raise ValueError("Missing remote log path.")
-            tail_cmd = f"tail -n +1 -F {shlex.quote(ctx.log_path)}"
+            if from_start:
+                tail_cmd = f"tail -n +1 -F {shlex.quote(ctx.log_path)}"
+            else:
+                tail_cmd = f"tail -n {int(tail_lines)} -F {shlex.quote(ctx.log_path)}"
 
             # Close any existing tail first.
             self._stop_tail(quiet=True)
@@ -2352,6 +2563,9 @@ if TK_AVAILABLE:
 
             # Clear run context.
             self.run_ctx = None
+
+            # Clear reattach metadata for completed/stopped runs.
+            self._clear_last_run_metadata()
 
             if payload == "ok":
                 do_cleanup = messagebox.askyesno(
@@ -2852,6 +3066,18 @@ if TK_AVAILABLE:
                     log_path="",
                     remote_start_epoch=0,
                 )
+
+                # Persist run metadata immediately so a GUI crash/power loss can reattach.
+                self.last_run_host = (self.var_host.get() or "").strip()
+                self.last_run_user = (self.var_user.get() or "").strip()
+                self.last_run_port = (self.var_port.get() or "").strip() or "22"
+                self.last_run_screen_name = self.run_ctx.screen_name
+                self.last_run_log_path = ""
+                self.last_run_remote_start_epoch = 0
+                try:
+                    self._persist_state()
+                except Exception:
+                    pass
                 self._stop_requested.clear()
                 self._done_emitted = False
                 self._done_handled = False
@@ -2880,6 +3106,12 @@ if TK_AVAILABLE:
 
                 # Find the log file path and begin tailing it.
                 self.run_ctx.log_path = self._find_latest_remote_log()
+                self.last_run_log_path = self.run_ctx.log_path
+                self.last_run_remote_start_epoch = int(self.run_ctx.remote_start_epoch or 0)
+                try:
+                    self._persist_state()
+                except Exception:
+                    pass
                 self._append_log(f"(Info) Following remote log: {self.run_ctx.log_path}\n")
                 self._start_tail()
 

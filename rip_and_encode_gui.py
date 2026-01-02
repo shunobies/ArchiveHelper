@@ -277,6 +277,8 @@ if TK_AVAILABLE:
             self._replay_stop = threading.Event()
             self._replay_mode = False
 
+            self._state_file_existed = False
+
             self.proc: subprocess.Popen[str] | None = None
             self.ssh_client = None
             self.ssh_channel = None
@@ -340,6 +342,9 @@ if TK_AVAILABLE:
             self._refresh_kind()
             self._poll_ui_queue()
 
+            self._apply_setup_gate()
+            self.root.after(0, self._maybe_run_first_launch_setup)
+
             # Periodic clock update (elapsed time label).
             self._tick_elapsed()
 
@@ -396,6 +401,9 @@ if TK_AVAILABLE:
             self.cbo_preset = ttk.Combobox(s2, textvariable=self.var_preset, width=33, state="normal")
             self.cbo_preset.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_preset, "HandBrake preset name on the server (loaded from HandBrakeCLI --preset-list).")
+
+            note = ttk.Label(settings, text="Connection and output directories are set under Settings.")
+            note.pack(anchor="w", pady=(6, 0))
 
             # Mode frame
             mode = ttk.LabelFrame(main, text="Schedule", padding=10)
@@ -1155,6 +1163,7 @@ if TK_AVAILABLE:
         def _load_persisted_state(self) -> None:
             p = self._state_path()
             if p.exists():
+                self._state_file_existed = True
                 try:
                     data = pickle.loads(p.read_bytes())
                     if isinstance(data, dict):
@@ -1287,7 +1296,7 @@ if TK_AVAILABLE:
             except Exception:
                 pass
 
-        def _open_connection_settings(self) -> None:
+        def _open_connection_settings(self, *, modal: bool = False, next_label: str = "Close") -> None:
             try:
                 if self._connection_win is not None and self._connection_win.winfo_exists():
                     self._connection_win.lift()
@@ -1299,6 +1308,13 @@ if TK_AVAILABLE:
             win.title("Settings: Connection")
             win.resizable(False, False)
             self._connection_win = win
+
+            if modal:
+                try:
+                    win.transient(self.root)
+                    win.grab_set()
+                except Exception:
+                    pass
 
             frm = ttk.Frame(win, padding=10)
             frm.pack(fill=BOTH, expand=True)
@@ -1340,9 +1356,48 @@ if TK_AVAILABLE:
 
             btns = ttk.Frame(frm)
             btns.pack(fill=X, pady=(10, 0))
-            ttk.Button(btns, text="Close", command=win.destroy).pack(side=RIGHT)
 
-        def _open_directories_settings(self) -> None:
+            def _close() -> None:
+                try:
+                    if modal:
+                        self._validate()
+                    self._persist_state()
+                except Exception as e:
+                    if modal:
+                        messagebox.showerror("Connection", str(e))
+                        return
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            try:
+                win.protocol("WM_DELETE_WINDOW", _close)
+            except Exception:
+                pass
+
+            ttk.Button(btns, text=next_label, command=_close).pack(side=RIGHT)
+
+            try:
+                ent_host.focus_set()
+            except Exception:
+                pass
+
+        def _validate_directories(self) -> None:
+            movies = (self.var_movies_dir.get() or "").strip()
+            series = (self.var_series_dir.get() or "").strip()
+            books = (self.var_books_dir.get() or "").strip()
+            music = (self.var_music_dir.get() or "").strip()
+            if not movies:
+                raise ValueError("Movies dir is required.")
+            if not series:
+                raise ValueError("Series dir is required.")
+            if not books:
+                raise ValueError("Books dir is required.")
+            if not music:
+                raise ValueError("Music dir is required.")
+
+        def _open_directories_settings(self, *, modal: bool = False, next_label: str = "Close") -> None:
             try:
                 if self._directories_win is not None and self._directories_win.winfo_exists():
                     self._directories_win.lift()
@@ -1354,6 +1409,13 @@ if TK_AVAILABLE:
             win.title("Settings: Directories")
             win.resizable(False, False)
             self._directories_win = win
+
+            if modal:
+                try:
+                    win.transient(self.root)
+                    win.grab_set()
+                except Exception:
+                    pass
 
             frm = ttk.Frame(win, padding=10)
             frm.pack(fill=BOTH, expand=True)
@@ -1391,7 +1453,107 @@ if TK_AVAILABLE:
 
             btns = ttk.Frame(frm)
             btns.pack(fill=X, pady=(10, 0))
-            ttk.Button(btns, text="Close", command=win.destroy).pack(side=RIGHT)
+
+            def _close() -> None:
+                try:
+                    if modal:
+                        self._validate_directories()
+                    self._persist_state()
+                except Exception as e:
+                    if modal:
+                        messagebox.showerror("Directories", str(e))
+                        return
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            try:
+                win.protocol("WM_DELETE_WINDOW", _close)
+            except Exception:
+                pass
+
+            ttk.Button(btns, text=next_label, command=_close).pack(side=RIGHT)
+
+            try:
+                ent_movies.focus_set()
+            except Exception:
+                pass
+
+        def _connection_ready(self) -> bool:
+            host = (self.var_host.get() or "").strip()
+            user = (self.var_user.get() or "").strip()
+            keyfile = (self.var_key.get() or "").strip()
+            password = (self.var_password.get() or "").strip()
+            if not host:
+                return False
+            if not keyfile and not password:
+                return False
+            if password and not user:
+                return False
+            return True
+
+        def _directories_ready(self) -> bool:
+            return all(
+                (v.get() or "").strip()
+                for v in (self.var_movies_dir, self.var_series_dir, self.var_books_dir, self.var_music_dir)
+            )
+
+        def _is_setup_complete(self) -> bool:
+            return self._connection_ready() and self._directories_ready()
+
+        def _apply_setup_gate(self) -> None:
+            ready = self._is_setup_complete()
+            try:
+                if hasattr(self, "btn_start"):
+                    self.btn_start.configure(state=("normal" if (ready and not self.state.running) else "disabled"))
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "btn_cleanup"):
+                    self.btn_cleanup.configure(state=("normal" if (ready and not self.state.running) else "disabled"))
+            except Exception:
+                pass
+
+        def _maybe_run_first_launch_setup(self) -> None:
+            # Run on first launch OR whenever required settings are missing.
+            if self._is_setup_complete():
+                self._apply_setup_gate()
+                return
+
+            # If the user already has a state file, they might have intentionally left settings blank.
+            # Still block Start/Cleanup, but don't force popups unless it's truly the first run.
+            if self._state_file_existed and not self._connection_ready():
+                self._apply_setup_gate()
+                return
+
+            self._run_setup_wizard()
+
+        def _run_setup_wizard(self) -> None:
+            # Block Start/Cleanup until both steps are complete.
+            self._apply_setup_gate()
+
+            while not self._connection_ready():
+                self._open_connection_settings(modal=True, next_label="Next")
+                try:
+                    if self._connection_win is not None:
+                        self.root.wait_window(self._connection_win)
+                except Exception:
+                    break
+                if self._connection_ready():
+                    break
+
+            while self._connection_ready() and not self._directories_ready():
+                self._open_directories_settings(modal=True, next_label="Finish")
+                try:
+                    if self._directories_win is not None:
+                        self.root.wait_window(self._directories_win)
+                except Exception:
+                    break
+                if self._directories_ready():
+                    break
+
+            self._apply_setup_gate()
 
         def _browse_csv(self) -> None:
             p = filedialog.askopenfilename(title="Select schedule CSV", filetypes=[("CSV", "*.csv"), ("All", "*")])
@@ -2196,6 +2358,11 @@ if TK_AVAILABLE:
                 messagebox.showerror("Error", "Cleanup is disabled while a job is running. Stop the job first.")
                 return
 
+            if not self._is_setup_complete():
+                self._run_setup_wizard()
+                if not self._is_setup_complete():
+                    return
+
             try:
                 cfg = self._validate()
                 self._persist_state()
@@ -2534,6 +2701,11 @@ if TK_AVAILABLE:
         def start(self) -> None:
             if self.state.running:
                 return
+
+            if not self._is_setup_complete():
+                self._run_setup_wizard()
+                if not self._is_setup_complete():
+                    return
 
             try:
                 # Fresh run: clear the visible log so prior MakeMKV/ERROR lines don't confuse recovery.

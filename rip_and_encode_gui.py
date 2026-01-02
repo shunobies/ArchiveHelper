@@ -58,6 +58,7 @@ from archive_helper_gui.log_patterns import (
 from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
 from archive_helper_gui.parser import parse_for_progress
 from archive_helper_gui.handbrake_presets import fetch_handbrake_presets
+from archive_helper_gui.connection_dialog import open_connection_settings_dialog
 from archive_helper_gui.help_dialog import show_help_dialog
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
@@ -668,84 +669,19 @@ if TK_AVAILABLE:
             except Exception:
                 self._connection_win = None
 
-            win = Toplevel(self.root)
-            win.title("Settings: Connection")
-            win.resizable(False, False)
-            self._connection_win = win
-
-            if modal:
-                try:
-                    win.transient(self.root)
-                    win.grab_set()
-                except Exception:
-                    pass
-
-            frm = ttk.Frame(win, padding=10)
-            frm.pack(fill=BOTH, expand=True)
-
-            conn = ttk.LabelFrame(frm, text="Connection (SSH)", padding=10)
-            conn.pack(fill=X)
-
-            row = ttk.Frame(conn)
-            row.pack(fill=X)
-            ttk.Label(row, text="Host:").pack(side=LEFT)
-            ent_host = ttk.Entry(row, textvariable=self.var_host, width=28)
-            ent_host.pack(side=LEFT, padx=5)
-            Tooltip(ent_host, "SSH host or IP address of the server.")
-            ttk.Label(row, text="User:").pack(side=LEFT)
-            ent_user = ttk.Entry(row, textvariable=self.var_user, width=16)
-            ent_user.pack(side=LEFT, padx=5)
-            Tooltip(ent_user, "SSH username on the server (example: jellyfin).")
-            ttk.Label(row, text="Port:").pack(side=LEFT)
-            ent_port = ttk.Entry(row, textvariable=self.var_port, width=6)
-            ent_port.pack(side=LEFT, padx=5)
-            Tooltip(ent_port, "SSH port (leave blank for default 22).")
-
-            row2 = ttk.Frame(conn)
-            row2.pack(fill=X, pady=(6, 0))
-            ttk.Label(row2, text="Key file (optional):").pack(side=LEFT)
-            ent_key = ttk.Entry(row2, textvariable=self.var_key, width=40)
-            ent_key.pack(side=LEFT, padx=5)
-            Tooltip(ent_key, "Optional: path to an SSH private key. If empty, password auth is used.")
-            btn_key = ttk.Button(row2, text="Browse", command=self._browse_key)
-            btn_key.pack(side=LEFT)
-            Tooltip(btn_key, "Pick an SSH private key file.")
-
-            row2b = ttk.Frame(conn)
-            row2b.pack(fill=X, pady=(6, 0))
-            ttk.Label(row2b, text="Password (required if no key):").pack(side=LEFT)
-            ent_pw = ttk.Entry(row2b, textvariable=self.var_password, width=40, show="*")
-            ent_pw.pack(side=LEFT, padx=5)
-            Tooltip(ent_pw, "SSH password (required if you are not using a key file).")
-
-            btns = ttk.Frame(frm)
-            btns.pack(fill=X, pady=(10, 0))
-
-            def _close() -> None:
-                try:
-                    if modal:
-                        self._validate()
-                    self._persist_state()
-                except Exception as e:
-                    if modal:
-                        messagebox.showerror("Connection", str(e))
-                        return
-                try:
-                    win.destroy()
-                except Exception:
-                    pass
-
-            try:
-                win.protocol("WM_DELETE_WINDOW", _close)
-            except Exception:
-                pass
-
-            ttk.Button(btns, text=next_label, command=_close).pack(side=RIGHT)
-
-            try:
-                ent_host.focus_set()
-            except Exception:
-                pass
+            self._connection_win = open_connection_settings_dialog(
+                root=self.root,
+                host_var=self.var_host,
+                user_var=self.var_user,
+                port_var=self.var_port,
+                key_var=self.var_key,
+                password_var=self.var_password,
+                browse_key=self._browse_key,
+                validate=self._validate,
+                persist_state=self._persist_state,
+                modal=modal,
+                next_label=next_label,
+            )
 
         def _validate_directories(self) -> None:
             movies = (self.var_movies_dir.get() or "").strip()

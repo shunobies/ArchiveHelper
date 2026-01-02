@@ -144,6 +144,10 @@ if TK_AVAILABLE:
             self.root.title("Archive Helper for Jellyfin")
             self.state = UiState()
 
+            # Set to True right before destroying the Tk root to prevent
+            # scheduled callbacks from attempting to open dialogs.
+            self._closing = False
+
             self._main_thread_ident = threading.get_ident()
             self._replay_stop = threading.Event()
             self._replay_mode = False
@@ -628,7 +632,14 @@ if TK_AVAILABLE:
                         self.stop()
             except Exception:
                 pass
-            self.root.destroy()
+            try:
+                self._closing = True
+            except Exception:
+                pass
+            try:
+                self.root.destroy()
+            except Exception:
+                pass
 
         def _refresh_mode(self) -> None:
             if self.var_mode.get() == "csv":
@@ -764,6 +775,8 @@ if TK_AVAILABLE:
             self._run_setup_wizard(force=force)
 
         def _maybe_run_first_launch_setup(self) -> None:
+            if getattr(self, "_closing", False):
+                return
             # Run on first launch OR whenever required settings are missing.
             if self._is_setup_complete():
                 self._apply_setup_gate()
@@ -822,6 +835,8 @@ if TK_AVAILABLE:
                 pass
 
         def _maybe_offer_reattach(self) -> None:
+            if getattr(self, "_closing", False):
+                return
             # Only offer if we're idle and have enough info to safely target the right host.
             if self.state.running or self.run_ctx is not None:
                 return
@@ -854,12 +869,17 @@ if TK_AVAILABLE:
                 self._clear_last_run_metadata()
                 return
 
-            do_reattach = messagebox.askyesno(
-                "Reattach",
-                "A remote job appears to still be running.\n\n"
-                f"Screen session: {self.last_run_screen_name}\n\n"
-                "Would you like to reattach and resume following progress?",
-            )
+            try:
+                do_reattach = messagebox.askyesno(
+                    "Reattach",
+                    "A remote job appears to still be running.\n\n"
+                    f"Screen session: {self.last_run_screen_name}\n\n"
+                    "Would you like to reattach and resume following progress?",
+                )
+            except Exception:
+                # Can occur if the app is closing/destroyed while a scheduled
+                # callback tries to show the prompt.
+                return
             if not do_reattach:
                 return
 

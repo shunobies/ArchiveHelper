@@ -31,6 +31,7 @@ import re
 import stat
 import shlex
 import shutil
+import subprocess
 import tempfile
 import threading
 import time

@@ -1,159 +1,187 @@
-# Archive Helper GUI for Jellyfin
+# Archive Helper for Jellyfin
 
-![Archive Helper for Jellyfin – Main Interface](screenshots/archive-helper-main.png)
+![Archive Helper GUI main window](screenshots/archive-helper-main.png)
 
-**Archive Helper GUI for Jellyfin** is a Python desktop app that helps you rip and encode your DVDs and Blu-rays for use with a Jellyfin media server. It gives you a friendly GUI to control a rip server over SSH and run a workflow that uses MakeMKV and HandBrake to prepare your media in a format Jellyfin can organize and play.
+Archive Helper is a small Python app that helps you copy DVDs/Blu-rays on a Linux “rip server”, convert them to a Jellyfin-friendly format, and put them into the right folders so Jellyfin can automatically scan and organize your library.
 
----
+If you are brand new to Linux and Python: this project is meant to reduce how much terminal work you need to do. You still need a Linux server with the right tools installed, but day-to-day ripping is driven from a simple desktop GUI.
 
-## 🔧 What This Project Does
+## What this app is for
 
-This tool makes it easier to:
+- You have a Linux machine (physical or virtual) with an optical drive attached. This is your rip server.
+- You want your finished files to land in a Movies/Series folder that Jellyfin watches.
+- You want a “remote control” app that connects over SSH, starts a rip/encode workflow, shows progress, and prompts you when to swap discs.
 
-- Connect to a remote rip server using SSH
-- Upload media ripping schedules
-- Upload and update the ripping & encoding workflow script
-- Remotely run the ripping and encoding process
-- See progress and get prompts when it’s time to insert the next disc
+## How it works (two-computer model)
 
-The rip server runs the heavy lifting with tools like **MakeMKV** and **HandBrakeCLI**, while this app provides a simple interface to control it from your desktop.
+This project has two scripts:
 
----
+- `rip_and_encode_gui.py` (runs on your desktop): the Tkinter GUI.
+- `rip_and_encode.py` (runs on the server): the rip/encode workflow the GUI uploads and starts remotely.
 
-## 🚀 Features
+The rip server does the heavy work with:
 
-- Remote control via SSH to run rip/encode workflows
-- Manual and CSV schedule support for movies and TV series
-- HandBrake presets selection
-- Real-time progress updates
-- Prompts to swap discs
-- Keeps settings between runs
-- Designed for ease of use on Linux servers
+- MakeMKV (reads the disc to MKV)
+- HandBrakeCLI (encodes/transcodes)
+- GNU screen (keeps the job running even if you close the GUI)
 
----
+The GUI connects to the server using SSH. It can use a password, but SSH keys are strongly recommended.
 
-## 📌 What You Need
+## What you need
 
-Before using this app, make sure your rip server has:
+### On your desktop (where you run the GUI)
 
-- **Python 3**
-- **MakeMKV** (for ripping discs)
-- **HandBrakeCLI** (for encoding to MP4/MKV in Jellyfin-friendly formats)
-- SSH access from your workstation
+- Python 3
+- Tkinter for Python (often packaged as `python3-tk` on Debian/Ubuntu)
+- Python packages: `paramiko` and `keyring`
+- Network access to your server’s SSH port
 
-You should also have a working Jellyfin server and libraries configured (for example: `/storage/Movies` and `/storage/Series`).  
-Jellyfin is a free, open-source media system for organizing and streaming media to clients on TVs, phones, tablets, and more.:contentReference[oaicite:0]{index=0}
+### On your rip server (Debian is a good choice)
 
----
+- Debian (or another Linux distribution) with SSH enabled
+- Python 3
+- GNU screen
+- MakeMKV
+- HandBrakeCLI
+- Enough free disk space for temporary rips and final output
 
-## 🛠 How It Works
+## Installation and running (beginner-friendly)
 
-1. **SSH Connect**  
-   The app connects to your rip server using SSH, so you don’t have to open a terminal.
+The steps below assume:
 
-2. **Scheduling**  
-   You can either:
-   - Enter one title manually (movie or TV season)
-   - Load a CSV schedule with multiple entries
+- Desktop and server are on the same network (or reachable over the internet).
+- Your server username is something like `jellyfin`.
+- Your SSH port is the default `22`.
 
-3. **Ripping & Encoding**  
-   On the server, the script will:
-   - Rip your disc using MakeMKV
-   - Encode the rip with HandBrakeCLI using your selected preset
-   - Prompt you when it’s time to insert the next disc
+### Step 1: Download this project on your desktop
 
-4. **Output**  
-   Completed media is stored in your configured Movies/Series directories on the server in a format Jellyfin can readily scan and organize.
+Open a terminal on your desktop and run:
 
----
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-tk
 
-## 📁 Interface Overview
+git clone <REPO_URL_HERE>
+cd ArchiveHelper
+```
 
-### Connection (SSH)
+If you downloaded a ZIP instead of using `git clone`, extract it and `cd` into the folder.
 
-| Field | Description |
-|-------|-------------|
-| **Host** | IP or hostname of the rip server |
-| **User** | Linux username on the rip server |
-| **Port** | SSH port (default is usually `22`) |
-| **Key file (optional)** | SSH private key to login without a password |
-| **Password** | Used if you’re not using a key |
+### Step 2: Create a Python virtual environment and install dependencies
 
----
+From inside the project folder:
 
-### Run Settings
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 
-| Option | What It Does |
-|--------|-------------|
-| **Install Jellyfin if missing** | Installs/starts Jellyfin on the server (requires sudo access) |
-| **Movies dir** | Where movie files will go on the server |
-| **Series dir** | Where TV show files will go |
-| **HandBrake preset** | Preset for encoding quality |
+python3 -m pip install --upgrade pip
+python3 -m pip install paramiko keyring
+```
 
----
+### Step 3: Set up your Debian rip server with SSH
 
-### Schedule
+At minimum, your server needs SSH enabled and reachable.
 
-This tells the server what to rip.
+If you are new to Debian server setup, these guides are good starting points:
 
-#### Manual
+- Debian documentation: https://www.debian.org/doc/
+- The Debian Administrator’s Handbook (free online book): https://debian-handbook.info/
 
-- **Type:** movie or series
-- **Title:** name of the media
-- **Year:** used for naming / Jellyfin metadata
-- **Season:** for series only
-- **Disc count:** how many discs in the job
+Install and enable SSH on the server:
 
-#### CSV file
+```bash
+sudo apt update
+sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+```
 
-- Load a pre-prepared CSV with multiple titles and disc counts
+### Step 4 (recommended): Use SSH keys instead of passwords
 
----
+Using SSH keys is safer and more reliable than typing a password. A simple, beginner-friendly flow:
 
-### Control Buttons
+1) Create a key on your desktop:
 
-| Button | What It Does |
-|--------|--------------|
-| **Start** | Starts a scheduled rip/encode |
-| **Continue** | After inserting the next disc in a multi-disc job |
-| **Stop** | Cancels the current job |
-| **Show Log** | Shows server output for troubleshooting |
+```bash
+ssh-keygen -t ed25519
+```
 
----
+2) Copy your key to the server (replace `USER` and `HOST`):
 
-## 📌 Tips for Best Results
+```bash
+ssh-copy-id USER@HOST
+```
 
-- Use clear, Jellyfin-friendly folder names (e.g., `Inception (2010)` or `Friends/Season 01`)
-- Pick appropriate HandBrake presets (HQ for quality, Very Fast for speed)
-- Make sure your server has adequate storage and CPU for encoding
+3) Test login:
 
----
+```bash
+ssh USER@HOST
+```
 
-## 🧠 Recommended Server Requirements
+Good learning resources:
 
-To run this workflow smoothly:
+- SSH key basics (SSH Academy): https://www.ssh.com/academy/ssh/keygen
+- `ssh-copy-id` usage (OpenSSH): https://man.openbsd.org/ssh-copy-id
 
-- A physical or virtual Linux server
-- MakeMKV and HandBrakeCLI installed
-- SSH access enabled
-- Sufficient CPU for encoding (HW acceleration optional)
+If you want to harden SSH by disabling password logins, only do that after confirming keys work:
 
----
+- OpenSSH server config: https://man.openbsd.org/sshd_config
 
-## 🤝 Contributing
+### Step 5: Install Jellyfin and set up libraries
 
-Contributions are welcome! You can:
+Jellyfin setup differs by OS and preference. The official docs are the best starting point:
 
-- Open issues for bugs or feature requests
-- Submit pull requests with improvements
-- Help improve documentation or presets
+- Jellyfin documentation: https://jellyfin.org/docs/
+- Jellyfin install guides: https://jellyfin.org/docs/general/installation/
 
----
+In Jellyfin, create (or confirm) library folders such as:
 
-## 🧾 License
+- Movies directory (example): `/storage/Movies`
+- Series directory (example): `/storage/Series`
 
-This project and related scripts are open-source. Refer to the repository for specific license details.
+Those paths must exist on the server and be writable by the user you connect as.
 
----
+### Step 6: Install MakeMKV and HandBrakeCLI on the server
 
-Thanks for checking out **Archive Helper GUI for Jellyfin!**  
+These tools are installed on the rip server (not your desktop).
+
+- MakeMKV: https://www.makemkv.com/
+- HandBrakeCLI: https://handbrake.fr/
+
+MakeMKV is not always in Debian’s default repositories; follow the official instructions for your environment.
+
+### Step 7: Run the GUI
+
+On your desktop, from the project folder:
+
+```bash
+source .venv/bin/activate
+python3 ./rip_and_encode_gui.py
+```
+
+On first run (or if settings are missing), the app will prompt you to configure:
+
+- Connection (SSH host/user/key/password)
+- Output directories (Movies/Series and other placeholders)
+
+After that, you can enter a title manually or load a CSV schedule and press Start.
+
+## Common questions
+
+### Where do the finished files go?
+
+The finished files are written on the rip server, into the Movies/Series directories you set in Settings. Jellyfin should be configured to scan those directories.
+
+### What happens if I close the GUI while it is ripping?
+
+The job runs on the server inside a `screen` session. Closing the GUI does not necessarily stop the job. When you reopen the GUI, it can offer to reattach and continue showing progress.
+
+## Troubleshooting
+
+- Can’t connect over SSH: verify `ssh USER@HOST` works from the desktop first.
+- Preset list is empty: confirm `HandBrakeCLI --preset-list` works on the server.
+- Permission errors writing to Movies/Series folders: verify the SSH user can write to those directories.
+
+## License
+
+This repository does not currently include a license file. If you plan to redistribute or publish it, add an explicit license first.

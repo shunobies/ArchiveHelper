@@ -60,6 +60,7 @@ from archive_helper_gui.log_patterns import (
     PROMPT_NEXT_DISC_RE,
 )
 from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
+from archive_helper_gui.remote_exec import RemoteExecutor
 from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
 from archive_helper_gui.tooltip import Tooltip
 
@@ -138,9 +139,6 @@ if TK_AVAILABLE:
             self.state = UiState()
 
             self._main_thread_ident = threading.get_ident()
-            self._hostkey_logged: set[str] = set()
-            self._hostkey_lock = threading.Lock()
-
             self._replay_stop = threading.Event()
             self._replay_mode = False
 
@@ -177,6 +175,13 @@ if TK_AVAILABLE:
             self.var_port = StringVar(value="")
             self.var_key = StringVar(value="")
             self.var_password = StringVar(value="")
+
+            # Remote executor (OpenSSH/Paramiko). Initialized after connection vars exist.
+            self.remote = RemoteExecutor(
+                state_dir=self._state_dir(),
+                log=self._log_threadsafe,
+                default_user_getter=lambda: (self.var_user.get() or "").strip(),
+            )
 
             # Script settings
             self.var_movies_dir = StringVar(value="/storage/Movies")
@@ -844,27 +849,10 @@ if TK_AVAILABLE:
             return self._state_dir() / "state.pkl"
 
         def _known_hosts_path(self) -> Path:
-            return self._state_dir() / "known_hosts"
+            return self.remote.known_hosts_path
 
         def _ssh_common_opts(self) -> list[str]:
-            # Avoid interactive terminal prompts (host key confirmation / password prompts).
-            # Password-based auth is handled via Paramiko.
-            kh = self._known_hosts_path()
-            kh.parent.mkdir(parents=True, exist_ok=True)
-            return [
-                "-o",
-                f"UserKnownHostsFile={str(kh)}",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "NumberOfPasswordPrompts=0",
-                "-o",
-                "ConnectTimeout=10",
-                "-o",
-                "LogLevel=ERROR",
-            ]
+            return self.remote.ssh_common_opts()
 
         def _log_threadsafe(self, message: str) -> None:
             if threading.get_ident() == self._main_thread_ident:
@@ -872,162 +860,11 @@ if TK_AVAILABLE:
             else:
                 self.ui_queue.put(("log", message))
 
-        def _target_host(self, target: str) -> str:
-            # target is typically "user@host" or "host".
-            host = (target or "").strip()
-            if "@" in host:
-                host = host.split("@", 1)[1]
-            host = host.strip()
-            if host.startswith("[") and host.endswith("]"):
-                host = host[1:-1]
-            return host
-
-        def _maybe_log_host_key_acceptance(self, target: str, port: str) -> None:
-            """Log the host key that will be auto-accepted.
-
-            For OpenSSH key-based mode, we best-effort use ssh-keyscan + ssh-keygen to show
-            the fingerprint(s) we are about to accept, and we store them in the app-specific
-            known_hosts file.
-            """
-
-            host = self._target_host(target)
-            if not host:
-                return
-            p = (port or "").strip() or "22"
-            key = f"openssh:{host}:{p}"
-
-            with self._hostkey_lock:
-                if key in self._hostkey_logged:
-                    return
-                self._hostkey_logged.add(key)
-
-            if shutil.which("ssh-keyscan") is None or shutil.which("ssh-keygen") is None:
-                self._log_threadsafe(
-                    f"(Info) Auto-accepting SSH host key for {host}:{p}. "
-                    "(ssh-keyscan/ssh-keygen not found; cannot display fingerprint.)\n"
-                )
-                return
-
-            kh = self._known_hosts_path()
-            kh.parent.mkdir(parents=True, exist_ok=True)
-
-            # If we already have an entry, display its fingerprint(s).
-            try:
-                existing = subprocess.run(
-                    ["ssh-keygen", "-F", host, "-f", str(kh)],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                if existing.returncode == 0 and (existing.stdout or "").strip():
-                    fps = subprocess.run(
-                        ["ssh-keygen", "-lf", str(kh), "-F", host],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                    )
-                    out = (fps.stdout or "").strip()
-                    if out:
-                        self._log_threadsafe(f"(Info) SSH known_hosts entry for {host}:{p}:\n{out}\n")
-                    else:
-                        self._log_threadsafe(f"(Info) SSH known_hosts entry already present for {host}:{p}.\n")
-                    return
-            except Exception:
-                # Continue to scanning below.
-                pass
-
-            # Scan and append (hashed) host keys, then display fingerprints.
-            try:
-                scan = subprocess.run(
-                    ["ssh-keyscan", "-H", "-p", str(p), "-T", "5", host],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                    text=True,
-                )
-                scan_out = (scan.stdout or "").strip()
-                if not scan_out:
-                    self._log_threadsafe(
-                        f"(Info) Auto-accepting SSH host key for {host}:{p}. "
-                        "(Unable to scan fingerprint with ssh-keyscan.)\n"
-                    )
-                    return
-
-                # Store what we're accepting in app-specific known_hosts.
-                with kh.open("a", encoding="utf-8") as f:
-                    f.write(scan_out + "\n")
-                try:
-                    os.chmod(kh, 0o600)
-                except Exception:
-                    pass
-
-                fps = subprocess.run(
-                    ["ssh-keygen", "-lf", "-"],
-                    input=scan_out + "\n",
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                fp_out = (fps.stdout or "").strip()
-                if fp_out:
-                    self._log_threadsafe(
-                        f"(Info) Auto-accepted SSH host key fingerprint(s) for {host}:{p}:\n{fp_out}\n"
-                    )
-                else:
-                    self._log_threadsafe(f"(Info) Auto-accepted SSH host key for {host}:{p}.\n")
-            except Exception as e:
-                self._log_threadsafe(
-                    f"(Info) Auto-accepting SSH host key for {host}:{p}. "
-                    f"(Could not display fingerprint: {e})\n"
-                )
-
-        def _maybe_log_paramiko_host_key(self, host: str, port: int, client) -> None:
-            key = f"paramiko:{host}:{port}"
-            with self._hostkey_lock:
-                if key in self._hostkey_logged:
-                    return
-                self._hostkey_logged.add(key)
-
-            try:
-                transport = client.get_transport()
-                if transport is None:
-                    return
-                pkey = transport.get_remote_server_key()
-                if pkey is None:
-                    return
-
-                # Prefer a SHA256 fingerprint similar to OpenSSH output.
-                raw = pkey.asbytes()
-                sha256 = base64.b64encode(hashlib.sha256(raw).digest()).decode("ascii").rstrip("=")
-                self._log_threadsafe(
-                    f"(Info) Auto-accepted SSH host key for {host}:{port} (Paramiko): "
-                    f"{pkey.get_name()} SHA256:{sha256}\n"
-                )
-            except Exception:
-                # Keep it best-effort only.
-                pass
-
         def _ssh_args(self, target: str, port: str, keyfile: str, *, tty: bool = True) -> list[str]:
-            self._maybe_log_host_key_acceptance(target, port)
-            args = ["ssh"]
-            if tty:
-                args.append("-tt")
-            if port.strip():
-                args += ["-p", port.strip()]
-            if keyfile.strip():
-                args += ["-i", keyfile.strip()]
-            args += self._ssh_common_opts()
-            args.append(target)
-            return args
+            return self.remote.ssh_args(target, port, keyfile, tty=tty)
 
         def _scp_args(self, target: str, port: str, keyfile: str) -> list[str]:
-            self._maybe_log_host_key_acceptance(target, port)
-            args = ["scp"]
-            if port.strip():
-                args += ["-P", port.strip()]
-            if keyfile.strip():
-                args += ["-i", keyfile.strip()]
-            args += self._ssh_common_opts()
-            return args
+            return self.remote.scp_args(target, port, keyfile)
 
         def _keyring_id(self) -> str:
             host = (self.var_host.get() or "").strip()
@@ -2264,26 +2101,7 @@ if TK_AVAILABLE:
             self.send_enter()
 
         def _remote_run(self, target: str, port: str, keyfile: str, password: str, cmd: str) -> tuple[int, str]:
-            """Run a short remote command and capture output."""
-
-            if password:
-                client = self._connect_paramiko(target, port, keyfile, password)
-                try:
-                    return self._exec_paramiko(client, "bash -lc " + shlex.quote(cmd))
-                finally:
-                    try:
-                        client.close()
-                    except Exception:
-                        pass
-
-            ssh_base = self._ssh_args(target, port, keyfile, tty=False)
-            res = subprocess.run(
-                ssh_base + ["bash", "-lc", shlex.quote(cmd)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            return res.returncode, res.stdout or ""
+            return self.remote.remote_run(target, port, keyfile, password, cmd)
 
         def _get_run_ctx(self) -> RunContext:
             if self.run_ctx is None:
@@ -2592,34 +2410,8 @@ if TK_AVAILABLE:
                 password=password,
             )
 
-        def _parse_target(self, target: str) -> tuple[str, str]:
-            # target is either "user@host" or "host"
-            if "@" in target:
-                user, host = target.split("@", 1)
-                return user, host
-            return self.var_user.get().strip(), target
-
         def _connect_paramiko(self, target: str, port: str, keyfile: str, password: str):
-            if not PARAMIKO_AVAILABLE:
-                raise ValueError("Paramiko is not available.")
-
-            user, host = self._parse_target(target)
-            if not user:
-                raise ValueError("User is required for password-based SSH.")
-
-            p = int(port.strip() or "22")
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            kf = keyfile.strip()
-            if kf:
-                client.connect(hostname=host, port=p, username=user, key_filename=kf, password=password or None)
-            else:
-                client.connect(hostname=host, port=p, username=user, password=password)
-
-            self._maybe_log_paramiko_host_key(host, p, client)
-
-            return client
+            return self.remote.connect_paramiko(target, port, keyfile, password)
 
         def _ensure_remote_python3(self, target: str, port: str, keyfile: str, password: str) -> None:
             """Ensure python3 exists on the remote host.
@@ -2711,21 +2503,10 @@ if TK_AVAILABLE:
             return s.replace("~", home, 1)
 
         def _exec_paramiko(self, client, command: str) -> tuple[int, str]:
-            stdin, stdout, stderr = client.exec_command(command)
-            out = (stdout.read() or b"").decode("utf-8", errors="replace")
-            err = (stderr.read() or b"").decode("utf-8", errors="replace")
-            code = stdout.channel.recv_exit_status()
-            return code, out + err
+            return self.remote.exec_paramiko(client, command)
 
         def _sftp_put(self, client, local_path: str, remote_path: str) -> None:
-            sftp = client.open_sftp()
-            try:
-                sftp.put(local_path, remote_path)
-            finally:
-                try:
-                    sftp.close()
-                except Exception:
-                    pass
+            self.remote.sftp_put(client, local_path, remote_path)
 
         def _ensure_remote_script(self, target: str, port: str, keyfile: str, remote_script: str) -> str:
             """Ensure the rip script exists on the remote; upload it if missing.

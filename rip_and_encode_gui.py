@@ -304,9 +304,14 @@ if TK_AVAILABLE:
             # Script settings
             self.var_movies_dir = StringVar(value="/storage/Movies")
             self.var_series_dir = StringVar(value="/storage/Series")
+            self.var_books_dir = StringVar(value="/storage/Books")
+            self.var_music_dir = StringVar(value="/storage/Music")
             self.var_preset = StringVar(value="HQ 1080p30 Surround")
             self.var_ensure_jellyfin = BooleanVar(value=False)
             self.var_disc_type = StringVar(value="dvd")
+
+            self._connection_win = None
+            self._directories_win = None
 
             self._presets_loading = False
             self._presets_loaded = False
@@ -353,6 +358,13 @@ if TK_AVAILABLE:
             self._maybe_load_presets_async()
 
         def _build_ui(self) -> None:
+            menubar = Menu(self.root)
+            settings_menu = Menu(menubar, tearoff=0)
+            settings_menu.add_command(label="Connection...", command=self._open_connection_settings)
+            settings_menu.add_command(label="Directories...", command=self._open_directories_settings)
+            menubar.add_cascade(label="Settings", menu=settings_menu)
+            self.root.config(menu=menubar)
+
             main = ttk.Frame(self.root, padding=10)
             main.pack(fill=BOTH, expand=True)
             self.main_frame = main
@@ -360,46 +372,6 @@ if TK_AVAILABLE:
             header = ttk.Frame(main)
             header.pack(fill=X, pady=(0, 10))
             self._build_logo(header)
-
-            # Connection frame
-            conn = ttk.LabelFrame(main, text="Connection (SSH)", padding=10)
-            conn.pack(fill=X)
-
-            row = ttk.Frame(conn)
-            row.pack(fill=X)
-            ttk.Label(row, text="Host:").pack(side=LEFT)
-            ent_host = ttk.Entry(row, textvariable=self.var_host, width=28)
-            ent_host.pack(side=LEFT, padx=5)
-            Tooltip(ent_host, "SSH host or IP address of the server.")
-            ttk.Label(row, text="User:").pack(side=LEFT)
-            ent_user = ttk.Entry(row, textvariable=self.var_user, width=16)
-            ent_user.pack(side=LEFT, padx=5)
-            Tooltip(ent_user, "SSH username on the server (example: jellyfin).")
-            ttk.Label(row, text="Port:").pack(side=LEFT)
-            ent_port = ttk.Entry(row, textvariable=self.var_port, width=6)
-            ent_port.pack(side=LEFT, padx=5)
-            Tooltip(ent_port, "SSH port (leave blank for default 22).")
-
-            row2 = ttk.Frame(conn)
-            row2.pack(fill=X, pady=(6, 0))
-            ttk.Label(row2, text="Key file (optional):").pack(side=LEFT)
-            ent_key = ttk.Entry(row2, textvariable=self.var_key, width=40)
-            ent_key.pack(side=LEFT, padx=5)
-            Tooltip(ent_key, "Optional: path to an SSH private key. If empty, password auth is used.")
-            btn_key = ttk.Button(row2, text="Browse", command=self._browse_key)
-            btn_key.pack(side=LEFT)
-            Tooltip(btn_key, "Pick an SSH private key file.")
-
-            row2b = ttk.Frame(conn)
-            row2b.pack(fill=X, pady=(6, 0))
-            ttk.Label(row2b, text="Password (required if no key):").pack(side=LEFT)
-            ent_pw = ttk.Entry(row2b, textvariable=self.var_password, width=40, show="*")
-            ent_pw.pack(side=LEFT, padx=5)
-            Tooltip(ent_pw, "SSH password (required if you are not using a key file).")
-
-            row3 = ttk.Frame(conn)
-            row3.pack(fill=X, pady=(6, 0))
-            # Intentionally blank: details are shown in Help to keep the UI clean.
 
             # Settings frame
             settings = ttk.LabelFrame(main, text="Run settings", padding=10)
@@ -420,26 +392,15 @@ if TK_AVAILABLE:
 
             s1 = ttk.Frame(settings)
             s1.pack(fill=X)
-            ttk.Label(s1, text="Movies dir:").pack(side=LEFT)
-            ent_movies = ttk.Entry(s1, textvariable=self.var_movies_dir, width=30)
-            ent_movies.pack(side=LEFT, padx=5)
-            Tooltip(ent_movies, "Output folder on the server for movies (example: /storage/Movies).")
-            ttk.Label(s1, text="Series dir:").pack(side=LEFT)
-            ent_series = ttk.Entry(s1, textvariable=self.var_series_dir, width=30)
-            ent_series.pack(side=LEFT, padx=5)
-            Tooltip(ent_series, "Output folder on the server for series (example: /storage/Series).")
-
-            s2 = ttk.Frame(settings)
-            s2.pack(fill=X, pady=(6, 0))
-            ttk.Label(s2, text="Disc type:").pack(side=LEFT)
-            cbo_disc = ttk.Combobox(s2, textvariable=self.var_disc_type, values=["dvd", "bluray"], state="readonly", width=8)
+            ttk.Label(s1, text="Disc type:").pack(side=LEFT)
+            cbo_disc = ttk.Combobox(s1, textvariable=self.var_disc_type, values=["dvd", "bluray"], state="readonly", width=8)
             cbo_disc.pack(side=LEFT, padx=5)
             Tooltip(cbo_disc, "Select 'bluray' for Blu-ray discs (uses a larger MakeMKV cache: 1024MB vs 128MB).")
 
-            s3 = ttk.Frame(settings)
-            s3.pack(fill=X, pady=(6, 0))
-            ttk.Label(s3, text="HandBrake preset:").pack(side=LEFT)
-            self.cbo_preset = ttk.Combobox(s3, textvariable=self.var_preset, width=33, state="normal")
+            s2 = ttk.Frame(settings)
+            s2.pack(fill=X, pady=(6, 0))
+            ttk.Label(s2, text="HandBrake preset:").pack(side=LEFT)
+            self.cbo_preset = ttk.Combobox(s2, textvariable=self.var_preset, width=33, state="normal")
             self.cbo_preset.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_preset, "HandBrake preset name on the server (loaded from HandBrakeCLI --preset-list).")
 
@@ -1211,6 +1172,8 @@ if TK_AVAILABLE:
 
                         self.var_movies_dir.set(str(data.get("movies_dir", self.var_movies_dir.get())))
                         self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
+                        self.var_books_dir.set(str(data.get("books_dir", self.var_books_dir.get())))
+                        self.var_music_dir.set(str(data.get("music_dir", self.var_music_dir.get())))
                         self.var_preset.set(str(data.get("preset", self.var_preset.get())))
                         self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
                         self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
@@ -1244,6 +1207,8 @@ if TK_AVAILABLE:
                 "key": self.var_key.get(),
                 "movies_dir": self.var_movies_dir.get(),
                 "series_dir": self.var_series_dir.get(),
+                "books_dir": self.var_books_dir.get(),
+                "music_dir": self.var_music_dir.get(),
                 "preset": self.var_preset.get(),
                 "ensure_jellyfin": bool(self.var_ensure_jellyfin.get()),
                 "disc_type": self.var_disc_type.get(),
@@ -1322,6 +1287,112 @@ if TK_AVAILABLE:
             p = filedialog.askopenfilename(title="Select SSH private key")
             if p:
                 self.var_key.set(p)
+
+        def _open_connection_settings(self) -> None:
+            try:
+                if self._connection_win is not None and self._connection_win.winfo_exists():
+                    self._connection_win.lift()
+                    return
+            except Exception:
+                self._connection_win = None
+
+            win = Toplevel(self.root)
+            win.title("Settings: Connection")
+            win.resizable(False, False)
+            self._connection_win = win
+
+            frm = ttk.Frame(win, padding=10)
+            frm.pack(fill=BOTH, expand=True)
+
+            conn = ttk.LabelFrame(frm, text="Connection (SSH)", padding=10)
+            conn.pack(fill=X)
+
+            row = ttk.Frame(conn)
+            row.pack(fill=X)
+            ttk.Label(row, text="Host:").pack(side=LEFT)
+            ent_host = ttk.Entry(row, textvariable=self.var_host, width=28)
+            ent_host.pack(side=LEFT, padx=5)
+            Tooltip(ent_host, "SSH host or IP address of the server.")
+            ttk.Label(row, text="User:").pack(side=LEFT)
+            ent_user = ttk.Entry(row, textvariable=self.var_user, width=16)
+            ent_user.pack(side=LEFT, padx=5)
+            Tooltip(ent_user, "SSH username on the server (example: jellyfin).")
+            ttk.Label(row, text="Port:").pack(side=LEFT)
+            ent_port = ttk.Entry(row, textvariable=self.var_port, width=6)
+            ent_port.pack(side=LEFT, padx=5)
+            Tooltip(ent_port, "SSH port (leave blank for default 22).")
+
+            row2 = ttk.Frame(conn)
+            row2.pack(fill=X, pady=(6, 0))
+            ttk.Label(row2, text="Key file (optional):").pack(side=LEFT)
+            ent_key = ttk.Entry(row2, textvariable=self.var_key, width=40)
+            ent_key.pack(side=LEFT, padx=5)
+            Tooltip(ent_key, "Optional: path to an SSH private key. If empty, password auth is used.")
+            btn_key = ttk.Button(row2, text="Browse", command=self._browse_key)
+            btn_key.pack(side=LEFT)
+            Tooltip(btn_key, "Pick an SSH private key file.")
+
+            row2b = ttk.Frame(conn)
+            row2b.pack(fill=X, pady=(6, 0))
+            ttk.Label(row2b, text="Password (required if no key):").pack(side=LEFT)
+            ent_pw = ttk.Entry(row2b, textvariable=self.var_password, width=40, show="*")
+            ent_pw.pack(side=LEFT, padx=5)
+            Tooltip(ent_pw, "SSH password (required if you are not using a key file).")
+
+            btns = ttk.Frame(frm)
+            btns.pack(fill=X, pady=(10, 0))
+            ttk.Button(btns, text="Close", command=win.destroy).pack(side=RIGHT)
+
+        def _open_directories_settings(self) -> None:
+            try:
+                if self._directories_win is not None and self._directories_win.winfo_exists():
+                    self._directories_win.lift()
+                    return
+            except Exception:
+                self._directories_win = None
+
+            win = Toplevel(self.root)
+            win.title("Settings: Directories")
+            win.resizable(False, False)
+            self._directories_win = win
+
+            frm = ttk.Frame(win, padding=10)
+            frm.pack(fill=BOTH, expand=True)
+
+            dirs = ttk.LabelFrame(frm, text="Directories", padding=10)
+            dirs.pack(fill=X)
+
+            r1 = ttk.Frame(dirs)
+            r1.pack(fill=X)
+            ttk.Label(r1, text="Movies dir:").pack(side=LEFT)
+            ent_movies = ttk.Entry(r1, textvariable=self.var_movies_dir, width=40)
+            ent_movies.pack(side=LEFT, padx=5)
+            Tooltip(ent_movies, "Output folder on the server for movies (example: /storage/Movies).")
+
+            r2 = ttk.Frame(dirs)
+            r2.pack(fill=X, pady=(6, 0))
+            ttk.Label(r2, text="Series dir:").pack(side=LEFT)
+            ent_series = ttk.Entry(r2, textvariable=self.var_series_dir, width=40)
+            ent_series.pack(side=LEFT, padx=5)
+            Tooltip(ent_series, "Output folder on the server for series (example: /storage/Series).")
+
+            r3 = ttk.Frame(dirs)
+            r3.pack(fill=X, pady=(6, 0))
+            ttk.Label(r3, text="Books dir:").pack(side=LEFT)
+            ent_books = ttk.Entry(r3, textvariable=self.var_books_dir, width=40)
+            ent_books.pack(side=LEFT, padx=5)
+            Tooltip(ent_books, "(Future) Output folder on the server for books (example: /storage/Books).")
+
+            r4 = ttk.Frame(dirs)
+            r4.pack(fill=X, pady=(6, 0))
+            ttk.Label(r4, text="Music dir:").pack(side=LEFT)
+            ent_music = ttk.Entry(r4, textvariable=self.var_music_dir, width=40)
+            ent_music.pack(side=LEFT, padx=5)
+            Tooltip(ent_music, "(Future) Output folder on the server for music (example: /storage/Music).")
+
+            btns = ttk.Frame(frm)
+            btns.pack(fill=X, pady=(10, 0))
+            ttk.Button(btns, text="Close", command=win.destroy).pack(side=RIGHT)
 
         def _browse_csv(self) -> None:
             p = filedialog.askopenfilename(title="Select schedule CSV", filetypes=[("CSV", "*.csv"), ("All", "*")])

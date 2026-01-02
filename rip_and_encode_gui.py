@@ -59,6 +59,7 @@ from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
 from archive_helper_gui.parser import parse_for_progress
 from archive_helper_gui.handbrake_presets import fetch_handbrake_presets
 from archive_helper_gui.connection_dialog import open_connection_settings_dialog
+from archive_helper_gui.directories_dialog import open_directories_settings_dialog
 from archive_helper_gui.help_dialog import show_help_dialog
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
@@ -705,80 +706,17 @@ if TK_AVAILABLE:
             except Exception:
                 self._directories_win = None
 
-            win = Toplevel(self.root)
-            win.title("Settings: Directories")
-            win.resizable(False, False)
-            self._directories_win = win
-
-            if modal:
-                try:
-                    win.transient(self.root)
-                    win.grab_set()
-                except Exception:
-                    pass
-
-            frm = ttk.Frame(win, padding=10)
-            frm.pack(fill=BOTH, expand=True)
-
-            dirs = ttk.LabelFrame(frm, text="Directories", padding=10)
-            dirs.pack(fill=X)
-
-            r1 = ttk.Frame(dirs)
-            r1.pack(fill=X)
-            ttk.Label(r1, text="Movies dir:").pack(side=LEFT)
-            ent_movies = ttk.Entry(r1, textvariable=self.var_movies_dir, width=40)
-            ent_movies.pack(side=LEFT, padx=5)
-            Tooltip(ent_movies, "Output folder on the server for movies (example: /storage/Movies).")
-
-            r2 = ttk.Frame(dirs)
-            r2.pack(fill=X, pady=(6, 0))
-            ttk.Label(r2, text="Series dir:").pack(side=LEFT)
-            ent_series = ttk.Entry(r2, textvariable=self.var_series_dir, width=40)
-            ent_series.pack(side=LEFT, padx=5)
-            Tooltip(ent_series, "Output folder on the server for series (example: /storage/Series).")
-
-            r3 = ttk.Frame(dirs)
-            r3.pack(fill=X, pady=(6, 0))
-            ttk.Label(r3, text="Books dir:").pack(side=LEFT)
-            ent_books = ttk.Entry(r3, textvariable=self.var_books_dir, width=40)
-            ent_books.pack(side=LEFT, padx=5)
-            Tooltip(ent_books, "(Future) Output folder on the server for books (example: /storage/Books).")
-
-            r4 = ttk.Frame(dirs)
-            r4.pack(fill=X, pady=(6, 0))
-            ttk.Label(r4, text="Music dir:").pack(side=LEFT)
-            ent_music = ttk.Entry(r4, textvariable=self.var_music_dir, width=40)
-            ent_music.pack(side=LEFT, padx=5)
-            Tooltip(ent_music, "(Future) Output folder on the server for music (example: /storage/Music).")
-
-            btns = ttk.Frame(frm)
-            btns.pack(fill=X, pady=(10, 0))
-
-            def _close() -> None:
-                try:
-                    if modal:
-                        self._validate_directories()
-                    self._persist_state()
-                except Exception as e:
-                    if modal:
-                        messagebox.showerror("Directories", str(e))
-                        return
-                try:
-                    win.destroy()
-                except Exception:
-                    pass
-
-            try:
-                win.protocol("WM_DELETE_WINDOW", _close)
-            except Exception:
-                pass
-
-            ttk.Button(btns, text=next_label, command=_close).pack(side=RIGHT)
-
-            try:
-                ent_movies.focus_set()
-            except Exception:
-                pass
+            self._directories_win = open_directories_settings_dialog(
+                root=self.root,
+                movies_dir_var=self.var_movies_dir,
+                series_dir_var=self.var_series_dir,
+                books_dir_var=self.var_books_dir,
+                music_dir_var=self.var_music_dir,
+                validate_directories=self._validate_directories,
+                persist_state=self._persist_state,
+                modal=modal,
+                next_label=next_label,
+            )
 
         def _connection_ready(self) -> bool:
             host = (self.var_host.get() or "").strip()

@@ -362,6 +362,12 @@ if TK_AVAILABLE:
             settings_menu = Menu(menubar, tearoff=0)
             settings_menu.add_command(label="Connection...", command=self._open_connection_settings)
             settings_menu.add_command(label="Directories...", command=self._open_directories_settings)
+            settings_menu.add_separator()
+            settings_menu.add_checkbutton(
+                label="Install Jellyfin if missing",
+                variable=self.var_ensure_jellyfin,
+                command=self._on_menu_setting_changed,
+            )
             menubar.add_cascade(label="Settings", menu=settings_menu)
             self.root.config(menu=menubar)
 
@@ -1287,6 +1293,12 @@ if TK_AVAILABLE:
             p = filedialog.askopenfilename(title="Select SSH private key")
             if p:
                 self.var_key.set(p)
+
+        def _on_menu_setting_changed(self) -> None:
+            try:
+                self._persist_state()
+            except Exception:
+                pass
 
         def _open_connection_settings(self) -> None:
             try:

@@ -258,8 +258,14 @@ if TK_AVAILABLE:
         def _build_ui(self) -> None:
             menubar = Menu(self.root)
             settings_menu = Menu(menubar, tearoff=0)
+            # Keep references so we can disable settings editing while a run is active.
+            self._settings_menu = settings_menu
+
             settings_menu.add_command(label="Connection...", command=self._open_connection_settings)
+            self._settings_menu_connection_idx = settings_menu.index("end")
+
             settings_menu.add_command(label="Directories...", command=self._open_directories_settings)
+            self._settings_menu_directories_idx = settings_menu.index("end")
             settings_menu.add_separator()
             settings_menu.add_checkbutton(
                 label="Install Jellyfin if missing",
@@ -1109,6 +1115,20 @@ if TK_AVAILABLE:
                 pass
             try:
                 self.btn_cleanup.configure(state=("normal" if enabled else "disabled"))
+            except Exception:
+                pass
+
+            # Prevent changing Connection/Directories mid-run.
+            try:
+                menu = getattr(self, "_settings_menu", None)
+                if menu is not None:
+                    state = "normal" if enabled else "disabled"
+                    idx_conn = getattr(self, "_settings_menu_connection_idx", None)
+                    idx_dirs = getattr(self, "_settings_menu_directories_idx", None)
+                    if idx_conn is not None:
+                        menu.entryconfigure(idx_conn, state=state)
+                    if idx_dirs is not None:
+                        menu.entryconfigure(idx_dirs, state=state)
             except Exception:
                 pass
 

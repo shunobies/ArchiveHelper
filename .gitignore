@@ -1,5 +1,6 @@
 *:Zone.Identifier
 __pycache__/
+archive_helper_gui/__pycache__/
 *.pyc
 *.pyo
 *.pyd

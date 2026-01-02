@@ -38,6 +38,9 @@ class RemoteExecutor:
         self._hostkey_logged: set[str] = set()
         self._hostkey_lock = threading.Lock()
 
+    def log(self, message: str) -> None:
+        self._log(message)
+
     @property
     def known_hosts_path(self) -> Path:
         return self._state_dir / "known_hosts"
@@ -245,13 +248,28 @@ class RemoteExecutor:
             except Exception:
                 pass
 
-    def remote_run(self, target: str, port: str, keyfile: str, password: str, cmd: str) -> tuple[int, str]:
-        """Run a short remote command and capture output."""
+    def run_bash(
+        self,
+        target: str,
+        port: str,
+        keyfile: str,
+        password: str,
+        cmd: str,
+        *,
+        interactive: bool = False,
+    ) -> tuple[int, str]:
+        """Run a short remote bash command and capture output.
+
+        - interactive=False uses `bash -lc` (default for automation)
+        - interactive=True uses `bash -lic` (matches many users' interactive shell PATH)
+        """
+
+        bash_flag = "-lic" if interactive else "-lc"
 
         if password:
             client = self.connect_paramiko(target, port, keyfile, password)
             try:
-                return self.exec_paramiko(client, "bash -lc " + shlex.quote(cmd))
+                return self.exec_paramiko(client, f"bash {bash_flag} " + shlex.quote(cmd))
             finally:
                 try:
                     client.close()
@@ -260,9 +278,14 @@ class RemoteExecutor:
 
         ssh_base = self.ssh_args(target, port, keyfile, tty=False)
         res = subprocess.run(
-            ssh_base + ["bash", "-lc", shlex.quote(cmd)],
+            ssh_base + ["bash", bash_flag, shlex.quote(cmd)],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
         )
         return res.returncode, res.stdout or ""
+
+    def remote_run(self, target: str, port: str, keyfile: str, password: str, cmd: str) -> tuple[int, str]:
+        """Backward-compatible alias for run_bash(interactive=False)."""
+
+        return self.run_bash(target, port, keyfile, password, cmd, interactive=False)

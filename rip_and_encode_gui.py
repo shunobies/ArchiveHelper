@@ -58,6 +58,7 @@ from archive_helper_gui.log_patterns import (
 )
 from archive_helper_gui.models import ConnectionInfo, RunContext, UiState
 from archive_helper_gui.parser import parse_for_progress
+from archive_helper_gui.handbrake_presets import fetch_handbrake_presets
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
 from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
@@ -1690,157 +1691,13 @@ if TK_AVAILABLE:
             threading.Thread(target=_work, daemon=True).start()
 
         def _fetch_remote_handbrake_presets(self, target: str, port: str, keyfile: str, password: str) -> list[str]:
-            """Fetch the remote HandBrake preset list.
-
-            Uses OpenSSH for key-based auth and Paramiko for password-based auth.
-            Returns a list of preset name candidates.
-            """
-
-            cmd = "HandBrakeCLI --preset-list"
-            precheck = "command -v HandBrakeCLI >/dev/null 2>&1"
-            out = ""
-
-            if password:
-                client = self._connect_paramiko(target, port, keyfile, password)
-                try:
-                    # Some servers only add HandBrakeCLI to PATH for interactive shells.
-                    # Try non-interactive login shell first, then fall back to interactive login shell.
-                    shell_prefix = "bash -lc "
-                    code, _ = self._exec_paramiko(client, shell_prefix + shlex.quote(precheck))
-                    if code != 0:
-                        shell_prefix = "bash -lic "
-                        code, _ = self._exec_paramiko(client, shell_prefix + shlex.quote(precheck))
-                        if code != 0:
-                            self._log_threadsafe(
-                                "(Info) HandBrakeCLI not found on the server; preset list cannot be loaded.\n"
-                            )
-                            return []
-                        self._log_threadsafe(
-                            "(Info) Loading HandBrake presets using an interactive shell (PATH differs for non-interactive SSH).\n"
-                        )
-
-                    code, out = self._exec_paramiko(client, shell_prefix + shlex.quote(cmd))
-                    if code != 0:
-                        self._log_threadsafe(
-                            "(Info) Failed to run HandBrakeCLI --preset-list on the server; preset list cannot be loaded.\n"
-                        )
-                        return []
-                finally:
-                    try:
-                        client.close()
-                    except Exception:
-                        pass
-            else:
-                ssh_base = self._ssh_args(target, port, keyfile, tty=False)
-                res = subprocess.run(
-                    ssh_base + ["bash", "-lc", shlex.quote(precheck)],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                if res.returncode != 0:
-                    # Fall back to interactive login shell to match many users' manual SSH sessions.
-                    res_i = subprocess.run(
-                        ssh_base + ["bash", "-lic", shlex.quote(precheck)],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                    )
-                    if res_i.returncode != 0:
-                        detail = (res.stdout or "").strip() or (res_i.stdout or "").strip()
-                        if detail:
-                            self._log_threadsafe(
-                                "(Info) HandBrakeCLI precheck failed on the server; preset list cannot be loaded:\n"
-                                + detail
-                                + "\n"
-                            )
-                        else:
-                            self._log_threadsafe(
-                                "(Info) HandBrakeCLI not found on the server; preset list cannot be loaded.\n"
-                            )
-                        return []
-                    self._log_threadsafe(
-                        "(Info) Loading HandBrake presets using an interactive shell (PATH differs for non-interactive SSH).\n"
-                    )
-                    use_interactive = True
-                else:
-                    use_interactive = False
-
-                res2 = subprocess.run(
-                    ssh_base
-                    + (["bash", "-lic", shlex.quote(cmd)] if use_interactive else ["bash", "-lc", shlex.quote(cmd)]),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                if res2.returncode != 0:
-                    detail = (res2.stdout or "").strip()
-                    if detail:
-                        self._log_threadsafe(
-                            "(Info) Failed to run HandBrakeCLI --preset-list on the server:\n" + detail + "\n"
-                        )
-                    else:
-                        self._log_threadsafe(
-                            "(Info) Failed to run HandBrakeCLI --preset-list on the server.\n"
-                        )
-                    return []
-                out = res2.stdout or ""
-
-            # Parse preset list output.
-            # Typical format:
-            #   General/
-            #       Very Fast 1080p30
-            #           Small H.264 ...
-            # We want ONLY the "preset name" lines (usually indented, but indentation varies by build).
-            presets: list[str] = []
-            for raw in out.splitlines():
-                line = raw.rstrip("\r\n")
-                if not line.strip():
-                    continue
-
-                # Preserve indentation for classification.
-                s = line.lstrip(" \t")
-                indent_len = len(line) - len(s)
-
-                # Skip common noise / warnings.
-                if s.startswith("[") or s.startswith("Cannot load"):
-                    continue
-                if s == "HandBrake has exited.":
-                    continue
-
-                # Skip category headers like "General/" (no indent, ends with '/').
-                if not line.startswith(" ") and s.endswith("/"):
-                    continue
-
-                # Preset name lines are indented a small amount (often 4 spaces), but not the deeper
-                # description lines (often 8+ spaces). Accept tabs too.
-                if 2 <= indent_len <= 6:
-                    name = s.strip()
-                    if not name:
-                        continue
-                    # Defensive: ignore any stray category-like lines.
-                    if name.endswith("/"):
-                        continue
-                    presets.append(name)
-
-            # If the command ran but parsing yielded nothing, log a small snippet for troubleshooting.
-            if not presets and out.strip():
-                snippet_lines = [ln.rstrip("\r\n") for ln in out.splitlines() if ln.strip()][:20]
-                if snippet_lines:
-                    self._log_threadsafe(
-                        "(Info) HandBrake preset list command ran, but no presets were parsed. "
-                        "First lines of output:\n" + "\n".join(snippet_lines) + "\n"
-                    )
-
-            # De-dup while preserving order.
-            seen: set[str] = set()
-            unique: list[str] = []
-            for p in presets:
-                if p in seen:
-                    continue
-                seen.add(p)
-                unique.append(p)
-            return unique
+            return fetch_handbrake_presets(
+                self.remote,
+                target=target,
+                port=port,
+                keyfile=keyfile,
+                password=password,
+            )
 
         def _parse_for_progress(self, text_chunk: str) -> None:
             parse_for_progress(self, text_chunk)

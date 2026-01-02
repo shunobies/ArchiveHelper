@@ -1026,7 +1026,27 @@ if TK_AVAILABLE:
         def _append_log(self, line: str) -> None:
             self.log_text.configure(state="normal")
             self.log_text.insert(END, line)
+            self._trim_log(max_lines=100)
             self.log_text.see(END)
+
+        def _trim_log(self, *, max_lines: int) -> None:
+            """Keep the log textbox bounded to avoid long-run UI slowdowns."""
+
+            try:
+                end_index = self.log_text.index("end-1c")  # e.g. "123.0"
+                line_count = int(str(end_index).split(".", 1)[0])
+            except Exception:
+                return
+
+            extra = line_count - int(max_lines)
+            if extra <= 0:
+                return
+
+            try:
+                # Delete whole lines from the start; keep the most recent max_lines.
+                self.log_text.delete("1.0", f"{extra + 1}.0")
+            except Exception:
+                return
             self.log_text.configure(state="disabled")
 
         def _clear_log(self) -> None:

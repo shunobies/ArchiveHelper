@@ -58,7 +58,7 @@ except Exception:
     PARAMIKO_AVAILABLE = False
 
 try:
-    from tkinter import BOTH, END, LEFT, RIGHT, X, BooleanVar, IntVar, StringVar, Tk, filedialog, messagebox
+    from tkinter import BOTH, END, LEFT, RIGHT, X, BooleanVar, IntVar, Menu, StringVar, Tk, Toplevel, filedialog, messagebox
     from tkinter import ttk
     from tkinter.scrolledtext import ScrolledText
 

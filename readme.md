@@ -61,7 +61,7 @@ Open a terminal on your desktop and run:
 sudo apt update
 sudo apt install -y git python3 python3-venv python3-tk
 
-git clone <REPO_URL_HERE>
+git clone https://github.com/shunobies/ArchiveHelper.git
 cd ArchiveHelper
 ```
 

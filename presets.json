@@ -1,0 +1,76 @@
+{
+  "Version": 47,
+  "MinVersion": 47,
+  "PresetList": [
+    {
+      "PresetName": "Archive Helper/",
+      "PresetDescription": "",
+      "Folder": true,
+      "Type": 1,
+      "ChildrenArray": [
+        {
+          "PresetName": "VAAPI H.264 (8000 kbps)",
+          "PresetDescription": "VAAPI H.264, avg bitrate 8000 kbps, MP4",
+          "Folder": false,
+          "Type": 1,
+          "Default": false,
+
+          "FileFormat": "mp4",
+          "Optimize": true,
+          "ChapterMarkers": true,
+
+          "VideoEncoder": "vaapi_h264",
+          "VideoQualityType": 1,
+          "VideoAvgBitrate": 8000,
+          "VideoTwoPass": false,
+          "VideoTurboTwoPass": false,
+          "VideoFramerate": "auto",
+          "VideoFramerateMode": "vfr",
+
+          "VideoPreset": "quality",
+          "VideoTune": "",
+          "VideoProfile": "auto",
+          "VideoLevel": "auto",
+
+          "AudioEncoderFallback": "av_aac",
+          "AudioCopyMask": [
+            "copy:aac",
+            "copy:ac3",
+            "copy:dts",
+            "copy:dtshd",
+            "copy:eac3",
+            "copy:flac",
+            "copy:truehd",
+            "copy:mp3",
+            "copy:opus"
+          ],
+          "AudioLanguageList": [],
+          "AudioList": [],
+
+          "SubtitleAddCC": false,
+          "SubtitleAddForeignAudioSearch": false,
+          "SubtitleBurnBDSub": false,
+          "SubtitleBurnBehavior": "none",
+          "SubtitleLanguageList": [],
+          "SubtitleTrackSelectionBehavior": "none",
+
+          "PictureAutoCrop": true,
+          "PictureBottomCrop": 0,
+          "PictureLeftCrop": 0,
+          "PictureRightCrop": 0,
+          "PictureTopCrop": 0,
+
+          "PictureWidth": 0,
+          "PictureHeight": 0,
+          "PictureModulus": 2,
+
+          "PictureKeepRatio": true,
+          "PictureAnamorphic": "auto",
+          "PicturePAR": "auto",
+          "PicturePARWidth": 1,
+          "PicturePARHeight": 1
+        }
+      ]
+    }
+  ]
+}

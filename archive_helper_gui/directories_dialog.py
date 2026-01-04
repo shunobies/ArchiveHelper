@@ -10,13 +10,14 @@ def open_directories_settings_dialog(
     series_dir_var,
     books_dir_var,
     music_dir_var,
+    local_dest_var,
     validate_directories: Callable[[], object],
     persist_state: Callable[[], None],
     modal: bool = False,
     next_label: str = "Close",
 ) -> "object":
     import tkinter as tk
-    from tkinter import BOTH, LEFT, X, messagebox, ttk
+    from tkinter import BOTH, LEFT, X, filedialog, messagebox, ttk
 
     from .tooltip import Tooltip
 
@@ -50,6 +51,32 @@ def open_directories_settings_dialog(
     ent_series = ttk.Entry(r2, textvariable=series_dir_var, width=40)
     ent_series.pack(side=LEFT, padx=5)
     Tooltip(ent_series, "Output folder on the server for series (example: /storage/Series).")
+
+    r5 = ttk.Frame(dirs)
+    r5.pack(fill=X, pady=(6, 0))
+    ttk.Label(r5, text="Local destination:").pack(side=LEFT)
+    ent_local = ttk.Entry(r5, textvariable=local_dest_var, width=45)
+    ent_local.pack(side=LEFT, padx=5)
+    Tooltip(
+        ent_local,
+        "Local staging directory for local rip modes (Rip locally...).\n"
+        "The app will create per-title subfolders here.",
+    )
+
+    def _browse_local() -> None:
+        try:
+            p = filedialog.askdirectory(title="Select local destination")
+        except Exception:
+            p = ""
+        if p:
+            try:
+                local_dest_var.set(p)
+            except Exception:
+                pass
+
+    btn_local = ttk.Button(r5, text="Browse", command=_browse_local)
+    btn_local.pack(side=LEFT)
+    Tooltip(btn_local, "Pick a local folder used as staging for local rip modes.")
 
     r3 = ttk.Frame(dirs)
     r3.pack(fill=X, pady=(6, 0))

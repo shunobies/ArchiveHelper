@@ -283,6 +283,8 @@ if TK_AVAILABLE:
             self.var_series_dir = StringVar(value="/storage/Series")
             self.var_books_dir = StringVar(value="/storage/Books")
             self.var_music_dir = StringVar(value="/storage/Music")
+            # Local staging destination for local rip modes.
+            self.var_local_dest = StringVar(value="")
             self.var_preset = StringVar(value="HQ 1080p30 Surround")
             self.var_ensure_jellyfin = BooleanVar(value=False)
             self.var_disc_type = StringVar(value="dvd")
@@ -592,6 +594,51 @@ if TK_AVAILABLE:
             # Windows: uses the user's home directory as well.
             return Path.home() / ".archive_helper_for_jellyfin"
 
+        def _local_staging_base(self) -> Path:
+            """Base directory for local ripping workdirs.
+
+            Prefer the user-configured Local destination; otherwise fall back to
+            a safe default under the app state dir.
+            """
+            raw = (self.var_local_dest.get() or "").strip()
+            if raw:
+                try:
+                    p = Path(raw).expanduser()
+                except Exception:
+                    p = Path(raw)
+                return p
+            return self._state_dir() / "local_rips"
+
+        def _local_free_gb(self, path: Path) -> float:
+            try:
+                usage = shutil.disk_usage(str(path))
+                return float(usage.free) / (1024.0**3)
+            except Exception:
+                return 0.0
+
+        def _local_pause_for_disk_space(self, path: Path, *, min_free_gb: float = 20.0) -> None:
+            """Worker-thread helper: pause until local disk space is above threshold."""
+            while not self._local_stop_requested.is_set():
+                free_gb = self._local_free_gb(path)
+                if free_gb >= float(min_free_gb):
+                    return
+
+                msg = (
+                    "Low disk space on local machine.\n\n"
+                    f"Path: {path}\n"
+                    f"Free: {free_gb:.1f} GB\n"
+                    f"Required: {float(min_free_gb):.0f} GB\n\n"
+                    "Free up space, then click Continue to re-check."
+                )
+                self.ui_queue.put(("local_wait", msg))
+
+                # Wait for Continue (or Stop).
+                while not self._local_stop_requested.is_set():
+                    if self._local_continue_event.wait(0.2):
+                        break
+                self._local_continue_event.clear()
+            return
+
         def _state_path(self) -> Path:
             return self.persistence.state_path()
 
@@ -634,6 +681,7 @@ if TK_AVAILABLE:
                 self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
                 self.var_books_dir.set(str(data.get("books_dir", self.var_books_dir.get())))
                 self.var_music_dir.set(str(data.get("music_dir", self.var_music_dir.get())))
+                self.var_local_dest.set(str(data.get("local_dest", self.var_local_dest.get())))
                 self.var_preset.set(str(data.get("preset", self.var_preset.get())))
                 self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
                 self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
@@ -677,6 +725,7 @@ if TK_AVAILABLE:
                 "series_dir": self.var_series_dir.get(),
                 "books_dir": self.var_books_dir.get(),
                 "music_dir": self.var_music_dir.get(),
+                "local_dest": self.var_local_dest.get(),
                 "preset": self.var_preset.get(),
                 "ensure_jellyfin": bool(self.var_ensure_jellyfin.get()),
                 "disc_type": self.var_disc_type.get(),
@@ -896,6 +945,7 @@ if TK_AVAILABLE:
             series = (self.var_series_dir.get() or "").strip()
             books = (self.var_books_dir.get() or "").strip()
             music = (self.var_music_dir.get() or "").strip()
+            local_dest = (self.var_local_dest.get() or "").strip()
             if not movies:
                 raise ValueError("Movies dir is required.")
             if not series:
@@ -904,6 +954,11 @@ if TK_AVAILABLE:
                 raise ValueError("Books dir is required.")
             if not music:
                 raise ValueError("Music dir is required.")
+
+            exec_mode = (self.var_exec_mode.get() or EXEC_MODE_REMOTE).strip() or EXEC_MODE_REMOTE
+            if exec_mode in {EXEC_MODE_LOCAL_RIP_ONLY, EXEC_MODE_LOCAL_RIP_ENCODE}:
+                if not local_dest:
+                    raise ValueError("Local destination is required for local rip modes.")
 
         def _open_directories_settings(self, *, modal: bool = False, next_label: str = "Close") -> None:
             try:
@@ -919,6 +974,7 @@ if TK_AVAILABLE:
                 series_dir_var=self.var_series_dir,
                 books_dir_var=self.var_books_dir,
                 music_dir_var=self.var_music_dir,
+                local_dest_var=self.var_local_dest,
                 validate_directories=self._validate_directories,
                 persist_state=self._persist_state,
                 modal=modal,
@@ -939,10 +995,17 @@ if TK_AVAILABLE:
             return True
 
         def _directories_ready(self) -> bool:
-            return all(
+            base_ready = all(
                 (v.get() or "").strip()
                 for v in (self.var_movies_dir, self.var_series_dir, self.var_books_dir, self.var_music_dir)
             )
+            if not base_ready:
+                return False
+
+            exec_mode = (self.var_exec_mode.get() or EXEC_MODE_REMOTE).strip() or EXEC_MODE_REMOTE
+            if exec_mode in {EXEC_MODE_LOCAL_RIP_ONLY, EXEC_MODE_LOCAL_RIP_ENCODE}:
+                return bool((self.var_local_dest.get() or "").strip())
+            return True
 
         def _is_setup_complete(self) -> bool:
             return self._connection_ready() and self._directories_ready()
@@ -2306,6 +2369,18 @@ if TK_AVAILABLE:
             schedule: list,
         ) -> None:
             try:
+                local_base = self._local_staging_base()
+                try:
+                    local_base.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    pass
+
+                # Initial guard before starting any disc work.
+                self._local_pause_for_disk_space(local_base, min_free_gb=20.0)
+                if self._local_stop_requested.is_set():
+                    self.ui_queue.put(("done", "Stopped"))
+                    return
+
                 code_home, out_home = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "echo $HOME")
                 if code_home != 0:
                     raise RuntimeError("Unable to determine remote $HOME: " + (out_home or "").strip())
@@ -2337,14 +2412,25 @@ if TK_AVAILABLE:
                         return
                     self._local_continue_event.clear()
 
+                    # Guard before each disc rip.
+                    self._local_pause_for_disk_space(local_base, min_free_gb=20.0)
+                    if self._local_stop_requested.is_set():
+                        self.ui_queue.put(("done", "Stopped"))
+                        return
+
                     local_disc_dir = (
-                        self._state_dir()
-                        / "local_rips"
+                        local_base
                         / f"{title_s} ({year_s})"
                         / "MKVs"
                         / f"Disc{disc_i:02d}"
                     )
                     local_disc_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Mark the per-title folder as app-managed (for future cleanup safety).
+                    try:
+                        (local_disc_dir.parent.parent / ".rip_and_encode_workdir").touch(exist_ok=True)
+                    except Exception:
+                        pass
 
                     existing = sorted([p for p in local_disc_dir.rglob("*.mkv") if p.is_file()])
                     if existing:
@@ -2352,6 +2438,12 @@ if TK_AVAILABLE:
                     else:
                         self.ui_queue.put(("log", f"(Local) Ripping to: {local_disc_dir}\n"))
                         self._run_local_makemkv(local_disc_dir)
+
+                    # Guard after rip (MKVs can be large).
+                    self._local_pause_for_disk_space(local_base, min_free_gb=20.0)
+                    if self._local_stop_requested.is_set():
+                        self.ui_queue.put(("done", "Stopped"))
+                        return
 
                     mkvs = sorted([p for p in local_disc_dir.rglob("*.mkv") if p.is_file()])
                     if not mkvs:

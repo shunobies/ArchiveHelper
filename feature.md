@@ -3,6 +3,20 @@
 
 ## Dual-Mode Operation: Rip Remote (existing) + Rip Local (new)
 
+## Current status (as of 2026-01-04)
+
+- Completed:
+	- Mode selector (3 modes) in the GUI with persistence + Settings entry.
+	- **Local rip-only, encode on server**: rip locally with MakeMKV, upload MKVs to server workdir, then start remote encode with `--no-disc-prompts`.
+	- Server support: `rip_and_encode.py` has `--no-disc-prompts` to skip between-disc `input()` pauses in CSV mode.
+- Not completed yet:
+	- Configurable local destination path (currently uses a fixed local staging location).
+	- Local disk-space checks during local ripping.
+	- Local cleanup (delete local workdirs safely) and any UI for it.
+	- **Rip + encode locally, upload results**.
+
+Where we left off: local rip-only is working end-to-end, but the local staging directory is not user-configurable yet and there are no local disk-space guardrails/cleanup tooling.
+
 Goal: Support two user workflows:
 
 1) **Rip Remote (existing)**: GUI controls a remote host over SSH; ripping/encoding happens on the server; GUI tails remote logs and responds to prompts.
@@ -11,14 +25,11 @@ Goal: Support two user workflows:
 ### Open questions (resolve before implementation)
 
 - Local mode scope:
-	- Is local mode **rip-only** (produce MKVs locally, then upload MKVs for server-side encode), or **rip+encode locally** (upload final MP4s)?
-	- If “rip-only”, do we also want a follow-up remote command to start HandBrake on the server after upload?
-- Disc prompting in local mode:
-	- Should the GUI still show the same “Insert disc / Continue” prompts when driving local MakeMKV?
-	- Should “Continue” control a local process stdin, similar to the legacy direct-stdin path?
-- Storage expectations:
-	- Where should local workdirs live (per-title temp under $HOME / %USERPROFILE%)?
-	- Do we support local output to external drives?
+	- Rip-only (MKVs locally, encode on server) is implemented.
+	- Rip + encode locally (upload MP4s) is still pending.
+- Storage expectations (NEW):
+	- Add a **configurable local destination path** in Settings so the app has a managed local workspace.
+	- Add **local disk-space checks** during a local run to prevent filling the drive.
 
 ### UX requirements
 
@@ -38,11 +49,7 @@ Goal: Support two user workflows:
 	- remote job (existing: screen + tail over SSH)
 	- local job (new: subprocess + local log file)
 
-Proposed modules (minimal changes, avoid large rewrites):
-
-- `archive_helper_gui/modes.py`: mode constants, persistence helpers, UI labels.
-- `archive_helper_gui/local_runner.py`: start local script, manage stdin (Enter), stream/tail local log.
-- `archive_helper_gui/uploader.py`: upload completed outputs to server (SFTP via Paramiko when available; fallback to `scp` if present).
+Note: local rip-only was implemented directly in `rip_and_encode_gui.py` (minimal change / avoid large rewrite). We can still refactor into modules later if desired.
 
 ### Local mode pipeline (high-level)
 
@@ -60,6 +67,7 @@ Proposed modules (minimal changes, avoid large rewrites):
 	 - optionally verify by checksum for small files (keep optional to avoid long runs)
 5) Local cleanup:
 	 - delete only local workdirs with marker files (mirror remote cleanup safety approach)
+	 - **NEW**: local workspace should be user-configurable and managed (safe cleanup + guardrails)
 
 ### Cross-platform considerations (Windows / Linux / macOS)
 
@@ -90,31 +98,34 @@ Proposed modules (minimal changes, avoid large rewrites):
 
 ### Implementation checklist (sequenced)
 
+Done:
+
 1) Persistence
-	- Add persisted setting for rip mode.
-	- Add migration default to “remote”.
+	- Persisted setting for rip mode (default remote).
 2) Startup modal
-	- Show mode picker on startup when no preference yet.
-	- Store preference and apply immediately.
+	- Mode picker shown on startup when no preference yet.
 3) Settings integration
-	- Add Settings → Mode to switch.
-	- Ensure disabled while running.
-4) Local runner (no upload yet)
-	- Run a local process and tail a local log.
-	- Verify GUI parser works with replay/log tail.
-	- Ensure Continue sends Enter to the local process when prompted.
-5) Upload-only prototype
-	- Implement “upload outputs to server” function and test with a small file.
-	- Prefer Paramiko SFTP when available; else OpenSSH scp.
-6) Local pipeline end-to-end
-	- After local job completes, upload outputs to the configured remote Movies/Series dirs.
-	- Handle partial failures: retry upload, show errors, leave local files intact on failure.
-7) Safety rails
-	- Confirm we never delete server storage dirs.
-	- Local cleanup guarded by marker file(s).
-8) UX polish
-	- Status text clearly indicates “Local run” vs “Remote run”.
-	- Connection dialog wording adjusted in local mode (still required for upload target).
+	- Settings entry to switch modes; blocked while running.
+4) Local runner + upload + handoff
+	- Local MakeMKV ripping via GUI, Continue prompts.
+	- Upload MKVs to server workdir.
+	- Start server-side encode pass with `--no-disc-prompts`.
+
+Next:
+
+5) Settings: configurable local destination (NEW)
+	- Add a “Local destination” path input when a local rip mode is selected.
+	- Use it for local staging/workdirs.
+	- Store/persist it.
+6) Local disk-space checks (NEW)
+	- Before starting each disc rip, ensure local destination drive has >= X GB free.
+	- Periodically check while ripping and warn/pause if below threshold.
+7) Local cleanup (NEW)
+	- Mirror remote cleanup safety rails: marker file + only delete within the configured local destination.
+	- Add a UI action to cleanup local staging.
+8) Local rip+encode mode
+	- Encode locally (HandBrakeCLI), upload MP4 results.
+	- Decide whether to upload into Movies/Series dirs directly or stage then remote move.
 
 ### Manual test checklist (with you)
 

@@ -732,6 +732,12 @@ def file_size_mb(f: Path) -> int:
 # ----------------------------
 
 
+class MakeMKVError(RuntimeError):
+    def __init__(self, code: int, message: str) -> None:
+        super().__init__(message)
+        self.code = int(code)
+
+
 def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -777,7 +783,7 @@ def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> N
     code = proc.wait()
     print()
     if code != 0:
-        raise RuntimeError(f"MakeMKV failed with exit code {code}")
+        raise MakeMKVError(int(code), f"MakeMKV failed with exit code {code}")
 
 
 def find_mkvs_in_dir(dir_: Path) -> list[Path]:
@@ -1135,7 +1141,30 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
     if wait_for_enter:
         input()
 
-    run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
+    auto_retry_used = False
+    while True:
+        try:
+            run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
+            break
+        except MakeMKVError as e:
+            # Exit code 11 commonly corresponds to a transient "Failed to open disc"
+            # (disc not fully ready, drive hiccup, tray state). Treat it as recoverable.
+            if int(getattr(e, "code", -1)) == 11:
+                if not auto_retry_used:
+                    auto_retry_used = True
+                    print("MakeMKV could not open the disc (exit 11). Retrying once in 8 seconds...")
+                    try:
+                        run_cmd(["eject", "-t", "/dev/sr0"], check=False)
+                    except Exception:
+                        pass
+                    time.sleep(8)
+                    continue
+
+                print("MakeMKV could not open the disc (exit 11).")
+                print("Check the disc/drive and press Enter to retry (or Ctrl-C / Stop to abort).")
+                input()
+                continue
+            raise
     try:
         run_cmd(["eject", "/dev/sr0"], check=False)
     except Exception:

@@ -39,6 +39,8 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
+from rip_and_encode import csv_disc_prompt_for_row, load_csv_schedule, sanitize_title_for_dir
+
 from archive_helper_gui.log_patterns import (
     CSV_LOADED_RE,
     ERROR_RE,
@@ -185,6 +187,18 @@ if TK_AVAILABLE:
             self.tail_channel = None
 
             self.run_ctx: RunContext | None = None
+
+            # Local rip mode runtime state.
+            self._local_continue_event = threading.Event()
+            self._local_waiting_for_continue = False
+            self._local_stop_requested = threading.Event()
+            self._local_proc: subprocess.Popen[str] | None = None
+            self._local_thread: threading.Thread | None = None
+            self._local_ripping_active = False
+
+            # Stashed connection/script info for local mode handoff.
+            self._local_cfg: ConnectionInfo | None = None
+            self._local_remote_script: str = ""
 
             self._stop_requested = threading.Event()
             self._done_emitted = False
@@ -1248,6 +1262,42 @@ if TK_AVAILABLE:
                     if kind == "log":
                         self._append_log(payload)
                         self._parse_for_progress(payload)
+                    elif kind == "local_wait":
+                        # Worker thread requests an operator prompt (disc swap / continue gate).
+                        self._local_continue_event.clear()
+                        self._local_waiting_for_continue = True
+                        self.state.waiting_for_enter = True
+                        self.var_step.set("Waiting for disc")
+                        self.var_prompt.set(payload)
+                        try:
+                            self.btn_continue.configure(state="normal")
+                        except Exception:
+                            pass
+                        try:
+                            self.progress.configure(mode="indeterminate")
+                            self.progress.start(10)
+                        except Exception:
+                            pass
+                    elif kind == "start_remote_encode":
+                        # Local rip/upload completed; start the remote encode pass.
+                        self._local_waiting_for_continue = False
+                        self._local_ripping_active = False
+                        try:
+                            self.btn_continue.configure(state="disabled")
+                        except Exception:
+                            pass
+                        self.var_prompt.set("")
+
+                        cfg = self._local_cfg
+                        remote_script = self._local_remote_script
+                        remote_csv = (payload or "").strip()
+                        if cfg is None or not remote_script or not remote_csv:
+                            self._on_done("Local mode internal error: missing remote start parameters.")
+                        else:
+                            try:
+                                self._start_remote_job(cfg, remote_script, remote_csv, extra_args=["--no-disc-prompts"])
+                            except Exception as e:
+                                self._on_done(str(e))
                     elif kind == "presets":
                         try:
                             presets = [p for p in payload.split("\n") if p.strip()]
@@ -1546,6 +1596,17 @@ if TK_AVAILABLE:
             self.var_elapsed.set("")
 
             self._set_inputs_enabled(True)
+
+            # Clear local-mode transient state.
+            try:
+                self._local_ripping_active = False
+                self._local_waiting_for_continue = False
+                self._local_cfg = None
+                self._local_remote_script = ""
+                self._local_stop_requested.clear()
+                self._local_continue_event.clear()
+            except Exception:
+                pass
 
             # Clear run context.
             self.run_ctx = None
@@ -1884,11 +1945,12 @@ if TK_AVAILABLE:
             if self.state.running:
                 return
 
-            if (self.var_exec_mode.get() or EXEC_MODE_REMOTE) != EXEC_MODE_REMOTE:
+            exec_mode = (self.var_exec_mode.get() or EXEC_MODE_REMOTE).strip() or EXEC_MODE_REMOTE
+            if exec_mode == EXEC_MODE_LOCAL_RIP_ENCODE:
                 messagebox.showinfo(
                     "Rip mode",
-                    "Local ripping/encoding modes are planned but not implemented yet.\n\n"
-                    "For now, please use: Rip + encode on server (remote).",
+                    "Rip + encode locally is planned but not implemented yet.\n\n"
+                    "For now, please use: Rip locally (encode on server) or Rip + encode on server (remote).",
                 )
                 return
 
@@ -1958,168 +2020,472 @@ if TK_AVAILABLE:
 
                 assert local_csv is not None
 
-                # Upload CSV to remote.
-                remote_csv = f"/tmp/rip_and_encode_schedule_{int(time.time())}.csv"
-                self._append_log("Uploading schedule via SCP...\n")
-                if cfg.password:
-                    client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
-                    try:
-                        self._sftp_put(client, str(local_csv), remote_csv)
-                    finally:
-                        try:
-                            client.close()
-                        except Exception:
-                            pass
-                else:
-                    scp_args = self._scp_args(cfg.target, cfg.port, cfg.keyfile)
-                    scp_cmd = scp_args + [str(local_csv), f"{cfg.target}:{remote_csv}"]
-                    try:
-                        res = subprocess.run(
-                            scp_cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            text=True,
-                            check=True,
-                        )
-                        if res.stdout:
-                            self._append_log(res.stdout)
-                    except subprocess.CalledProcessError as e:
-                        detail = ((e.stdout or "").strip())
-                        raise ValueError(
-                            "Failed to upload schedule to the remote host.\n\n"
-                            f"Target: {cfg.target}\n"
-                            f"Remote path: {remote_csv}\n\n"
-                            + (detail if detail else "(No additional details.)")
-                        )
+                if exec_mode == EXEC_MODE_LOCAL_RIP_ONLY:
+                    schedule = load_csv_schedule(local_csv)
+                    self._begin_local_rip_only(cfg, remote_script, local_csv, schedule)
+                    return
 
-                # Build remote command.
-                cmd_parts = [
-                    "RIP_AND_ENCODE_IN_SCREEN=1",
-                    "python3",
-                    remote_script,
-                    "--csv",
-                    remote_csv,
-                    "--movies-dir",
-                    self.var_movies_dir.get().strip(),
-                    "--series-dir",
-                    self.var_series_dir.get().strip(),
-                    "--disc-type",
-                    (self.var_disc_type.get().strip() or "dvd"),
-                    "--preset",
-                    self.var_preset.get().strip(),
-                ]
+                remote_csv = self._upload_schedule_to_remote(cfg, local_csv)
+                self._start_remote_job(cfg, remote_script, remote_csv)
 
-                if self.var_ensure_jellyfin.get():
-                    cmd_parts += ["--ensure-jellyfin"]
-
-                # Defaults: always overlap with 1 encode job, and always keep MKVs (fail-safe).
-                cmd_parts += ["--overlap", "--encode-jobs", "1", "--keep-mkvs"]
-
-                remote_cmd = " ".join(shlex.quote(p) for p in cmd_parts)
-
-                # Start remote job in a detached screen session so we can reconnect/tail logs.
-                self._append_log("Starting remote job (screen)...\n")
-
-                # Store run context for reconnect.
-                self.run_ctx = RunContext(
-                    target=cfg.target,
-                    port=cfg.port,
-                    keyfile=cfg.keyfile,
-                    password=cfg.password,
-                    screen_name=f"archive_helper_for_jellyfin_{int(time.time())}",
-                    log_path="",
-                    remote_start_epoch=0,
-                )
-
-                # Persist run metadata immediately so a GUI crash/power loss can reattach.
-                self.last_run_host = (self.var_host.get() or "").strip()
-                self.last_run_user = (self.var_user.get() or "").strip()
-                self.last_run_port = (self.var_port.get() or "").strip() or "22"
-                self.last_run_screen_name = self.run_ctx.screen_name
-                self.last_run_log_path = ""
-                self.last_run_remote_start_epoch = 0
-                try:
-                    self._persist_state()
-                except Exception:
-                    pass
-                self._stop_requested.clear()
-                self._done_emitted = False
-                self._done_handled = False
-
-                # Ensure screen exists.
-                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "command -v screen >/dev/null 2>&1")
-                if code != 0:
-                    raise ValueError("Remote host is missing 'screen'. Install it and try again.\n" + (out or "").strip())
-
-                screen_cmd = (
-                    f"screen -S {shlex.quote(self.run_ctx.screen_name)} -dm "
-                    f"bash -lc {shlex.quote(remote_cmd)}"
-                )
-
-                # Capture remote time so we can pick the correct (new) log file for this run.
-                try:
-                    code_ts, out_ts = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "date +%s")
-                    if code_ts == 0:
-                        self.run_ctx.remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 1)
-                except Exception:
-                    self.run_ctx.remote_start_epoch = 0
-
-                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, screen_cmd)
-                if code != 0:
-                    raise ValueError("Failed to start remote job in screen: " + (out or "").strip())
-
-                # Find the log file path and begin tailing it.
-                self.run_ctx.log_path = self._find_latest_remote_log()
-                self.last_run_log_path = self.run_ctx.log_path
-                self.last_run_remote_start_epoch = int(self.run_ctx.remote_start_epoch or 0)
-                try:
-                    self._persist_state()
-                except Exception:
-                    pass
-                self._append_log(f"(Info) Following remote log: {self.run_ctx.log_path}\n")
-                self._start_tail()
-
-                # Clear legacy direct-stream handles (we tail logs instead).
-                self.proc = None
-                self.ssh_channel = None
-                self.ssh_client = None
-
-                self.state.running = True
-                self.state.waiting_for_enter = False
-                self.state.makemkv_phase = ""
-                self.state.last_makemkv_total_pct = 0.0
-                self.state.encode_queued = 0
-                self.state.encode_started = 0
-                self.state.encode_finished = 0
-                self.state.encode_active_label = ""
-                self.state.eta_phase = ""
-                self.state.eta_last_pct = 0.0
-                self.state.eta_last_ts = 0.0
-                self.state.eta_rate_ewma = 0.0
-                self.state.run_started_ts = time.time()
-                self.var_step.set("Running")
-                self.var_prompt.set("")
-                self.var_eta.set("")
-                self.progress.configure(mode="indeterminate")
-                self.progress.start(10)
-
-                self.btn_start.configure(state="disabled")
-                self.btn_stop.configure(state="normal")
-                self.btn_continue.configure(state="disabled")
-
-                self._set_inputs_enabled(False)
-
-                self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
-                self.reader_thread.start()
+                return
 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
+
+        def _upload_schedule_to_remote(self, cfg: ConnectionInfo, local_csv: Path) -> str:
+            remote_csv = f"/tmp/rip_and_encode_schedule_{int(time.time())}.csv"
+            self._append_log("Uploading schedule via SCP...\n")
+
+            if cfg.password:
+                client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
+                try:
+                    self._sftp_put(client, str(local_csv), remote_csv)
+                finally:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return remote_csv
+
+            scp_args = self._scp_args(cfg.target, cfg.port, cfg.keyfile)
+            scp_cmd = scp_args + [str(local_csv), f"{cfg.target}:{shlex.quote(remote_csv)}"]
+            try:
+                res = subprocess.run(
+                    scp_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=True,
+                )
+                if res.stdout:
+                    self._append_log(res.stdout)
+            except subprocess.CalledProcessError as e:
+                detail = ((e.stdout or "").strip())
+                raise ValueError(
+                    "Failed to upload schedule to the remote host.\n\n"
+                    f"Target: {cfg.target}\n"
+                    f"Remote path: {remote_csv}\n\n"
+                    + (detail if detail else "(No additional details.)")
+                )
+            return remote_csv
+
+        def _start_remote_job(
+            self,
+            cfg: ConnectionInfo,
+            remote_script: str,
+            remote_csv: str,
+            *,
+            extra_args: list[str] | None = None,
+        ) -> None:
+            extra = list(extra_args or [])
+
+            cmd_parts = [
+                "RIP_AND_ENCODE_IN_SCREEN=1",
+                "python3",
+                remote_script,
+                "--csv",
+                remote_csv,
+                "--movies-dir",
+                self.var_movies_dir.get().strip(),
+                "--series-dir",
+                self.var_series_dir.get().strip(),
+                "--disc-type",
+                (self.var_disc_type.get().strip() or "dvd"),
+                "--preset",
+                self.var_preset.get().strip(),
+            ]
+
+            if self.var_ensure_jellyfin.get():
+                cmd_parts += ["--ensure-jellyfin"]
+
+            # Defaults: always overlap with 1 encode job, and always keep MKVs (fail-safe).
+            cmd_parts += ["--overlap", "--encode-jobs", "1", "--keep-mkvs"]
+            cmd_parts += extra
+
+            remote_cmd = " ".join(shlex.quote(p) for p in cmd_parts)
+
+            self._append_log("Starting remote job (screen)...\n")
+
+            self.run_ctx = RunContext(
+                target=cfg.target,
+                port=cfg.port,
+                keyfile=cfg.keyfile,
+                password=cfg.password,
+                screen_name=f"archive_helper_for_jellyfin_{int(time.time())}",
+                log_path="",
+                remote_start_epoch=0,
+            )
+
+            # Persist run metadata immediately so a GUI crash/power loss can reattach.
+            self.last_run_host = (self.var_host.get() or "").strip()
+            self.last_run_user = (self.var_user.get() or "").strip()
+            self.last_run_port = (self.var_port.get() or "").strip() or "22"
+            self.last_run_screen_name = self.run_ctx.screen_name
+            self.last_run_log_path = ""
+            self.last_run_remote_start_epoch = 0
+            try:
+                self._persist_state()
+            except Exception:
+                pass
+
+            self._stop_requested.clear()
+            self._done_emitted = False
+            self._done_handled = False
+
+            code, out = self._remote_run(
+                cfg.target,
+                cfg.port,
+                cfg.keyfile,
+                cfg.password,
+                "command -v screen >/dev/null 2>&1",
+            )
+            if code != 0:
+                raise ValueError("Remote host is missing 'screen'. Install it and try again.\n" + (out or "").strip())
+
+            screen_cmd = (
+                f"screen -S {shlex.quote(self.run_ctx.screen_name)} -dm "
+                f"bash -lc {shlex.quote(remote_cmd)}"
+            )
+
+            # Capture remote time so we can pick the correct (new) log file for this run.
+            try:
+                code_ts, out_ts = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "date +%s")
+                if code_ts == 0:
+                    self.run_ctx.remote_start_epoch = max(0, int((out_ts or "").strip().splitlines()[-1]) - 1)
+            except Exception:
+                self.run_ctx.remote_start_epoch = 0
+
+            code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, screen_cmd)
+            if code != 0:
+                raise ValueError("Failed to start remote job in screen: " + (out or "").strip())
+
+            self.run_ctx.log_path = self._find_latest_remote_log()
+            self.last_run_log_path = self.run_ctx.log_path
+            self.last_run_remote_start_epoch = int(self.run_ctx.remote_start_epoch or 0)
+            try:
+                self._persist_state()
+            except Exception:
+                pass
+
+            self._append_log(f"(Info) Following remote log: {self.run_ctx.log_path}\n")
+            self._start_tail()
+
+            self.proc = None
+            self.ssh_channel = None
+            self.ssh_client = None
+
+            self.state.running = True
+            self.state.waiting_for_enter = False
+            self.state.makemkv_phase = ""
+            self.state.last_makemkv_total_pct = 0.0
+            self.state.encode_queued = 0
+            self.state.encode_started = 0
+            self.state.encode_finished = 0
+            self.state.encode_active_label = ""
+            self.state.eta_phase = ""
+            self.state.eta_start_pct = 0.0
+            self.state.eta_start_ts = 0.0
+            self.state.eta_last_pct = 0.0
+            self.state.eta_last_ts = 0.0
+            self.state.eta_rate_ewma = 0.0
+            self.state.run_started_ts = time.time()
+            self.var_step.set("Running")
+            self.var_prompt.set("")
+            self.var_eta.set("")
+            self.progress.configure(mode="indeterminate")
+            self.progress.start(10)
+
+            self.btn_start.configure(state="disabled")
+            self.btn_stop.configure(state="normal")
+            self.btn_continue.configure(state="disabled")
+
+            self._set_inputs_enabled(False)
+
+            self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self.reader_thread.start()
+
+        def _begin_local_rip_only(
+            self,
+            cfg: ConnectionInfo,
+            remote_script: str,
+            local_csv: Path,
+            schedule: list,
+        ) -> None:
+            if self.state.running:
+                raise RuntimeError("Already running.")
+
+            self._append_log("Local rip mode: rip locally, upload MKVs, encode on server.\n")
+            self._local_cfg = cfg
+            self._local_remote_script = remote_script
+            self._local_stop_requested.clear()
+            self._local_continue_event.clear()
+            self._local_waiting_for_continue = False
+            self._local_ripping_active = True
+
+            # Treat local ripping as a run so Stop/inputs behave consistently.
+            self.state.running = True
+            self.state.waiting_for_enter = False
+            self.state.run_started_ts = time.time()
+            self.var_step.set("Running")
+            self.var_prompt.set("")
+            self.var_eta.set("")
+            self.progress.configure(mode="indeterminate")
+            self.progress.start(10)
+
+            self.btn_start.configure(state="disabled")
+            self.btn_stop.configure(state="normal")
+            self.btn_continue.configure(state="disabled")
+            self._set_inputs_enabled(False)
+
+            self._local_thread = threading.Thread(
+                target=self._local_rip_only_worker,
+                args=(cfg, remote_script, local_csv, schedule),
+                daemon=True,
+            )
+            self._local_thread.start()
+
+        def _local_rip_only_worker(
+            self,
+            cfg: ConnectionInfo,
+            remote_script: str,
+            local_csv: Path,
+            schedule: list,
+        ) -> None:
+            try:
+                code_home, out_home = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, "echo $HOME")
+                if code_home != 0:
+                    raise RuntimeError("Unable to determine remote $HOME: " + (out_home or "").strip())
+                remote_home = (out_home or "").strip().splitlines()[-1].strip()
+                if not remote_home:
+                    raise RuntimeError("Unable to determine remote $HOME.")
+
+                for row in schedule:
+                    if self._local_stop_requested.is_set():
+                        self.ui_queue.put(("done", "Stopped"))
+                        return
+
+                    title_s = sanitize_title_for_dir(getattr(row, "name", ""))
+                    year_s = str(getattr(row, "year", "")).strip()
+                    disc_i = int(getattr(row, "disc", 0) or 0)
+                    if not title_s or not year_s or disc_i < 1:
+                        raise RuntimeError("Invalid schedule row encountered during local rip.")
+
+                    prompt = csv_disc_prompt_for_row(row)
+                    prompt += "\n\nClick Continue to start ripping locally."
+                    self.ui_queue.put(("local_wait", prompt))
+
+                    # Wait for Continue (or Stop).
+                    while not self._local_stop_requested.is_set():
+                        if self._local_continue_event.wait(0.2):
+                            break
+                    if self._local_stop_requested.is_set():
+                        self.ui_queue.put(("done", "Stopped"))
+                        return
+                    self._local_continue_event.clear()
+
+                    local_disc_dir = (
+                        self._state_dir()
+                        / "local_rips"
+                        / f"{title_s} ({year_s})"
+                        / "MKVs"
+                        / f"Disc{disc_i:02d}"
+                    )
+                    local_disc_dir.mkdir(parents=True, exist_ok=True)
+
+                    existing = sorted([p for p in local_disc_dir.rglob("*.mkv") if p.is_file()])
+                    if existing:
+                        self.ui_queue.put(("log", f"(Local) Resume: found existing MKVs in {local_disc_dir}; skipping rip.\n"))
+                    else:
+                        self.ui_queue.put(("log", f"(Local) Ripping to: {local_disc_dir}\n"))
+                        self._run_local_makemkv(local_disc_dir)
+
+                    mkvs = sorted([p for p in local_disc_dir.rglob("*.mkv") if p.is_file()])
+                    if not mkvs:
+                        raise RuntimeError(f"No MKVs found after local rip: {local_disc_dir}")
+
+                    remote_work_dir = f"{remote_home}/{title_s} ({year_s})"
+                    remote_mkv_root = f"{remote_work_dir}/MKVs"
+                    self._ensure_remote_dir(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_mkv_root)
+
+                    self.ui_queue.put(("log", f"(Local) Uploading MKVs for Disc{disc_i:02d}...\n"))
+                    self._upload_dir_to_remote_mkv_root(cfg, local_disc_dir, remote_mkv_root)
+
+                # Upload schedule and kick off encode-only pass (no disc prompts).
+                remote_csv = self._upload_schedule_to_remote(cfg, local_csv)
+                self.ui_queue.put(("start_remote_encode", remote_csv))
+            except Exception as e:
+                msg = (str(e) or "").strip()
+                if msg.lower() == "stopped":
+                    self.ui_queue.put(("done", "Stopped"))
+                else:
+                    self.ui_queue.put(("done", f"Local rip failed: {e}"))
+
+        def _upload_dir_to_remote_mkv_root(self, cfg: ConnectionInfo, local_disc_dir: Path, remote_mkv_root: str) -> None:
+            # Copy DiscNN directory into remote MKVs/ (so remote gets MKVs/DiscNN/*)
+            if cfg.password:
+                client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
+                try:
+                    abs_root = self._remote_abs_path_paramiko(client, remote_mkv_root)
+                    # Ensure MKVs root exists (Paramiko path does not expand '~').
+                    code, out = self._exec_paramiko(client, "bash -lc " + shlex.quote("mkdir -p -- " + shlex.quote(abs_root)))
+                    if code != 0:
+                        raise ValueError("Failed to create remote MKVs dir: " + (out or "").strip())
+
+                    disc_name = local_disc_dir.name
+                    abs_disc_dir = f"{abs_root.rstrip('/')}/{disc_name}"
+                    code2, out2 = self._exec_paramiko(
+                        client,
+                        "bash -lc " + shlex.quote("mkdir -p -- " + shlex.quote(abs_disc_dir)),
+                    )
+                    if code2 != 0:
+                        raise ValueError("Failed to create remote disc dir: " + (out2 or "").strip())
+
+                    sftp = client.open_sftp()
+                    try:
+                        for p in sorted(local_disc_dir.rglob("*")):
+                            if p.is_dir():
+                                rel = p.relative_to(local_disc_dir)
+                                rdir = f"{abs_disc_dir}/{str(rel).replace(os.sep, '/') }"
+                                try:
+                                    sftp.mkdir(rdir)
+                                except Exception:
+                                    pass
+                                continue
+                            if not p.is_file():
+                                continue
+
+                            rel = p.relative_to(local_disc_dir)
+                            rpath = f"{abs_disc_dir}/{str(rel).replace(os.sep, '/') }"
+                            # Ensure parent directories exist.
+                            parent = rpath.rsplit("/", 1)[0]
+                            try:
+                                sftp.mkdir(parent)
+                            except Exception:
+                                pass
+                            sftp.put(str(p), rpath)
+                    finally:
+                        try:
+                            sftp.close()
+                        except Exception:
+                            pass
+                finally:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return
+
+            scp_args = self._scp_args(cfg.target, cfg.port, cfg.keyfile)
+            dest = f"{cfg.target}:{shlex.quote(remote_mkv_root)}"
+            try:
+                res = subprocess.run(
+                    scp_args + ["-r", str(local_disc_dir), dest],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=True,
+                )
+                if res.stdout:
+                    self.ui_queue.put(("log", res.stdout))
+            except subprocess.CalledProcessError as e:
+                detail = ((e.stdout or "").strip())
+                raise ValueError(
+                    "Failed to upload MKVs to the remote host.\n\n"
+                    f"Target: {cfg.target}\n"
+                    f"Remote dir: {remote_mkv_root}\n\n"
+                    + (detail if detail else "(No additional details.)")
+                )
+
+        def _run_local_makemkv(self, out_dir: Path, *, cache_mb: int = 128) -> None:
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            exe = None
+            for cand in ["makemkvcon", "makemkvcon64", "makemkvcon.exe", "makemkvcon64.exe"]:
+                exe = shutil.which(cand)
+                if exe:
+                    break
+            if not exe:
+                raise RuntimeError("MakeMKV not found. Install MakeMKV and ensure 'makemkvcon' is on PATH.")
+
+            try:
+                cache_mb = int(cache_mb)
+            except Exception:
+                cache_mb = 128
+            cache_mb = max(16, min(8192, cache_mb))
+
+            argv: list[str] = []
+            if os.name != "nt" and shutil.which("stdbuf"):
+                argv += ["stdbuf", "-oL", "-eL"]
+            argv += [
+                exe,
+                "mkv",
+                "--progress=-stdout",
+                "--decrypt",
+                f"--cache={cache_mb}",
+                "--minlength=300",
+                "disc:0",
+                "all",
+                str(out_dir),
+            ]
+
+            proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            self._local_proc = proc
+            assert proc.stdout is not None
+
+            prgv_re = re.compile(r"^PRGV:(.*)$")
+            last_emit = 0.0
+            last_pct = -1.0
+            try:
+                for line in proc.stdout:
+                    if self._local_stop_requested.is_set():
+                        break
+                    s = line.rstrip("\n")
+                    m = prgv_re.match(s.strip())
+                    if m:
+                        parts = re.split(r"[, ]+", m.group(1).strip())
+                        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit() and int(parts[1]) > 0:
+                            pct = (int(parts[0]) / int(parts[1])) * 100.0
+                            now = time.time()
+                            if pct - last_pct >= 0.3 and (now - last_emit) >= 0.5:
+                                last_pct = pct
+                                last_emit = now
+                                self.ui_queue.put(("log", f"MakeMKV progress: {pct:5.1f}%\n"))
+                        continue
+
+                    if s.startswith("PRGC:") or s.startswith("PRGT:"):
+                        continue
+                    self.ui_queue.put(("log", s + "\n"))
+            finally:
+                self._local_proc = None
+
+            if self._local_stop_requested.is_set():
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                raise RuntimeError("Stopped")
+
+            code = proc.wait()
+            if code != 0:
+                raise RuntimeError(f"MakeMKV failed with exit code {code}")
 
         def _reader_loop(self) -> None:
             tailer_reader_loop(self)
 
         def send_enter(self) -> None:
             try:
+                # Local mode: Continue acts as a gate between discs.
+                if self._local_waiting_for_continue and self.state.running:
+                    self._local_continue_event.set()
+                    self._local_waiting_for_continue = False
+                    self.state.waiting_for_enter = False
+                    self.btn_continue.configure(state="disabled")
+                    self.var_prompt.set("")
+                    self.var_eta.set("")
+                    self.var_step.set("Running")
+                    return
+
                 if self.run_ctx is not None and self.run_ctx.screen_name:
                     # Send Enter into the remote screen session.
                     self._screen_stuff("$'\\n'")
@@ -2266,6 +2632,23 @@ if TK_AVAILABLE:
         def stop(self) -> None:
             if self._replay_mode and self.state.running:
                 self._replay_stop.set()
+                return
+
+            # Local rip-only phase (before remote encode starts).
+            if self._local_ripping_active and self.run_ctx is None and self.state.running:
+                self._local_stop_requested.set()
+                # Unblock any pending Continue wait.
+                try:
+                    self._local_continue_event.set()
+                except Exception:
+                    pass
+                try:
+                    if self._local_proc is not None and self._local_proc.poll() is None:
+                        self._local_proc.terminate()
+                except Exception:
+                    pass
+                self._local_ripping_active = False
+                self._on_done("Stopped")
                 return
 
             # If we're not running, still reset UI to a known-good idle state.

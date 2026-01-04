@@ -1773,6 +1773,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     p.add_argument("--csv", dest="csv_file", default="", help="Drive continuous mode from a CSV schedule (implies --continuous)")
 
+    p.add_argument(
+        "--no-disc-prompts",
+        action="store_true",
+        help=(
+            "In CSV mode, do not pause between discs for manual disc insertion. "
+            "Useful when discs were ripped elsewhere and MKVs already exist in the per-disc folders."
+        ),
+    )
+
     return p.parse_args(argv)
 
 
@@ -2311,7 +2320,7 @@ def main(argv: list[str]) -> int:
             schedule = load_csv_schedule(csv_path)
             print(f"CSV schedule loaded: {len(schedule)} discs")
 
-            csv_next_confirmed = False
+            csv_next_confirmed = bool(ns.no_disc_prompts)
             for idx, row in enumerate(schedule):
                 # Apply row to globals.
                 if row.kind == "movie":
@@ -2389,10 +2398,13 @@ def main(argv: list[str]) -> int:
                         ),
                         min_free_gb=20,
                     )
-                    csv_next_up_note(schedule[idx + 1])
-                    print("When the next disc is inserted, press Enter to start ripping... ")
-                    input()
-                    csv_next_confirmed = True
+                    if not ns.no_disc_prompts:
+                        csv_next_up_note(schedule[idx + 1])
+                        print("When the next disc is inserted, press Enter to start ripping... ")
+                        input()
+                        csv_next_confirmed = True
+                    else:
+                        csv_next_confirmed = True
         else:
             # Interactive.
             title_raw = prompt_nonempty("Enter title (Movie or Series name): ")

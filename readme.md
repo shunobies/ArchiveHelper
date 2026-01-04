@@ -17,7 +17,7 @@ If you are brand new to Linux and Python: this project is meant to reduce how mu
 The GUI supports choosing where ripping/encoding should happen:
 
 - **Rip + encode on server (remote)** (default): the current, fully implemented workflow.
-- **Rip locally, encode on server** (planned): rip on your desktop, upload MKVs, then encode on the server.
+- **Rip locally, encode on server**: rip on your desktop, upload MKVs, then encode on the server.
 - **Rip + encode locally, upload results** (planned): do everything on your desktop, then upload finished files to the server.
 
 If you do not select a local option, the app assumes **Rip + encode on server (remote)**.
@@ -37,7 +37,7 @@ The rip server does the heavy work with:
 
 The GUI connects to the server using SSH. It can use a password, but SSH keys are strongly recommended.
 
-Note: the **local rip** modes are being designed, but are not implemented yet. The app currently performs ripping/encoding on the server.
+Note: **Rip + encode locally, upload results** is still planned. The other two modes are usable.
 
 ## What you need
 
@@ -46,6 +46,7 @@ Note: the **local rip** modes are being designed, but are not implemented yet. T
 - Python 3
 - Tkinter for Python (often packaged as `python3-tk` on Debian/Ubuntu)
 - Python packages: `paramiko` and `keyring`
+- MakeMKV (only required for **Rip locally, encode on server**)
 - Network access to your server’s SSH port
 
 ### On your rip server (Debian is a good choice)

@@ -2010,6 +2010,8 @@ if TK_AVAILABLE:
         def _eta_reset(self, phase: str) -> None:
             # Reset when we switch phases or go indeterminate.
             self.state.eta_phase = phase
+            self.state.eta_start_pct = 0.0
+            self.state.eta_start_ts = 0.0
             self.state.eta_last_pct = 0.0
             self.state.eta_last_ts = 0.0
             self.state.eta_rate_ewma = 0.0
@@ -2026,24 +2028,60 @@ if TK_AVAILABLE:
             now = time.time()
             if self.state.eta_phase != phase:
                 self._eta_reset(phase)
+                self.state.eta_start_pct = pct
+                self.state.eta_start_ts = now
                 self.state.eta_last_pct = pct
                 self.state.eta_last_ts = now
                 return
 
             if self.state.eta_last_ts <= 0.0:
+                self.state.eta_start_pct = pct
+                self.state.eta_start_ts = now
                 self.state.eta_last_pct = pct
                 self.state.eta_last_ts = now
                 return
+
+            if self.state.eta_start_ts <= 0.0:
+                self.state.eta_start_pct = self.state.eta_last_pct
+                self.state.eta_start_ts = self.state.eta_last_ts
 
             dt = now - self.state.eta_last_ts
             if dt <= 0.4:
                 return
 
             dp = pct - self.state.eta_last_pct
-            # Ignore non-forward movement.
+            # If progress isn't moving (or we only got a "current" update while total is
+            # unchanged), gently decay the rate so the ETA doesn't get stuck optimistic.
             if dp <= 0.0:
+                if self.state.eta_rate_ewma > 0.0:
+                    # Very mild decay (~0.1% per second) so a stall slowly increases ETA.
+                    decay = 0.999 ** max(0.0, dt)
+                    self.state.eta_rate_ewma *= decay
+
                 self.state.eta_last_ts = now
                 self.state.eta_last_pct = pct
+
+                # Still display an ETA if we have a prior rate estimate.
+                rate_used = self.state.eta_rate_ewma
+                if rate_used <= 0.01:
+                    return
+
+                remaining_pct = max(0.0, 100.0 - pct)
+                eta_s = remaining_pct / rate_used
+                if eta_s <= 30.0:
+                    self.var_eta.set("ETA <1m")
+                    return
+                if eta_s > (12 * 60 * 60):
+                    return
+
+                mins = int(eta_s // 60)
+                secs = int(eta_s % 60)
+                if mins >= 60:
+                    hrs = mins // 60
+                    mins = mins % 60
+                    self.var_eta.set(f"ETA {hrs}h {mins:02d}m")
+                else:
+                    self.var_eta.set(f"ETA {mins}m {secs:02d}s")
                 return
 
             rate = dp / dt  # pct per second
@@ -2057,16 +2095,30 @@ if TK_AVAILABLE:
             self.state.eta_last_ts = now
             self.state.eta_last_pct = pct
 
-            if self.state.eta_rate_ewma <= 0.01:
-                self.var_eta.set("")
+            # Blend EWMA with average-rate since phase start for stability.
+            avg_rate = 0.0
+            total_dt = now - self.state.eta_start_ts
+            total_dp = pct - self.state.eta_start_pct
+            if total_dt >= 5.0 and total_dp > 0.5:
+                avg_rate = total_dp / total_dt
+
+            rate_used = self.state.eta_rate_ewma
+            if avg_rate > 0.0 and rate_used > 0.0:
+                rate_used = 0.55 * rate_used + 0.45 * avg_rate
+            elif avg_rate > 0.0:
+                rate_used = avg_rate
+
+            if rate_used <= 0.01:
                 return
 
             remaining_pct = max(0.0, 100.0 - pct)
-            eta_s = remaining_pct / self.state.eta_rate_ewma
+            eta_s = remaining_pct / rate_used
 
-            # Hide clearly bogus numbers.
-            if eta_s < 1.0 or eta_s > (12 * 60 * 60):
-                self.var_eta.set("")
+            # Avoid clearing the ETA on transient estimates; clamp instead.
+            if eta_s <= 30.0:
+                self.var_eta.set("ETA <1m")
+                return
+            if eta_s > (12 * 60 * 60):
                 return
 
             mins = int(eta_s // 60)

@@ -56,9 +56,16 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.makemkv_phase = "process"
             gui.var_step.set("Ripping (MakeMKV): " + op)
 
-        gui._eta_reset("makemkv")
-        gui.progress.configure(mode="indeterminate")
-        gui.progress.start(10)
+        # Don't reset ETA every time MakeMKV changes operation; keep using the last
+        # known total progress. Only go indeterminate early before we see totals.
+        if gui.state.last_makemkv_total_pct > 0.0:
+            gui.progress.configure(mode="determinate")
+            gui.progress.stop()
+            gui.progress["value"] = max(0.0, min(100.0, gui.state.last_makemkv_total_pct))
+        else:
+            gui._eta_reset("makemkv")
+            gui.progress.configure(mode="indeterminate")
+            gui.progress.start(10)
         return
 
     m = MAKEMKV_ACTION_RE.match(line)
@@ -77,9 +84,15 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.makemkv_phase = "process"
             gui.var_step.set("Ripping (MakeMKV): " + act)
 
-        gui._eta_reset("makemkv")
-        gui.progress.configure(mode="indeterminate")
-        gui.progress.start(10)
+        # Same as operation lines: don't wipe ETA unless we have no totals yet.
+        if gui.state.last_makemkv_total_pct > 0.0:
+            gui.progress.configure(mode="determinate")
+            gui.progress.stop()
+            gui.progress["value"] = max(0.0, min(100.0, gui.state.last_makemkv_total_pct))
+        else:
+            gui._eta_reset("makemkv")
+            gui.progress.configure(mode="indeterminate")
+            gui.progress.start(10)
         return
 
     m = MAKEMKV_TOTAL_PROGRESS_RE.search(line)
@@ -118,6 +131,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
 
         phase = gui.state.makemkv_phase or "process"
         gui.var_step.set("Analyzing (MakeMKV)" if phase == "analyze" else "Ripping (MakeMKV)")
+        # ETA should always be based on total progress.
         if gui.state.last_makemkv_total_pct > 0.0:
             gui.progress.configure(mode="determinate")
             gui.progress.stop()
@@ -125,11 +139,10 @@ def parse_for_progress(gui, text_chunk: str) -> None:
 
             gui._eta_update("makemkv", gui.state.last_makemkv_total_pct)
         else:
+            # We haven't seen totals yet; show current progress but don't compute ETA.
             gui.progress.configure(mode="determinate")
             gui.progress.stop()
             gui.progress["value"] = max(0.0, min(100.0, pct))
-
-            gui._eta_update("makemkv", pct)
         return
 
     if MAKEMKV_ACCESS_ERROR_RE.search(line):
@@ -183,7 +196,10 @@ def parse_for_progress(gui, text_chunk: str) -> None:
         gui.var_step.set("Ripping (MakeMKV)")
         gui.progress.configure(mode="determinate")
         gui.progress.stop()
-        gui.progress["value"] = float(m.group(1))
+        pct_total = float(m.group(1))
+        gui.state.last_makemkv_total_pct = pct_total
+        gui.progress["value"] = max(0.0, min(100.0, pct_total))
+        gui._eta_update("makemkv", pct_total)
         return
 
     m = HB_PROGRESS_RE.search(line)

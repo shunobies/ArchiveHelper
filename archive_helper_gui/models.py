@@ -21,6 +21,9 @@ class UiState:
     next_disc_prompt: str = ""
 
     eta_phase: str = ""  # e.g., "makemkv" | "handbrake" | ""
+    # Baseline used for average-rate ETA smoothing within a phase.
+    eta_start_pct: float = 0.0
+    eta_start_ts: float = 0.0
     eta_last_pct: float = 0.0
     eta_last_ts: float = 0.0
     eta_rate_ewma: float = 0.0  # pct per second

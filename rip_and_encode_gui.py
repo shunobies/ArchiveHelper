@@ -2644,7 +2644,7 @@ if TK_AVAILABLE:
                     + (detail if detail else "(No additional details.)")
                 )
 
-        def _run_local_makemkv(self, out_dir: Path, *, cache_mb: int = 128) -> None:
+        def _run_local_makemkv(self, out_dir: Path, *, cache_mb: int = 512) -> None:
             out_dir.mkdir(parents=True, exist_ok=True)
 
             exe = None
@@ -2658,7 +2658,7 @@ if TK_AVAILABLE:
             try:
                 cache_mb = int(cache_mb)
             except Exception:
-                cache_mb = 128
+                cache_mb = 512
             cache_mb = max(16, min(8192, cache_mb))
 
             argv: list[str] = []

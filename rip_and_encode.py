@@ -744,7 +744,7 @@ def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> N
     try:
         cache_mb = int(cache_mb)
     except Exception:
-        cache_mb = 128
+        cache_mb = 512
     cache_mb = max(16, min(8192, cache_mb))
 
     argv = [
@@ -2120,7 +2120,7 @@ def main(argv: list[str]) -> int:
 
     failsafe = FailSafe()
 
-    makemkv_cache_mb = 1024 if (getattr(ns, "disc_type", "dvd") == "bluray") else 128
+    makemkv_cache_mb = 1024 if (getattr(ns, "disc_type", "dvd") == "bluray") else 512
 
     def _handle_sigint(signum, frame):
         failsafe.mark_failed()

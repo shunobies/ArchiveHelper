@@ -10,7 +10,7 @@ def open_directories_settings_dialog(
     series_dir_var,
     books_dir_var,
     music_dir_var,
-    validate_directories: Callable[[], None],
+    validate_directories: Callable[[], object],
     persist_state: Callable[[], None],
     modal: bool = False,
     next_label: str = "Close",

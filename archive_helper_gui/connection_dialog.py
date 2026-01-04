@@ -12,7 +12,7 @@ def open_connection_settings_dialog(
     key_var,
     password_var,
     browse_key: Callable[[], None],
-    validate: Callable[[], None],
+    validate: Callable[[], object],
     persist_state: Callable[[], None],
     modal: bool = False,
     next_label: str = "Close",

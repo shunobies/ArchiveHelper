@@ -37,7 +37,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rip_and_encode import csv_disc_prompt_for_row, load_csv_schedule, sanitize_title_for_dir
 
@@ -72,9 +72,13 @@ from archive_helper_gui.tailer import start_tail as tailer_start_tail
 from archive_helper_gui.tailer import stop_tail as tailer_stop_tail
 from archive_helper_gui.tooltip import Tooltip
 
+# Optional dependencies: define symbols on all paths so static analyzers (Pylance)
+# don't report hundreds of "possibly unbound" errors.
+keyring = None
 try:
-    import keyring  # type: ignore
+    import keyring as _keyring  # type: ignore
 
+    keyring = _keyring
     KEYRING_AVAILABLE = True
 except Exception:
     KEYRING_AVAILABLE = False
@@ -87,13 +91,62 @@ except Exception:
     PARAMIKO_AVAILABLE = False
 
 try:
-    from tkinter import BOTH, END, LEFT, RIGHT, X, BooleanVar, IntVar, Menu, StringVar, Tk, Toplevel, filedialog, messagebox
-    from tkinter import ttk
-    from tkinter.scrolledtext import ScrolledText
+    from tkinter import (  # type: ignore
+        BOTH as _TK_BOTH,
+        END as _TK_END,
+        LEFT as _TK_LEFT,
+        RIGHT as _TK_RIGHT,
+        X as _TK_X,
+        BooleanVar as _TK_BooleanVar,
+        IntVar as _TK_IntVar,
+        Menu as _TK_Menu,
+        StringVar as _TK_StringVar,
+        Tk as _TK_Tk,
+        Toplevel as _TK_Toplevel,
+        filedialog as _TK_filedialog,
+        messagebox as _TK_messagebox,
+    )
+    from tkinter import ttk as _TK_ttk  # type: ignore
+    from tkinter.scrolledtext import ScrolledText as _TK_ScrolledText  # type: ignore
+
+    BOTH = _TK_BOTH
+    END = _TK_END
+    LEFT = _TK_LEFT
+    RIGHT = _TK_RIGHT
+    X = _TK_X
+    BooleanVar = _TK_BooleanVar
+    IntVar = _TK_IntVar
+    Menu = _TK_Menu
+    StringVar = _TK_StringVar
+    Tk = _TK_Tk
+    Toplevel = _TK_Toplevel
+    filedialog = _TK_filedialog
+    messagebox = _TK_messagebox
+    ttk = _TK_ttk
+    ScrolledText = _TK_ScrolledText
 
     TK_AVAILABLE = True
 except ModuleNotFoundError:
     TK_AVAILABLE = False
+
+    # Define placeholders so references are always bound for type checking.
+    # These are never used at runtime because the GUI exits early when TK_AVAILABLE is False.
+    BOTH = cast(Any, "both")
+    X = cast(Any, "x")
+    LEFT = cast(Any, "left")
+    RIGHT = cast(Any, "right")
+    END = cast(Any, "end")
+
+    StringVar = cast(Any, lambda *args, **kwargs: None)
+    BooleanVar = cast(Any, lambda *args, **kwargs: None)
+    IntVar = cast(Any, lambda *args, **kwargs: None)
+    Menu = cast(Any, lambda *args, **kwargs: None)
+    Tk = cast(Any, object)
+    Toplevel = cast(Any, object)
+    ttk = cast(Any, None)
+    filedialog = cast(Any, None)
+    messagebox = cast(Any, None)
+    ScrolledText = cast(Any, object)
 
 
 
@@ -152,7 +205,7 @@ def _exec_mode_label(mode: str) -> str:
 if TK_AVAILABLE:
 
     class RipGui:
-        def __init__(self, root: Tk) -> None:
+        def __init__(self, root: Any) -> None:
             self.root = root
             self.root.title("Archive Helper for Jellyfin")
             self.state = UiState()
@@ -234,8 +287,8 @@ if TK_AVAILABLE:
             self.var_ensure_jellyfin = BooleanVar(value=False)
             self.var_disc_type = StringVar(value="dvd")
 
-            self._connection_win = None
-            self._directories_win = None
+            self._connection_win: Any | None = None
+            self._directories_win: Any | None = None
 
             self._presets_loading = False
             self._presets_loaded = False
@@ -461,7 +514,7 @@ if TK_AVAILABLE:
         def show_help(self) -> None:
             show_help_dialog(self.root)
 
-        def _build_logo(self, parent: ttk.Frame) -> None:
+        def _build_logo(self, parent: Any) -> None:
             """Draw a simple, original mark + title using a Canvas.
 
             This avoids external image dependencies (Pillow) and keeps the GUI
@@ -1021,7 +1074,7 @@ if TK_AVAILABLE:
 
             self._reattach_to_existing_run(cfg)
 
-        def _reattach_to_existing_run(self, cfg: "Config") -> None:
+        def _reattach_to_existing_run(self, cfg: ConnectionInfo) -> None:
             # Rebuild run context from persisted metadata.
             self._clear_log()
             self._append_log("(Info) Reattaching to existing remote job...\n")

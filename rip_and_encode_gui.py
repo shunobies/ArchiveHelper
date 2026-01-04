@@ -764,6 +764,8 @@ if TK_AVAILABLE:
             except Exception:
                 pass
             try:
+                # Mark closing early so Stop/_on_done won't try to show dialogs.
+                self._closing = True
                 if self.state.running:
                     # Give the user a safe choice: stop remote job, or leave it running
                     # so they can reattach later (useful if the GUI is being closed accidentally).
@@ -781,13 +783,17 @@ if TK_AVAILABLE:
             except Exception:
                 pass
             try:
-                self._closing = True
-            except Exception:
-                pass
-            try:
                 self.root.destroy()
             except Exception:
                 pass
+
+        def _can_show_dialogs(self) -> bool:
+            if self._closing:
+                return False
+            try:
+                return bool(self.root.winfo_exists())
+            except Exception:
+                return False
 
         def _refresh_mode(self) -> None:
             if self.var_mode.get() == "csv":
@@ -1542,6 +1548,33 @@ if TK_AVAILABLE:
             if self._presets_loaded or self._presets_loading:
                 return
 
+            exec_mode = (self.var_exec_mode.get() or EXEC_MODE_REMOTE).strip() or EXEC_MODE_REMOTE
+            if exec_mode == EXEC_MODE_LOCAL_RIP_ENCODE:
+                # In local rip+encode mode, presets should come from the local machine.
+                self._presets_loading = True
+
+                def _work_local() -> None:
+                    try:
+                        presets = self._fetch_local_handbrake_presets()
+                        if not presets:
+                            self.ui_queue.put(
+                                (
+                                    "log",
+                                    "(Info) HandBrake preset list not available locally. "
+                                    "HandBrakeCLI may be missing, or not on PATH. "
+                                    "You can still type a preset name manually.\n",
+                                )
+                            )
+                        self.ui_queue.put(("presets", "\n".join(presets)))
+                    except Exception as e:
+                        self.ui_queue.put(("log", f"(Info) Could not load local HandBrake presets: {e}\n"))
+                        self.ui_queue.put(("presets", ""))
+                    finally:
+                        self._presets_loading = False
+
+                threading.Thread(target=_work_local, daemon=True).start()
+                return
+
             host = (self.var_host.get() or "").strip()
             if not host:
                 return
@@ -1598,6 +1631,64 @@ if TK_AVAILABLE:
                     self.ui_queue.put(("presets", ""))
 
             threading.Thread(target=_work, daemon=True).start()
+
+        def _fetch_local_handbrake_presets(self) -> list[str]:
+            """Fetch HandBrake preset names from the local machine."""
+            exe = shutil.which("HandBrakeCLI")
+            if exe is None:
+                return []
+
+            try:
+                res = subprocess.run(
+                    [exe, "--preset-list"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+            except Exception:
+                return []
+
+            out_text = res.stdout or ""
+            if res.returncode != 0:
+                return []
+
+            presets: list[str] = []
+            for raw in out_text.splitlines():
+                line = raw.rstrip("\r\n")
+                if not line.strip():
+                    continue
+
+                s = line.lstrip(" \t")
+                indent_len = len(line) - len(s)
+
+                # Skip common noise / warnings.
+                if s.startswith("[") or s.startswith("Cannot load"):
+                    continue
+                if s == "HandBrake has exited.":
+                    continue
+
+                # Skip category headers like "General/" (no indent, ends with '/').
+                if not line.startswith(" ") and s.endswith("/"):
+                    continue
+
+                # Preset name lines are indented a small amount; description lines are indented deeper.
+                if 2 <= indent_len <= 6:
+                    name = s.strip()
+                    if not name:
+                        continue
+                    if name.endswith("/"):
+                        continue
+                    presets.append(name)
+
+            seen: set[str] = set()
+            unique: list[str] = []
+            for p in presets:
+                if p in seen:
+                    continue
+                seen.add(p)
+                unique.append(p)
+            return unique
 
         def _fetch_remote_handbrake_presets(self, target: str, port: str, keyfile: str, password: str) -> list[str]:
             return fetch_handbrake_presets(
@@ -1744,10 +1835,21 @@ if TK_AVAILABLE:
             # Any non-ok terminal state: show message and clear the visible log so a restart
             # does not look/feel stuck on previous errors.
             if str(payload).strip().lower() == "stopped":
-                messagebox.showinfo("Stopped", "Stopped.")
+                if self._can_show_dialogs():
+                    try:
+                        messagebox.showinfo("Stopped", "Stopped.")
+                    except Exception:
+                        pass
             else:
-                messagebox.showerror("Stopped", payload)
-            self._clear_log()
+                if self._can_show_dialogs():
+                    try:
+                        messagebox.showerror("Stopped", payload)
+                    except Exception:
+                        pass
+            try:
+                self._clear_log()
+            except Exception:
+                pass
 
         def cleanup_mkvs(self) -> None:
             if self.state.running:

@@ -29,6 +29,15 @@ def parse_for_progress(gui, text_chunk: str) -> None:
 
     line = (text_chunk or "").rstrip("\n")
 
+    def _format_disc_prompt(raw: str) -> str:
+        shown = (raw or "").strip()
+        if shown.lower().startswith("next up:"):
+            shown = shown.split(":", 1)[1].strip()
+        if shown.startswith("Insert:"):
+            shown = "Please " + shown[0].lower() + shown[1:]
+        shown = re.sub(r"\bpress\s+enter\b", "Click Continue (or press Enter)", shown, flags=re.I)
+        return shown
+
     # MakeMKV raw status lines
     m = MAKEMKV_OPERATION_RE.match(line)
     if m:
@@ -37,6 +46,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.waiting_for_enter = False
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
 
         if re.search(r"analy", op, flags=re.IGNORECASE):
             gui.state.makemkv_phase = "analyze"
@@ -57,6 +67,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.waiting_for_enter = False
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
 
         if re.search(r"analy", act, flags=re.IGNORECASE):
             gui.state.makemkv_phase = "analyze"
@@ -80,6 +91,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.waiting_for_enter = False
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
 
         gui.state.last_makemkv_total_pct = pct
         phase = gui.state.makemkv_phase or "process"
@@ -101,6 +113,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.waiting_for_enter = False
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
 
         phase = gui.state.makemkv_phase or "process"
         gui.var_step.set("Analyzing (MakeMKV)" if phase == "analyze" else "Ripping (MakeMKV)")
@@ -163,6 +176,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.state.waiting_for_enter = False
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
         gui.var_step.set("Ripping (MakeMKV)")
         gui.progress.configure(mode="determinate")
         gui.progress.stop()
@@ -189,10 +203,19 @@ def parse_for_progress(gui, text_chunk: str) -> None:
     if PROMPT_INSERT_RE.search(line) or PROMPT_NEXT_DISC_RE.search(line):
         gui.state.waiting_for_enter = True
         gui.var_step.set("Waiting for disc")
-        shown = line
-        if "Press Enter" in shown:
-            shown = shown.replace("Press Enter", "Click Continue (or press Enter)")
-        gui.var_prompt.set(shown)
+
+        # Remember the last concrete disc prompt so CSV mode can keep displaying it
+        # even when the script prints a generic "next disc" line afterward.
+        if PROMPT_INSERT_RE.search(line):
+            gui.state.next_disc_prompt = line
+
+        shown_raw = line
+        if PROMPT_NEXT_DISC_RE.search(line):
+            prev = (getattr(gui.state, "next_disc_prompt", "") or "").strip()
+            if prev:
+                shown_raw = prev
+
+        gui.var_prompt.set(_format_disc_prompt(shown_raw))
         gui.btn_continue.configure(state="normal")
         gui.progress.configure(mode="indeterminate")
         gui.progress.start(10)

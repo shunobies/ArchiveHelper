@@ -16,6 +16,10 @@ class UiState:
     encode_finished: int = 0
     encode_active_label: str = ""
 
+    # Most recent disc prompt (used so CSV mode can show which disc is next even
+    # when the script prints a generic "next disc" message afterward).
+    next_disc_prompt: str = ""
+
     eta_phase: str = ""  # e.g., "makemkv" | "handbrake" | ""
     eta_last_pct: float = 0.0
     eta_last_ts: float = 0.0

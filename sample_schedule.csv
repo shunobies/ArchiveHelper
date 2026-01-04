@@ -1,0 +1,25 @@
+# Archive Helper for Jellyfin - sample CSV schedule
+#
+# Format: 4 columns, comma-separated, NO embedded commas in titles.
+# One row per disc.
+#
+# Movie rows:
+#   Movie Name, Year, MultiDisc(y/n), DiscNumber
+# Series rows:
+#   Series Name, Year, SeasonNumber, DiscNumber
+#
+# Notes:
+# - MultiDisc must be y/n (not 1/0) so it doesn't get confused with Season 1.
+# - SeasonNumber must be an integer (01 is OK).
+# - DiscNumber must be an integer >= 1.
+
+# Single-disc movie
+The Matrix, 1999, n, 1
+
+# Multi-disc movie (disc 2+ treated as extras-only)
+The Lord of the Rings - The Two Towers, 2002, y, 1
+The Lord of the Rings - The Two Towers, 2002, y, 2
+
+# TV series season (list discs in the order you want episodes numbered)
+Firefly, 2002, 01, 1
+Firefly, 2002, 01, 2

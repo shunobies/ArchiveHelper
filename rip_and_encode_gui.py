@@ -134,6 +134,17 @@ def _normalize_remote_script_path(remote_script: str) -> str:
 
 
 REMOTE_SCRIPT_RUN_PATH = "~/.archive_helper_for_jellyfin/rip_and_encode.py"
+EXEC_MODE_REMOTE = "remote"  # rip+encode on server (current behavior)
+EXEC_MODE_LOCAL_RIP_ONLY = "local_rip_only"  # rip locally, encode on server (planned)
+EXEC_MODE_LOCAL_RIP_ENCODE = "local_rip_encode"  # rip+encode locally, upload results (planned)
+
+def _exec_mode_label(mode: str) -> str:
+    m = (mode or "").strip()
+    if m == EXEC_MODE_LOCAL_RIP_ONLY:
+        return "Rip locally (encode on server)"
+    if m == EXEC_MODE_LOCAL_RIP_ENCODE:
+        return "Rip + encode locally (upload results)"
+    return "Rip + encode on server (remote)"
 
 
 if TK_AVAILABLE:
@@ -214,6 +225,9 @@ if TK_AVAILABLE:
 
             self._presets_loading = False
             self._presets_loaded = False
+            # Execution mode (where ripping/encoding happens). Default is current behavior: remote.
+            self.var_exec_mode = StringVar(value=EXEC_MODE_REMOTE)
+            self._exec_mode_was_loaded = False
 
             # Mode
             self.var_mode = StringVar(value="manual")
@@ -238,6 +252,9 @@ if TK_AVAILABLE:
             self.var_kind.trace_add("write", lambda *_: self._refresh_kind())
             self._refresh_kind()
             self._poll_ui_queue()
+
+            # If the user hasn't picked an execution mode yet, prompt once on startup.
+            self._maybe_prompt_exec_mode_on_startup()
 
             self._apply_setup_gate()
             self.root.after(0, self._maybe_run_first_launch_setup)
@@ -276,6 +293,8 @@ if TK_AVAILABLE:
                 variable=self.var_ensure_jellyfin,
                 command=self._on_menu_setting_changed,
             )
+            settings_menu.add_command(label="Rip mode...", command=self._open_exec_mode_settings)
+            self._settings_menu_exec_mode_idx = settings_menu.index("end")
             menubar.add_cascade(label="Settings", menu=settings_menu)
             self.root.config(menu=menubar)
 
@@ -307,6 +326,9 @@ if TK_AVAILABLE:
 
             note = ttk.Label(settings, text="Connection and output directories are set under Settings.")
             note.pack(anchor="w", pady=(6, 0))
+
+            self.lbl_exec_mode = ttk.Label(settings, text=f"Rip mode: {_exec_mode_label(self.var_exec_mode.get())}")
+            self.lbl_exec_mode.pack(anchor="w", pady=(2, 0))
 
             # Mode frame
             mode = ttk.LabelFrame(main, text="Schedule", padding=10)
@@ -548,6 +570,9 @@ if TK_AVAILABLE:
                 self.var_preset.set(str(data.get("preset", self.var_preset.get())))
                 self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
                 self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
+                if "exec_mode" in data:
+                    self._exec_mode_was_loaded = True
+                self.var_exec_mode.set(str(data.get("exec_mode", self.var_exec_mode.get())))
 
                 self.var_mode.set(str(data.get("mode", self.var_mode.get())))
                 self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
@@ -596,6 +621,7 @@ if TK_AVAILABLE:
                 "season": self.var_season.get(),
                 "start_disc": int(self.var_start_disc.get()),
                 "disc_count": int(self.var_disc_count.get()),
+                "exec_mode": self.var_exec_mode.get(),
 
                 # Last-run (reattach) metadata.
                 "last_run_host": self.last_run_host,
@@ -608,6 +634,12 @@ if TK_AVAILABLE:
 
             self.persistence.save_state_dict(data)
             self.persistence.save_password(self._keyring_id(), (self.var_password.get() or ""))
+
+            try:
+                if hasattr(self, "lbl_exec_mode"):
+                    self.lbl_exec_mode.configure(text=f"Rip mode: {_exec_mode_label(self.var_exec_mode.get())}")
+            except Exception:
+                pass
 
         def _on_close(self) -> None:
             # Best-effort stop and persist state.
@@ -679,6 +711,96 @@ if TK_AVAILABLE:
                 self._persist_state()
             except Exception:
                 pass
+
+        def _maybe_prompt_exec_mode_on_startup(self) -> None:
+            # We only prompt once, when the setting hasn't been loaded from disk.
+            # Default behavior remains remote rip+encode.
+            if self._exec_mode_was_loaded:
+                return
+            try:
+                self._open_exec_mode_settings(modal=True, title="Choose rip mode")
+            except Exception:
+                return
+
+        def _open_exec_mode_settings(self, *, modal: bool = False, title: str = "Rip mode") -> None:
+            if self.state.running:
+                messagebox.showinfo("Rip mode", "You can only change rip mode when idle.")
+                return
+
+            win = Toplevel(self.root)
+            win.title(title)
+            win.resizable(False, False)
+            try:
+                win.transient(self.root)
+            except Exception:
+                pass
+
+            container = ttk.Frame(win, padding=12)
+            container.pack(fill=BOTH, expand=True)
+
+            ttk.Label(
+                container,
+                text=(
+                    "Where should ripping/encoding happen?\n\n"
+                    "If you don't change this, the default is: rip + encode on the server (remote)."
+                ),
+                justify=LEFT,
+            ).pack(anchor="w")
+
+            choice = StringVar(value=(self.var_exec_mode.get() or EXEC_MODE_REMOTE))
+            options = ttk.Frame(container)
+            options.pack(fill=X, pady=(10, 0))
+
+            ttk.Radiobutton(
+                options,
+                text="Rip + encode on server (remote)",
+                variable=choice,
+                value=EXEC_MODE_REMOTE,
+            ).pack(anchor="w")
+
+            ttk.Radiobutton(
+                options,
+                text="Rip locally, encode on server (planned)",
+                variable=choice,
+                value=EXEC_MODE_LOCAL_RIP_ONLY,
+            ).pack(anchor="w", pady=(4, 0))
+
+            ttk.Radiobutton(
+                options,
+                text="Rip + encode locally, upload results (planned)",
+                variable=choice,
+                value=EXEC_MODE_LOCAL_RIP_ENCODE,
+            ).pack(anchor="w", pady=(4, 0))
+
+            btns = ttk.Frame(container)
+            btns.pack(fill=X, pady=(12, 0))
+
+            def _cancel() -> None:
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            def _ok() -> None:
+                self.var_exec_mode.set(choice.get() or EXEC_MODE_REMOTE)
+                try:
+                    self._persist_state()
+                except Exception:
+                    pass
+                _cancel()
+
+            ttk.Button(btns, text="Cancel", command=_cancel).pack(side=RIGHT)
+            ttk.Button(btns, text="OK", command=_ok).pack(side=RIGHT, padx=(0, 8))
+
+            if modal:
+                try:
+                    win.grab_set()
+                except Exception:
+                    pass
+                try:
+                    self.root.wait_window(win)
+                except Exception:
+                    pass
 
         def _open_connection_settings(self, *, modal: bool = False, next_label: str = "Close") -> None:
             try:
@@ -1213,10 +1335,13 @@ if TK_AVAILABLE:
                     state = "normal" if enabled else "disabled"
                     idx_conn = getattr(self, "_settings_menu_connection_idx", None)
                     idx_dirs = getattr(self, "_settings_menu_directories_idx", None)
+                    idx_mode = getattr(self, "_settings_menu_exec_mode_idx", None)
                     if idx_conn is not None:
                         menu.entryconfigure(idx_conn, state=state)
                     if idx_dirs is not None:
                         menu.entryconfigure(idx_dirs, state=state)
+                    if idx_mode is not None:
+                        menu.entryconfigure(idx_mode, state=state)
             except Exception:
                 pass
 
@@ -1757,6 +1882,14 @@ if TK_AVAILABLE:
 
         def start(self) -> None:
             if self.state.running:
+                return
+
+            if (self.var_exec_mode.get() or EXEC_MODE_REMOTE) != EXEC_MODE_REMOTE:
+                messagebox.showinfo(
+                    "Rip mode",
+                    "Local ripping/encoding modes are planned but not implemented yet.\n\n"
+                    "For now, please use: Rip + encode on server (remote).",
+                )
                 return
 
             if not self._is_setup_complete():

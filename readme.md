@@ -12,6 +12,16 @@ If you are brand new to Linux and Python: this project is meant to reduce how mu
 - You want your finished files to land in a Movies/Series folder that Jellyfin watches.
 - You want a “remote control” app that connects over SSH, starts a rip/encode workflow, shows progress, and prompts you when to swap discs.
 
+## Rip modes (remote vs local)
+
+The GUI supports choosing where ripping/encoding should happen:
+
+- **Rip + encode on server (remote)** (default): the current, fully implemented workflow.
+- **Rip locally, encode on server** (planned): rip on your desktop, upload MKVs, then encode on the server.
+- **Rip + encode locally, upload results** (planned): do everything on your desktop, then upload finished files to the server.
+
+If you do not select a local option, the app assumes **Rip + encode on server (remote)**.
+
 ## How it works (two-computer model)
 
 This project has two scripts:
@@ -26,6 +36,8 @@ The rip server does the heavy work with:
 - GNU screen (keeps the job running even if you close the GUI)
 
 The GUI connects to the server using SSH. It can use a password, but SSH keys are strongly recommended.
+
+Note: the **local rip** modes are being designed, but are not implemented yet. The app currently performs ripping/encoding on the server.
 
 ## What you need
 

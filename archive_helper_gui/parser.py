@@ -151,7 +151,8 @@ def parse_for_progress(gui, text_chunk: str) -> None:
     m = HB_START_RE.match(line)
     if m:
         gui.state.encode_started = int(m.group(1))
-        gui.state.encode_queued = max(gui.state.encode_queued, int(m.group(2)))
+        # Use the server-reported total (authoritative) to avoid UI drift.
+        gui.state.encode_queued = int(m.group(2))
         gui.state.encode_active_label = m.group(3).strip()
         gui.var_step.set(f"Encoding (HandBrake) {gui.state.encode_started} of {max(1, gui.state.encode_queued)}")
         gui._eta_reset("handbrake")
@@ -162,7 +163,8 @@ def parse_for_progress(gui, text_chunk: str) -> None:
     m = HB_DONE_RE.match(line)
     if m:
         gui.state.encode_finished = int(m.group(1))
-        gui.state.encode_queued = max(gui.state.encode_queued, int(m.group(2)))
+        # Use the server-reported total (authoritative) to avoid UI drift.
+        gui.state.encode_queued = int(m.group(2))
         gui.var_step.set(
             f"Encoding (HandBrake) {min(gui.state.encode_finished, gui.state.encode_queued)} of {max(1, gui.state.encode_queued)}"
         )

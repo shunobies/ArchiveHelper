@@ -1010,6 +1010,54 @@ if TK_AVAILABLE:
             p = filedialog.askopenfilename(title="Select schedule CSV", filetypes=[("CSV", "*.csv"), ("All", "*")])
             if p:
                 self.var_csv_path.set(p)
+        def _validate_csv_schedule_file(self, path: Path) -> int:
+            """Validate the entire CSV schedule before starting a run.
+
+            Mirrors the server-side rules (4 columns, no embedded commas, strict year/disc/season).
+            Returns the number of parsed rows.
+            """
+
+            text = path.read_text(errors="ignore")
+            rows = 0
+            for n, raw in enumerate(text.splitlines(), start=1):
+                line = raw.rstrip("\r")
+                if not line.strip():
+                    continue
+                if line.lstrip().startswith("#"):
+                    continue
+                if re.match(r"^\s*(movie|series)?\s*name\s*,\s*year\s*,", line, flags=re.I):
+                    continue
+
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) != 4 or any(p == "" for p in parts[:4]):
+                    raise ValueError(
+                        f"CSV parse error at line {n}: expected exactly 4 comma-separated columns (no embedded commas)\n"
+                        f"Line: {line}"
+                    )
+
+                _name, year, third, disc_s = parts
+
+                if not re.fullmatch(r"\d{4}", year):
+                    raise ValueError(f"CSV validation error at line {n}: year must be 4 digits\nLine: {line}")
+                if not disc_s.isdigit() or int(disc_s) < 1:
+                    raise ValueError(f"CSV validation error at line {n}: disc must be an integer >= 1\nLine: {line}")
+
+                v = third.strip().lower()
+                is_bool = v in {"y", "n", "yes", "no", "true", "false"}
+                if is_bool:
+                    if v not in {"y", "n", "yes", "no", "true", "false"}:
+                        raise ValueError(f"CSV validation error at line {n}: MultiDisc must be y/n\nLine: {line}")
+                else:
+                    if not third.isdigit() or int(third) < 1:
+                        raise ValueError(
+                            f"CSV validation error at line {n}: season must be an integer >= 1\nLine: {line}"
+                        )
+
+                rows += 1
+
+            if rows < 1:
+                raise ValueError(f"CSV schedule is empty: {path}")
+            return rows
 
         def toggle_log(self) -> None:
             self._set_log_visible(not self.log_visible)
@@ -1735,6 +1783,13 @@ if TK_AVAILABLE:
                     local_csv = Path(p)
                     if not local_csv.exists():
                         raise ValueError(f"CSV file not found: {local_csv}")
+                    # Preflight validate the entire CSV now so we fail fast with a helpful line number.
+                    try:
+                        _rows = self._validate_csv_schedule_file(local_csv)
+                    except Exception as e:
+                        raise ValueError(
+                            "CSV validation failed. Fix the CSV and try again.\n\n" + str(e)
+                        )
                 else:
                     title = self.var_title.get().strip()
                     year = self.var_year.get().strip()

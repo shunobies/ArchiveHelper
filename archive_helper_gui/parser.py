@@ -16,6 +16,7 @@ from archive_helper_gui.log_patterns import (
     MAKEMKV_TOTAL_PROGRESS_RE,
     MAKE_MKV_PROGRESS_RE,
     PROMPT_INSERT_RE,
+    PROMPT_LOW_DISK_RE,
     PROMPT_NEXT_DISC_RE,
 )
 
@@ -216,6 +217,18 @@ def parse_for_progress(gui, text_chunk: str) -> None:
                 shown_raw = prev
 
         gui.var_prompt.set(_format_disc_prompt(shown_raw))
+        gui.btn_continue.configure(state="normal")
+        gui.progress.configure(mode="indeterminate")
+        gui.progress.start(10)
+        return
+
+    if PROMPT_LOW_DISK_RE.search(line):
+        gui.state.waiting_for_enter = True
+        gui.var_step.set("Paused (low disk space)")
+        shown = line
+        if "Press Enter" in shown:
+            shown = shown.replace("Press Enter", "Click Continue (or press Enter)")
+        gui.var_prompt.set(shown)
         gui.btn_continue.configure(state="normal")
         gui.progress.configure(mode="indeterminate")
         gui.progress.start(10)

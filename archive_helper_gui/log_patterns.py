@@ -17,6 +17,7 @@ HB_DONE_RE = re.compile(r"^HandBrake done:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
 
 PROMPT_INSERT_RE = re.compile(r"Insert: ")
 PROMPT_NEXT_DISC_RE = re.compile(r"When the next disc is inserted, press Enter to start ripping\.\.\.")
+PROMPT_LOW_DISK_RE = re.compile(r"^Low disk space:")
 FINALIZING_RE = re.compile(r"^Finalizing: ")
 CSV_LOADED_RE = re.compile(r"^CSV schedule loaded:\s*(\d+)\s*discs")
 ERROR_RE = re.compile(r"^ERROR:")

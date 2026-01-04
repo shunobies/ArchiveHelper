@@ -1776,6 +1776,130 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+def _format_gb(bytes_: int) -> float:
+    try:
+        return float(bytes_) / (1024.0 ** 3)
+    except Exception:
+        return 0.0
+
+
+def _disk_targets_for_run(*, home_base: Path, movies_dir: str, series_dir: str) -> list[Path]:
+    targets: list[Path] = [home_base]
+    if movies_dir and not is_remote_dest(movies_dir):
+        targets.append(Path(movies_dir))
+    if series_dir and not is_remote_dest(series_dir):
+        targets.append(Path(series_dir))
+    return targets
+
+
+def _dedupe_paths_by_device(paths: list[Path]) -> list[Path]:
+    seen: set[int] = set()
+    unique: list[Path] = []
+    for p in paths:
+        try:
+            dev = os.stat(p).st_dev
+        except Exception:
+            dev = None
+        if dev is None:
+            unique.append(p)
+            continue
+        if dev in seen:
+            continue
+        seen.add(dev)
+        unique.append(p)
+    return unique
+
+
+def pause_if_low_disk_space(*, paths: list[Path], min_free_gb: int = 20) -> None:
+    """Pause the run if free space is below the threshold on any relevant filesystem.
+
+    Intended for long CSV runs: prevents silently filling disks mid-run.
+    """
+
+    try:
+        min_free_gb = int(min_free_gb)
+    except Exception:
+        min_free_gb = 20
+    min_free_gb = max(1, min_free_gb)
+
+    targets = _dedupe_paths_by_device([p for p in (paths or []) if p])
+    if not targets:
+        return
+
+    while True:
+        low: list[tuple[Path, float]] = []
+        for p in targets:
+            try:
+                usage = shutil.disk_usage(p)
+                free_gb = _format_gb(int(usage.free))
+            except Exception:
+                continue
+            if free_gb < float(min_free_gb):
+                low.append((p, free_gb))
+
+        if not low:
+            return
+
+        print("Low disk space detected. Please free up space on the server.")
+        for p, free_gb in low:
+            print(f"  - {p}: {free_gb:.1f} GB free (need >= {min_free_gb} GB)")
+        print(
+            "Low disk space: free up space and Press Enter to retry.\n"
+            "\n"
+            "Note: this script does NOT auto-clean while a job is running, because\n"
+            "background encodes may still be reading MKVs from the work directory.\n"
+            "To run managed cleanup, stop the job and use the GUI Cleanup button\n"
+            "(or run rip_and_encode.py --cleanup-mkvs separately).\n"
+            "\n"
+            "CSV resume note: after cleanup, re-running the same CSV will skip movie\n"
+            "discs whose output files already exist; for series, you may still need\n"
+            "to remove completed rows if you cleaned the work directory."
+        )
+        input()
+
+
+def _encode_lock_active_for_output(out: Path) -> bool:
+    lock = encode_lock_path(out)
+    return not lock_is_stale_or_clear(lock)
+
+
+def _movie_disc_outputs_exist(ctx: "TitleContext", disc_index: int) -> bool:
+    """Best-effort check to skip re-ripping discs on CSV restart.
+
+    Conservative: only skips when we see expected outputs and there is no active
+    encode lock suggesting the output is still being written.
+    """
+
+    try:
+        disc_index = int(disc_index)
+    except Exception:
+        return False
+    if disc_index < 1:
+        return False
+
+    # Disc 1: main movie output is deterministic.
+    if disc_index == 1:
+        out = ctx.output_movie_main
+        if out is None or not out.exists():
+            return False
+        if _encode_lock_active_for_output(out):
+            return False
+        return True
+
+    # Disc 2+: extras-only outputs have a deterministic prefix.
+    extras_dir = ctx.output_extras_dir
+    if not extras_dir.exists():
+        return False
+    prefix = f"Disc{disc_index:02d}_"
+    try:
+        for p in extras_dir.glob(prefix + "*.mp4"):
+            if p.is_file() and not _encode_lock_active_for_output(p):
+                return True
+    except Exception:
+        return False
+    return False
+
+
 def list_handbrake_presets() -> None:
     which_required("HandBrakeCLI")
     run_cmd(["HandBrakeCLI", "--preset-list"], check=True)
@@ -2215,20 +2339,56 @@ def main(argv: list[str]) -> int:
                 disc_dir = ctx.mkv_root / f"Disc{row.disc:02d}"
                 prompt_msg = csv_disc_prompt_for_row(row)
 
-                mkvs = rip_disc_if_needed(
-                    disc_dir,
-                    prompt_msg,
-                    wait_for_enter=not csv_next_confirmed,
-                    makemkv_cache_mb=makemkv_cache_mb,
-                )
-                csv_next_confirmed = False
-
-                if ctx.is_series:
-                    process_series_disc(ctx=ctx, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, submit_encode=submit_encode)
+                # CSV restart support: if the work directory was cleaned but output files
+                # already exist, skip re-ripping movie discs to avoid starting over.
+                # (Series discs are not safely attributable without the per-disc manifest.)
+                if (
+                    row.kind == "movie"
+                    and not find_mkvs_in_dir(disc_dir)
+                    and _movie_disc_outputs_exist(ctx, row.disc)
+                    and not csv_next_confirmed
+                ):
+                    print(
+                        f"Resume: outputs already exist; skipping rip/encode: {ctx.title} ({ctx.year}) disc {row.disc}"
+                    )
                 else:
-                    process_movie_disc(ctx=ctx, disc_index=row.disc, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, submit_encode=submit_encode)
+                    mkvs = rip_disc_if_needed(
+                        disc_dir,
+                        prompt_msg,
+                        wait_for_enter=not csv_next_confirmed,
+                        makemkv_cache_mb=makemkv_cache_mb,
+                    )
+                    csv_next_confirmed = False
+
+                    if ctx.is_series:
+                        process_series_disc(
+                            ctx=ctx,
+                            disc_dir=disc_dir,
+                            overlap=ns.overlap,
+                            preset=ns.preset,
+                            submit_encode=submit_encode,
+                        )
+                    else:
+                        process_movie_disc(
+                            ctx=ctx,
+                            disc_index=row.disc,
+                            disc_dir=disc_dir,
+                            overlap=ns.overlap,
+                            preset=ns.preset,
+                            submit_encode=submit_encode,
+                        )
 
                 if idx + 1 < len(schedule):
+                    # Before prompting for the next disc, ensure we have enough free space
+                    # on the filesystem(s) where we are storing MKVs and writing MP4 outputs.
+                    pause_if_low_disk_space(
+                        paths=_disk_targets_for_run(
+                            home_base=home_base,
+                            movies_dir=ns.movies_dir,
+                            series_dir=ns.series_dir,
+                        ),
+                        min_free_gb=20,
+                    )
                     csv_next_up_note(schedule[idx + 1])
                     print("When the next disc is inserted, press Enter to start ripping... ")
                     input()

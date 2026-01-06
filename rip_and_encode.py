@@ -961,6 +961,7 @@ def hb_encode_with_progress(input_: Path, output: Path, preset: str) -> None:
     args = ["HandBrakeCLI", "-i", str(input_), "-o", str(output), "--preset", preset]
     proc = subprocess.Popen(
         args,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -2230,6 +2231,7 @@ def main(argv: list[str]) -> int:
 
             proc = subprocess.Popen(
                 ["HandBrakeCLI", "-i", str(input_), "-o", str(output), "--preset", preset],
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

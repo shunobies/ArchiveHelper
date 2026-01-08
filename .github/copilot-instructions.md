@@ -72,3 +72,99 @@ Guidelines:
 - After a successful, meaningful change, create a git commit with a clear message.
 - Avoid drive-by formatting changes.
 
+# Documentation & Code Comment Writing Instructions
+
+## Audience
+Write for a **middle school–level reader (grades 6–8)**.  
+Assume the reader is smart, curious, and new to the topic—but not an expert.
+
+The reader should be able to say after one read:
+> “Oh. That makes sense.”
+
+---
+
+## Voice & Style (Daniel Suarez–Inspired)
+Write with the clarity and confidence of **Daniel Suarez explaining how a real system works**.
+
+- Calm, precise, and serious (never childish)
+- Focused on **systems**, **cause and effect**, and **how things actually work**
+- Slightly cinematic when helpful, but always practical
+- No hype, no marketing language, no slang
+
+Think:
+> “Here’s what this does, how it works behind the scenes, and why it matters.”
+
+---
+
+## Readability Rules
+- Use **short sentences** (prefer under 20 words)
+- Keep **paragraphs short** (1 idea per paragraph)
+- Use **simple, everyday language**
+- Avoid jargon; if you must use it, **define it immediately**
+- Explain acronyms on first use
+- Prefer bullet points over dense paragraphs
+
+If something feels dense, split it.
+
+---
+
+## Explanation Structure (Use This Pattern)
+For each concept, function, class, or module:
+
+1. **What it is** (plain definition)
+2. **Why it exists** (the problem it solves)
+3. **Simple example** (easy, familiar scenario)
+4. **Real or technical example** (how it’s actually used)
+5. **Plain-language summary**
+
+---
+
+## Examples Are Required
+- Every important idea **must include at least one example**
+- Complex ideas should include:
+  - One **simple example** first
+  - One **more realistic example** second
+- Use familiar analogies:
+  - Locks and keys
+  - Roads and traffic
+  - Messages and mailboxes
+  - Machines, tools, games, or rules
+
+Examples should clarify, not impress.
+
+---
+
+## Code Comments Guidelines
+Code comments should explain **intent and behavior**, not restate the code.
+
+Good comments answer:
+- What is this code responsible for?
+- Why does it exist?
+- What problem does it prevent or solve?
+- What would break if it were removed?
+
+Prefer:
+- Clear, complete sentences
+- Comments above blocks of logic
+- Explanations of *why*, not just *what*
+
+Avoid:
+- Obvious comments
+- Jargon without explanation
+- Humor or sarcasm
+
+---
+
+## Documentation Goals
+Documentation should:
+- Teach, not assume
+- Move step by step
+- Make invisible systems understandable
+- Prioritize clarity over cleverness
+
+When finished, ask:
+> “Would a curious 12-year-old understand this without asking questions?”
+
+If not, rewrite.
+
+---

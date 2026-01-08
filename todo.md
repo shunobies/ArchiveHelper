@@ -20,6 +20,8 @@ Look into auto generating cover.jpg or cover.png
 
 Look into generating metadata.opf file for each book to help indexing.
 
+Could we use bash command DVD_NAME=$(blkid -o value -s LABEL /dev/sr0) on the server to get a name of the movie and compare to what's expected in the list for a sanity check to make sure that the expected dvd is in the drive.
+
 -------------
 
 This system was designed for a spare laptop or desktop that has a DVD-ROM installed sitting around that you want to through some disks in and use as a Jellyfin server or even using a Raspberry Pi with a USB DVD-ROM. This script wasn't designed for renting a remote server that you don't have physical access to in my opinion that defeats the purpose the idea in my mind is to allow access to your physical media without the work of digging through it all for one movie, it also reduced wear and tear on your dvd collection. Big reason for me prevents the kids from digging around the DVD's and breaking them by mistake or getting the dreaded syrup from breakfast all over a disc. If you know you know.

@@ -14,13 +14,24 @@ If you are brand new to Linux and Python: this project is meant to reduce how mu
 
 ## Rip modes (remote vs local)
 
-The GUI supports choosing where ripping/encoding should happen:
+The GUI supports choosing where ripping and encoding happen.
 
-- **Rip + encode on server (remote)** (default): the current, fully implemented workflow.
-- **Rip locally, encode on server**: rip on your desktop, upload MKVs, then encode on the server.
-- **Rip + encode locally, upload results** (planned): do everything on your desktop, then upload finished files to the server.
+Three modes are available:
 
-If you do not select a local option, the app assumes **Rip + encode on server (remote)**.
+- **Rip + encode on server (remote)** (default): Everything happens on the server. The GUI controls the server over SSH and shows progress.
+- **Rip locally, encode on server**: Your desktop rips the disc. The app uploads the raw MKV files to the server, then the server encodes them to MP4.
+- **Rip + encode locally, upload results** (planned): Your desktop does all the work. When finished, the app uploads the final MP4 files to the server.
+
+If you do not pick a mode, the app uses **Rip + encode on server (remote)**.
+
+Note: The first two modes are ready to use. The third mode (local rip and encode) is still being built.
+
+## Recent improvements (January 2026)
+
+- **Local destination setting**: When using local rip mode, you can now set where temporary files are stored on your desktop. Go to Settings → Directories to configure this.
+- **Disk space checks**: The app now checks that you have enough free space before ripping each disc (default: 20 GB). If space is low, it pauses and prompts you to free up space before continuing.
+- **Better overlap mode**: When encoding a disc while ripping the next one, HandBrake no longer gets confused by keypresses. This means encodes keep running smoothly while you work on the next disc.
+- **Faster DVD ripping**: MakeMKV now uses more cache memory (512 MB instead of 128 MB) when ripping DVDs, which makes rips more stable and can reduce errors.
 
 ## How it works (two-computer model)
 
@@ -46,7 +57,8 @@ Note: **Rip + encode locally, upload results** is still planned. The other two m
 - Python 3
 - Tkinter for Python (often packaged as `python3-tk` on Debian/Ubuntu)
 - Python packages: `paramiko` and `keyring`
-- MakeMKV (only required for **Rip locally, encode on server**)
+- MakeMKV (only required if you use **Rip locally, encode on server** mode)
+- At least 20 GB free disk space (for local ripping modes; configurable in Settings)
 - Network access to your server’s SSH port
 
 ### On your rip server (Debian is a good choice)
@@ -191,9 +203,11 @@ The job runs on the server inside a `screen` session. Closing the GUI does not n
 
 ## Troubleshooting
 
-- Can’t connect over SSH: verify `ssh USER@HOST` works from the desktop first.
-- Preset list is empty: confirm `HandBrakeCLI --preset-list` works on the server.
-- Permission errors writing to Movies/Series folders: verify the SSH user can write to those directories.
+- **Can't connect over SSH**: verify `ssh USER@HOST` works from the desktop first.
+- **Preset list is empty**: confirm `HandBrakeCLI --preset-list` works on the server.
+- **Permission errors writing to Movies/Series folders**: verify the SSH user can write to those directories.
+- **HandBrake seems to pause when inserting next disc**: this was fixed in recent versions. The app now prevents disc prompts from affecting background encodes. Update to the latest version.
+- **Local mode says "not enough disk space"**: the app checks that you have at least 20 GB free before ripping each disc. Free up space or change the threshold in Settings.
 
 ## License
 

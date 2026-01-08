@@ -3,33 +3,35 @@
 
 ## Dual-Mode Operation: Rip Remote (existing) + Rip Local (new)
 
-## Current status (as of 2026-01-04)
+## Current status (as of 2026-01-08)
 
 - Completed:
 	- Mode selector (3 modes) in the GUI with persistence + Settings entry.
 	- **Local rip-only, encode on server**: rip locally with MakeMKV, upload MKVs to server workdir, then start remote encode with `--no-disc-prompts`.
 	- Server support: `rip_and_encode.py` has `--no-disc-prompts` to skip between-disc `input()` pauses in CSV mode.
+	- **Configurable local destination path**: Users can set a local staging directory in Settings. The app uses this for all local ripping work.
+	- **Local disk-space checks**: The app checks free space before starting and before each disc. If space is low (default: 20 GB threshold), it pauses and prompts the user to free up space.
+	- **HandBrake overlap input interference fix**: HandBrake encodes no longer consume keypress input during disc prompts.
+	- **MakeMKV cache increase**: DVD rips now use 512 MB cache (up from 128 MB) for better performance and stability.
 - Not completed yet:
-	- Configurable local destination path (currently uses a fixed local staging location).
-	- Local disk-space checks during local ripping.
-	- Local cleanup (delete local workdirs safely) and any UI for it.
-	- **Rip + encode locally, upload results**.
+	- Local cleanup UI (delete local workdirs safely) with marker file safety checks.
+	- **Rip + encode locally, upload results** (full local pipeline).
 
-Where we left off: local rip-only is working end-to-end, but the local staging directory is not user-configurable yet and there are no local disk-space guardrails/cleanup tooling.
+Where we are now: Local rip-only mode is fully functional with user-configurable destination and disk-space guardrails. Overlap mode stability has been improved. The remaining work is local cleanup UI and full local encode mode.
 
 Goal: Support two user workflows:
 
 1) **Rip Remote (existing)**: GUI controls a remote host over SSH; ripping/encoding happens on the server; GUI tails remote logs and responds to prompts.
 2) **Rip Local (new)**: ripping (and optionally encoding) happens on the local machine; when completed, outputs are uploaded to the server directories (Movies/Series/etc.) in the correct structure.
 
-### Open questions (resolve before implementation)
+### Open questions (resolved)
 
 - Local mode scope:
-	- Rip-only (MKVs locally, encode on server) is implemented.
+	- Rip-only (MKVs locally, encode on server) is implemented ✓
 	- Rip + encode locally (upload MP4s) is still pending.
-- Storage expectations (NEW):
-	- Add a **configurable local destination path** in Settings so the app has a managed local workspace.
-	- Add **local disk-space checks** during a local run to prevent filling the drive.
+- Storage expectations:
+	- Configurable local destination path in Settings ✓
+	- Local disk-space checks during a local run ✓
 
 ### UX requirements
 

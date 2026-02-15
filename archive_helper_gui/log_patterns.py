@@ -14,6 +14,9 @@ HB_TASK_RE = re.compile(r"^\[[0-9]{2}:[0-9]{2}:[0-9]{2}\]\s*Starting Task:\s*(.+
 
 HB_START_RE = re.compile(r"^HandBrake start:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
 HB_DONE_RE = re.compile(r"^HandBrake done:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
+SUBTITLE_START_RE = re.compile(r"^Subtitle extraction start:\s*(.+?)\s*\((\d+)\s+streams\)$")
+SUBTITLE_PROGRESS_RE = re.compile(r"^Subtitle extraction progress:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
+SUBTITLE_DONE_RE = re.compile(r"^Subtitle extraction done:\s*(.+?)\s*\((.+)\)$")
 
 PROMPT_INSERT_RE = re.compile(r"Insert: ")
 PROMPT_NEXT_DISC_RE = re.compile(r"When the next disc is inserted, press Enter to start ripping\.\.\.")

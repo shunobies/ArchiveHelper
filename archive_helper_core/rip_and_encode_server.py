@@ -5,7 +5,7 @@ Python port of the original rip_and_encode shell workflow.
 
 This script orchestrates external tools:
 - MakeMKV (makemkvcon) to rip DVDs to MKV files
-- HandBrakeCLI to transcode MKVs to MP4
+- HandBrakeCLI to transcode MKVs to MP4/MKV
 - ffprobe to read MKV metadata/duration/chapters
 - optional ssh/scp for remote copy destinations (host:/path)
 
@@ -275,6 +275,7 @@ def debian_install_hint(cmd: str) -> str:
         "screen": "sudo apt-get update && sudo apt-get install -y screen",
         "eject": "sudo apt-get update && sudo apt-get install -y eject",
         "ffprobe": "sudo apt-get update && sudo apt-get install -y ffmpeg",
+        "ffmpeg": "sudo apt-get update && sudo apt-get install -y ffmpeg",
         "find": "sudo apt-get update && sudo apt-get install -y findutils",
         "grep": "sudo apt-get update && sudo apt-get install -y grep",
         "HandBrakeCLI": "sudo apt-get update && sudo apt-get install -y handbrake-cli",
@@ -306,6 +307,7 @@ def check_deps(movies_dir: str, series_dir: str) -> int:
         "awk",
         "eject",
         "ffprobe",
+        "ffmpeg",
         "find",
         "grep",
         "HandBrakeCLI",
@@ -889,8 +891,141 @@ def create_lock_or_fail(lock: Path) -> None:
         raise RuntimeError(f"Output is locked (encode in progress?): {lock}\nIf this is stale, remove: {lock}") from e
 
 
-def hb_encode(input_: Path, output: Path, preset: str) -> None:
-    hb_encode_with_progress(input_, output, preset)
+def handbrake_subtitle_args(mode: str) -> list[str]:
+    mode_s = (mode or "preset").strip().lower()
+    if mode_s == "soft":
+        # Keep subtitle tracks selectable (best compatibility with MKV outputs).
+        return ["--all-subtitles", "--subtitle-default=none"]
+    if mode_s in {"none", "external"}:
+        return ["--subtitle=none"]
+    return []
+
+
+def ffprobe_subtitle_streams(path: Path) -> list[dict]:
+    try:
+        cp = run_cmd(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "s",
+                "-show_streams",
+                "-print_format",
+                "json",
+                str(path),
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        data = json.loads(cp.stdout or "{}")
+    except Exception:
+        return []
+
+    streams = data.get("streams") if isinstance(data, dict) else None
+    return [st for st in (streams or []) if isinstance(st, dict)]
+
+
+def _normalize_subtitle_language(raw: str) -> str:
+    code = (raw or "").strip().lower()
+    # Jellyfin-friendly, short language tags: use two-letter ISO-ish prefix.
+    # Examples: eng -> en, en_us -> en, fra -> fr.
+    letters = re.sub(r"[^a-z]", "", code)
+    if len(letters) >= 2:
+        return letters[:2]
+    return "und"
+
+
+def _subtitle_output_path(base: Path, ext: str) -> Path:
+    out = Path(str(base) + ext)
+    if not out.exists():
+        return out
+    for i in range(2, 100):
+        cand = Path(str(base) + f".{i:02d}" + ext)
+        if not cand.exists():
+            return cand
+    return out
+
+
+def extract_external_subtitles(input_: Path, video_output: Path) -> None:
+    streams = ffprobe_subtitle_streams(input_)
+    if not streams:
+        return
+
+    out_dir = video_output.parent
+    stem = video_output.stem
+
+    for st in streams:
+        stream_index = st.get("index")
+        if not isinstance(stream_index, int):
+            continue
+
+        codec = str(st.get("codec_name") or "").strip().lower()
+        tags = st.get("tags") if isinstance(st.get("tags"), dict) else {}
+        lang = _normalize_subtitle_language(str(tags.get("language") or "und"))
+
+        base = out_dir / f"{stem}.{lang}"
+
+        if codec in {"subrip", "srt", "ass", "ssa", "webvtt", "mov_text"}:
+            out = _subtitle_output_path(base, ".srt")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-nostdin",
+                "-i",
+                str(input_),
+                "-map",
+                f"0:{stream_index}",
+                "-c:s",
+                "srt",
+                str(out),
+            ]
+        elif codec == "dvd_subtitle":
+            out = _subtitle_output_path(base, ".idx")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-nostdin",
+                "-i",
+                str(input_),
+                "-map",
+                f"0:{stream_index}",
+                "-c:s",
+                "copy",
+                "-f",
+                "vobsub",
+                str(out),
+            ]
+        else:
+            out = _subtitle_output_path(base, ".mks")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-nostdin",
+                "-i",
+                str(input_),
+                "-map",
+                f"0:{stream_index}",
+                "-c:s",
+                "copy",
+                "-f",
+                "matroska",
+                str(out),
+            ]
+
+        print(f"Subtitle extract: {input_.name} stream {stream_index} -> {out.name}")
+        cp = run_cmd(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if cp.returncode != 0:
+            try:
+                out.unlink(missing_ok=True)
+            except Exception:
+                pass
+            print(f"Warning: subtitle extraction failed for stream {stream_index} ({codec or 'unknown'})")
+
+
+def hb_encode(input_: Path, output: Path, preset: str, *, subtitle_mode: str = "preset") -> None:
+    hb_encode_with_progress(input_, output, preset, subtitle_mode=subtitle_mode)
 
 
 def _ensure_log_dir(home: Path) -> Path:
@@ -962,10 +1097,11 @@ def rotate_logs(log_dir: Path, *, keep: int = 30, compress: bool = True, exclude
             pass
 
 
-def hb_encode_with_progress(input_: Path, output: Path, preset: str) -> None:
+def hb_encode_with_progress(input_: Path, output: Path, preset: str, *, subtitle_mode: str = "preset") -> None:
     """Run HandBrakeCLI while emitting progress as newline-delimited log lines."""
 
     args = ["HandBrakeCLI", "-i", str(input_), "-o", str(output), "--preset", preset]
+    args.extend(handbrake_subtitle_args(subtitle_mode))
     proc = subprocess.Popen(
         args,
         stdin=subprocess.DEVNULL,
@@ -1067,6 +1203,7 @@ def setup_title_context(
     movie_multi_disc: bool,
     movies_dir: str,
     series_dir: str,
+    output_ext: str,
 ) -> TitleContext:
     title = sanitize_title_for_dir(title_raw)
 
@@ -1107,7 +1244,7 @@ def setup_title_context(
             output_movie_dir = work_dir
         else:
             output_movie_dir = Path(movies_dir) / f"{title} ({year})"
-        output_movie_main = output_movie_dir / f"{title}.mp4"
+        output_movie_main = output_movie_dir / f"{title}.{output_ext}"
         output_extras_dir = output_movie_dir / "Extras"
         output_extras_nfo = output_extras_dir / "extras.nfo"
         output_movie_dir.mkdir(parents=True, exist_ok=True)
@@ -1239,6 +1376,7 @@ def _find_existing_series_episode_output(
     series_title: str,
     season_pad: str,
     clean_episode_title: str,
+    output_ext: str,
 ) -> Optional[Path]:
     if not clean_episode_title:
         return None
@@ -1246,7 +1384,7 @@ def _find_existing_series_episode_output(
         return None
     try:
         pat = re.compile(
-            r"^" + re.escape(series_title) + r" - S" + re.escape(season_pad) + r"E\d{2} - " + re.escape(clean_episode_title) + r"\.mp4$"
+            r"^" + re.escape(series_title) + r" - S" + re.escape(season_pad) + r"E\d{2} - " + re.escape(clean_episode_title) + r"\." + re.escape(output_ext) + r"$"
         )
         matches = sorted([p for p in season_dir.iterdir() if p.is_file() and pat.match(p.name)])
         return matches[0] if matches else None
@@ -1261,18 +1399,22 @@ def _encode_extra_to_output_and_register(
     extras_nfo: Path,
     overlap: bool,
     preset: str,
+    subtitle_mode: str,
     submit_encode,
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     stem = output.stem
+    if subtitle_mode == "external":
+        extract_external_subtitles(input_, output)
+
     if overlap:
         append_extra_nfo_if_missing(extras_nfo, stem, output.name)
-        submit_encode(input_, output, preset)
+        submit_encode(input_, output, preset, subtitle_mode)
     else:
         if output.exists():
             print(f"Skipping encode (exists): {output}")
         else:
-            hb_encode(input_, output, preset)
+            hb_encode(input_, output, preset, subtitle_mode=subtitle_mode)
         append_extra_nfo_if_missing(extras_nfo, stem, output.name)
 
 
@@ -1304,19 +1446,24 @@ def encode_extra_and_register(
     base_name: str,
     overlap: bool,
     preset: str,
+    output_ext: str,
+    subtitle_mode: str,
     submit_encode,
 ) -> None:
-    out = unique_out_path(extras_dir, base_name, "mp4")
+    out = unique_out_path(extras_dir, base_name, output_ext)
     stem = out.stem
+
+    if subtitle_mode == "external":
+        extract_external_subtitles(input_, out)
 
     if overlap:
         append_extra_nfo_if_missing(extras_nfo, stem, out.name)
-        submit_encode(input_, out, preset)
+        submit_encode(input_, out, preset, subtitle_mode)
     else:
         if out.exists():
             print(f"Skipping encode (exists): {out}")
         else:
-            hb_encode(input_, out, preset)
+            hb_encode(input_, out, preset, subtitle_mode=subtitle_mode)
         append_extra_nfo_if_missing(extras_nfo, stem, out.name)
 
 
@@ -1327,6 +1474,8 @@ def process_movie_disc(
     disc_dir: Path,
     overlap: bool,
     preset: str,
+    output_ext: str,
+    subtitle_mode: str,
     submit_encode,
 ) -> None:
     mkvs = find_mkvs_in_dir(disc_dir)
@@ -1340,13 +1489,16 @@ def process_movie_disc(
         if not analysis.main_mkv:
             raise RuntimeError("Could not determine main MKV for disc 1.")
 
+        if subtitle_mode == "external":
+            extract_external_subtitles(analysis.main_mkv, ctx.output_movie_main)
+
         if overlap:
-            submit_encode(analysis.main_mkv, ctx.output_movie_main, preset)
+            submit_encode(analysis.main_mkv, ctx.output_movie_main, preset, subtitle_mode)
         else:
             if ctx.output_movie_main.exists():
                 print(f"Skipping encode (exists): {ctx.output_movie_main}")
             else:
-                hb_encode(analysis.main_mkv, ctx.output_movie_main, preset)
+                hb_encode(analysis.main_mkv, ctx.output_movie_main, preset, subtitle_mode=subtitle_mode)
 
         for f in mkvs:
             if analysis.main_mkv and f == analysis.main_mkv:
@@ -1359,6 +1511,8 @@ def process_movie_disc(
                 base_name=name,
                 overlap=overlap,
                 preset=preset,
+                output_ext=output_ext,
+                subtitle_mode=subtitle_mode,
                 submit_encode=submit_encode,
             )
     else:
@@ -1374,6 +1528,8 @@ def process_movie_disc(
                 base_name=base,
                 overlap=overlap,
                 preset=preset,
+                output_ext=output_ext,
+                subtitle_mode=subtitle_mode,
                 submit_encode=submit_encode,
             )
 
@@ -1397,6 +1553,8 @@ def process_series_disc(
     disc_dir: Path,
     overlap: bool,
     preset: str,
+    output_ext: str,
+    subtitle_mode: str,
     submit_encode,
 ) -> None:
     mkvs = find_mkvs_in_dir(disc_dir)
@@ -1435,10 +1593,10 @@ def process_series_disc(
             input_rel = str(f.relative_to(disc_dir))
 
             if is_extra:
-                out = unique_out_path(ctx.output_extras_dir, clean or "Extra", "mp4")
+                out = unique_out_path(ctx.output_extras_dir, clean or "Extra", output_ext)
                 # Ensure no accidental duplicates in the plan.
                 if str(out) in used_outputs:
-                    out = unique_out_path(ctx.output_extras_dir, (clean or "Extra") + "-dup", "mp4")
+                    out = unique_out_path(ctx.output_extras_dir, (clean or "Extra") + "-dup", output_ext)
                 used_outputs.add(str(out))
                 items.append({"type": "extra", "input_rel": input_rel, "output": str(out)})
                 continue
@@ -1449,16 +1607,17 @@ def process_series_disc(
                 series_title=ctx.title,
                 season_pad=ctx.season_pad,
                 clean_episode_title=clean,
+                output_ext=output_ext,
             )
             if existing is not None:
                 out = existing
             else:
-                out = ctx.output_season_dir / f"{ctx.title} - S{ctx.season_pad}E{ep_num:02d} - {clean}.mp4"
+                out = ctx.output_season_dir / f"{ctx.title} - S{ctx.season_pad}E{ep_num:02d} - {clean}.{output_ext}"
                 ep_num += 1
 
             if str(out) in used_outputs:
                 # Extremely defensive: fall back to allocating a new episode number.
-                out = ctx.output_season_dir / f"{ctx.title} - S{ctx.season_pad}E{ep_num:02d} - {clean}.mp4"
+                out = ctx.output_season_dir / f"{ctx.title} - S{ctx.season_pad}E{ep_num:02d} - {clean}.{output_ext}"
                 ep_num += 1
             used_outputs.add(str(out))
             items.append({"type": "episode", "input_rel": input_rel, "output": str(out)})
@@ -1497,16 +1656,20 @@ def process_series_disc(
                     extras_nfo=ctx.output_extras_nfo,
                     overlap=overlap,
                     preset=preset,
+                    subtitle_mode=subtitle_mode,
                     submit_encode=submit_encode,
                 )
             else:
+                if subtitle_mode == "external":
+                    extract_external_subtitles(input_path, out)
+
                 if overlap:
-                    submit_encode(input_path, out, preset)
+                    submit_encode(input_path, out, preset, subtitle_mode)
                 else:
                     if out.exists():
                         print(f"Skipping encode (exists): {out}")
                     else:
-                        hb_encode(input_path, out, preset)
+                        hb_encode(input_path, out, preset, subtitle_mode=subtitle_mode)
         except Exception:
             raise
 
@@ -1678,6 +1841,25 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="HandBrake preset name; if omitted, list presets and exit",
     )
 
+    p.add_argument(
+        "--output-container",
+        choices=["mp4", "mkv"],
+        default=(os.environ.get("HB_OUTPUT_CONTAINER", "mp4") or "mp4").lower(),
+        help="Output container extension for encoded files (default: mp4)",
+    )
+
+    p.add_argument(
+        "--subtitle-mode",
+        choices=["preset", "soft", "external", "none"],
+        default=(os.environ.get("HB_SUBTITLE_MODE", "external") or "external").lower(),
+        help=(
+            "Subtitle behavior: preset=use preset defaults, "
+            "soft=embed subtitle tracks without default selection, "
+            "external=extract subtitles from source MKV to sidecar files with ffmpeg, "
+            "none=drop subtitles"
+        ),
+    )
+
     p.add_argument("--movies-dir", default="/storage/Movies", help="Movies output directory (default: /storage/Movies)")
     p.add_argument("--series-dir", default="/storage/Series", help="Series output directory (default: /storage/Series)")
 
@@ -1782,7 +1964,7 @@ def _encode_lock_active_for_output(out: Path) -> bool:
     return not lock_is_stale_or_clear(lock)
 
 
-def _movie_disc_outputs_exist(ctx: "TitleContext", disc_index: int) -> bool:
+def _movie_disc_outputs_exist(ctx: "TitleContext", disc_index: int, output_ext: str) -> bool:
     """Best-effort check to skip re-ripping discs on CSV restart.
 
     Conservative: only skips when we see expected outputs and there is no active
@@ -1811,7 +1993,7 @@ def _movie_disc_outputs_exist(ctx: "TitleContext", disc_index: int) -> bool:
         return False
     prefix = f"Disc{disc_index:02d}_"
     try:
-        for p in extras_dir.glob(prefix + "*.mp4"):
+        for p in extras_dir.glob(prefix + f"*.{output_ext}"):
             if p.is_file() and not _encode_lock_active_for_output(p):
                 return True
     except Exception:
@@ -2044,7 +2226,7 @@ def main(argv: list[str]) -> int:
     # Fail fast deps.
     try:
         which_required("screen")
-        for cmd in ["awk", "eject", "ffprobe", "find", "grep", "HandBrakeCLI", "makemkvcon", "sed", "sort", "stdbuf", "tr", "wc", "tee", "date", "id"]:
+        for cmd in ["awk", "eject", "ffprobe", "ffmpeg", "find", "grep", "HandBrakeCLI", "makemkvcon", "sed", "sort", "stdbuf", "tr", "wc", "tee", "date", "id"]:
             which_required(cmd)
         if is_remote_dest(ns.movies_dir) or is_remote_dest(ns.series_dir):
             which_required("ssh")
@@ -2101,7 +2283,7 @@ def main(argv: list[str]) -> int:
 
         executor = ThreadPoolExecutor(max_workers=ns.encode_jobs)
 
-    def submit_encode(input_: Path, output: Path, preset: str) -> None:
+    def submit_encode(input_: Path, output: Path, preset: str, subtitle_mode: str) -> None:
         nonlocal encode_queued, encode_started, encode_finished
         if output.exists():
             print(f"Skipping encode (exists): {output}")
@@ -2118,7 +2300,7 @@ def main(argv: list[str]) -> int:
                 started_now = encode_started
                 queued_snap = encode_queued
             print(f"HandBrake start: {started_now}/{queued_snap}: {output.name}")
-            hb_encode(input_, output, preset)
+            hb_encode(input_, output, preset, subtitle_mode=subtitle_mode)
             with encode_stats_lock:
                 encode_finished += 1
                 finished_now = encode_finished
@@ -2139,7 +2321,7 @@ def main(argv: list[str]) -> int:
             print(f"HandBrake start: {started_now}/{queued_snap}: {output.name}")
 
             proc = subprocess.Popen(
-                ["HandBrakeCLI", "-i", str(input_), "-o", str(output), "--preset", preset],
+                ["HandBrakeCLI", "-i", str(input_), "-o", str(output), "--preset", preset, *handbrake_subtitle_args(subtitle_mode)],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -2253,6 +2435,7 @@ def main(argv: list[str]) -> int:
                     movie_multi_disc=movie_multi,
                     movies_dir=ns.movies_dir,
                     series_dir=ns.series_dir,
+                    output_ext=ns.output_container,
                 )
                 batch_add_once(ctx)
 
@@ -2265,7 +2448,7 @@ def main(argv: list[str]) -> int:
                 if (
                     row.kind == "movie"
                     and not find_mkvs_in_dir(disc_dir)
-                    and _movie_disc_outputs_exist(ctx, row.disc)
+                    and _movie_disc_outputs_exist(ctx, row.disc, ns.output_container)
                     and not csv_next_confirmed
                 ):
                     print(
@@ -2286,6 +2469,8 @@ def main(argv: list[str]) -> int:
                             disc_dir=disc_dir,
                             overlap=ns.overlap,
                             preset=ns.preset,
+                            output_ext=ns.output_container,
+                            subtitle_mode=ns.subtitle_mode,
                             submit_encode=submit_encode,
                         )
                     else:
@@ -2295,12 +2480,14 @@ def main(argv: list[str]) -> int:
                             disc_dir=disc_dir,
                             overlap=ns.overlap,
                             preset=ns.preset,
+                            output_ext=ns.output_container,
+                            subtitle_mode=ns.subtitle_mode,
                             submit_encode=submit_encode,
                         )
 
                 if idx + 1 < len(schedule):
                     # Before prompting for the next disc, ensure we have enough free space
-                    # on the filesystem(s) where we are storing MKVs and writing MP4 outputs.
+                    # on the filesystem(s) where we are storing MKVs and writing encoded outputs.
                     pause_if_low_disk_space(
                         paths=_disk_targets_for_run(
                             home_base=home_base,
@@ -2340,6 +2527,7 @@ def main(argv: list[str]) -> int:
                 movie_multi_disc=movie_multi,
                 movies_dir=ns.movies_dir,
                 series_dir=ns.series_dir,
+                output_ext=ns.output_container,
             )
 
             while True:
@@ -2354,14 +2542,14 @@ def main(argv: list[str]) -> int:
                     )
 
                     if ctx.is_series:
-                        process_series_disc(ctx=ctx, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, submit_encode=submit_encode)
+                        process_series_disc(ctx=ctx, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, output_ext=ns.output_container, subtitle_mode=ns.subtitle_mode, submit_encode=submit_encode)
                         nxt = input("Insert next disc for this season? (y/n): ").strip().lower() or "n"
                         if nxt != "y":
                             break
                         disc_index += 1
                         continue
 
-                    process_movie_disc(ctx=ctx, disc_index=disc_index, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, submit_encode=submit_encode)
+                    process_movie_disc(ctx=ctx, disc_index=disc_index, disc_dir=disc_dir, overlap=ns.overlap, preset=ns.preset, output_ext=ns.output_container, subtitle_mode=ns.subtitle_mode, submit_encode=submit_encode)
                     if ctx.movie_multi_disc:
                         nxt = prompt_yes_no("Rip another disc for this movie (extras only)? (y/n): ")
                         if nxt != "y":
@@ -2398,6 +2586,7 @@ def main(argv: list[str]) -> int:
                     movie_multi_disc=movie_multi,
                     movies_dir=ns.movies_dir,
                     series_dir=ns.series_dir,
+                    output_ext=ns.output_container,
                 )
 
         # Wait for encodes.

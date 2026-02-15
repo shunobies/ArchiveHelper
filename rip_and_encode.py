@@ -7,10 +7,12 @@ script small and easier to maintain.
 
 from __future__ import annotations
 
+import sys
+
 from archive_helper_core.rip_and_encode_server import main, sanitize_title_for_dir
 
 __all__ = ["main", "sanitize_title_for_dir"]
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

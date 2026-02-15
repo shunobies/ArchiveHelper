@@ -19,8 +19,8 @@ The GUI supports choosing where ripping and encoding happen.
 Three modes are available:
 
 - **Rip + encode on server (remote)** (default): Everything happens on the server. The GUI controls the server over SSH and shows progress.
-- **Rip locally, encode on server**: Your desktop rips the disc. The app uploads the raw MKV files to the server, then the server encodes them to MP4.
-- **Rip + encode locally, upload results** (planned): Your desktop does all the work. When finished, the app uploads the final MP4 files to the server.
+- **Rip locally, encode on server**: Your desktop rips the disc. The app uploads the raw MKV files to the server, then the server encodes them to MP4 or MKV (configurable).
+- **Rip + encode locally, upload results** (planned): Your desktop does all the work. When finished, the app uploads the final encoded files to the server.
 
 If you do not pick a mode, the app uses **Rip + encode on server (remote)**.
 
@@ -212,3 +212,15 @@ The job runs on the server inside a `screen` session. Closing the GUI does not n
 ## License
 
 This repository does not currently include a license file. If you plan to redistribute or publish it, add an explicit license first.
+
+
+### Subtitle behavior for Jellyfin
+
+- Default behavior uses `--output-container mp4` and `--subtitle-mode external` so files stay in the existing MP4 workflow while extracting subtitles from source MKVs into Jellyfin-readable sidecar files.
+- You can change this with:
+  - `--output-container mp4|mkv`
+  - `--subtitle-mode preset|soft|external|none`
+
+For external subtitle mode, sidecar names are generated beside the video using two-letter language tags, for example `MovieName.en.srt`.
+
+For DVD/BD image-based subtitles, MKV is recommended for best soft-subtitle compatibility in Jellyfin.

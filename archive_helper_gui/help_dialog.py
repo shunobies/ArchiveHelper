@@ -255,6 +255,21 @@ def show_help_dialog(root) -> None:
     add_line("You can change this later without reinstalling anything", "p")
 
     add_blank()
+    add_line("Output", "h2")
+    add_line("Container for encoded files", "p")
+    add_bullets(["mp4 (default): most compatible with existing workflow", "mkv: can preserve more subtitle formats"], "bullet")
+
+    add_blank()
+    add_line("Subtitles", "h2")
+    add_line("How subtitle tracks are handled during encode", "p")
+    add_bullets([
+        "preset: use the subtitle rules already defined in the HandBrake preset",
+        "soft: keep subtitle tracks selectable in Jellyfin (not burned in)",
+        "external: extract subtitles from MKV with ffmpeg into sidecar files for Jellyfin",
+        "none: remove subtitle tracks from encoded output",
+    ], "bullet")
+
+    add_blank()
     add_line("Schedule", "h1")
     add_blank()
     add_line("The schedule tells the app what you want to rip.", "p")

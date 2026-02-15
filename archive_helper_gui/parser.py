@@ -18,6 +18,7 @@ from archive_helper_gui.log_patterns import (
     MAKEMKV_OPERATION_RE,
     MAKEMKV_TOTAL_PROGRESS_RE,
     MAKE_MKV_PROGRESS_RE,
+    FALLBACK_STATUS_RE,
     PROMPT_INSERT_RE,
     PROMPT_LOW_DISK_RE,
     PROMPT_NEXT_DISC_RE,
@@ -152,6 +153,14 @@ def parse_for_progress(gui, text_chunk: str) -> None:
         gui.var_step.set("Error")
         gui.progress.stop()
         gui.progress.configure(mode="indeterminate")
+        return
+
+    m = FALLBACK_STATUS_RE.match(line)
+    if m:
+        stage = m.group(1).strip()
+        gui.var_step.set("Fallback: " + stage)
+        gui.progress.configure(mode="indeterminate")
+        gui.progress.start(10)
         return
 
     # HandBrake task markers

@@ -40,6 +40,11 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
+try:
+    import tkinter.font as tkfont  # type: ignore
+except Exception:
+    tkfont = None
+
 from archive_helper_core.schedule_csv import csv_disc_prompt_for_row, load_csv_schedule
 from rip_and_encode import sanitize_title_for_dir
 
@@ -278,6 +283,8 @@ if TK_AVAILABLE:
                 if "clam" in style.theme_names():
                     style.theme_use("clam")
 
+                self._apply_readable_ui_font(style)
+
                 colors = {
                     "bg": "#101726",
                     "panel": "#18233a",
@@ -333,7 +340,23 @@ if TK_AVAILABLE:
                     arrowcolor=colors["entry_text"],
                     bordercolor=colors["border"],
                 )
-                style.map("TCombobox", fieldbackground=[("readonly", colors["entry"])] , foreground=[("readonly", colors["entry_text"])])
+                style.map("TCombobox", fieldbackground=[("readonly", colors["entry"])], foreground=[("readonly", colors["entry_text"])])
+
+                style.configure(
+                    "TSpinbox",
+                    fieldbackground=colors["entry"],
+                    foreground=colors["entry_text"],
+                    background=colors["panel_alt"],
+                    arrowcolor=colors["entry_text"],
+                    bordercolor=colors["border"],
+                    insertcolor=colors["entry_text"],
+                )
+                style.map(
+                    "TSpinbox",
+                    fieldbackground=[("readonly", colors["entry"]), ("disabled", colors["entry"])],
+                    foreground=[("readonly", colors["entry_text"]), ("disabled", colors["muted"])],
+                    arrowcolor=[("disabled", colors["muted"]), ("!disabled", colors["entry_text"])],
+                )
 
                 style.configure("TRadiobutton", background=colors["panel"], foreground=colors["text"])
                 style.configure("TCheckbutton", background=colors["panel"], foreground=colors["text"])
@@ -354,6 +377,40 @@ if TK_AVAILABLE:
                     "muted": "#444444",
                     "accent": "#2563eb",
                 }
+
+        def _apply_readable_ui_font(self, style: Any) -> None:
+            """Prefer a softer, modern sans-serif stack and apply it to Tk named fonts."""
+
+            if tkfont is None:
+                return
+
+            preferred_families = [
+                "Segoe UI Variable Text",
+                "Segoe UI",
+                "SF Pro Text",
+                "Inter",
+                "Noto Sans",
+                "Helvetica Neue",
+                "Helvetica",
+                "Arial",
+            ]
+
+            available = {name.casefold(): name for name in tkfont.families(self.root)}
+            family = next((available[name.casefold()] for name in preferred_families if name.casefold() in available), "TkDefaultFont")
+
+            for font_name, config in (
+                ("TkDefaultFont", {"family": family, "size": 10}),
+                ("TkTextFont", {"family": family, "size": 10}),
+                ("TkMenuFont", {"family": family, "size": 10}),
+                ("TkHeadingFont", {"family": family, "size": 11, "weight": "bold"}),
+                ("TkTooltipFont", {"family": family, "size": 9}),
+            ):
+                try:
+                    tkfont.nametofont(font_name).configure(**config)
+                except Exception:
+                    continue
+
+            style.configure(".", font=("TkDefaultFont", 10))
 
         def _build_ui(self) -> None:
             menubar = Menu(self.root)

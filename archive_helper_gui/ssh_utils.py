@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 EXEC_MODE_REMOTE = "remote"  # rip+encode on server (current behavior)
-EXEC_MODE_LOCAL_RIP_ONLY = "local_rip_only"  # rip locally, encode on server (planned)
-EXEC_MODE_LOCAL_RIP_ENCODE = "local_rip_encode"  # rip+encode locally, upload results (planned)
+EXEC_MODE_LOCAL_RIP_ONLY = "local_rip_only"  # rip locally, encode on server
+EXEC_MODE_LOCAL_RIP_ENCODE = "local_rip_encode"  # rip+encode locally, upload results (beta)
 
 REMOTE_SCRIPT_RUN_PATH = "~/.archive_helper_for_jellyfin/rip_and_encode.py"
 

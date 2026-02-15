@@ -233,6 +233,11 @@ if TK_AVAILABLE:
 
             self.var_kind = StringVar(value="movie")
             self.var_cd_artist = StringVar(value="")
+            self.var_audible_sync = BooleanVar(value=False)
+            self.var_audible_download_cmd = StringVar(value="")
+            self.var_audible_library_json = StringVar(value="")
+            self.var_tagbooks_script = StringVar(value="")
+            self.var_run_tagbooks = BooleanVar(value=True)
             self.var_title = StringVar(value="")
             self.var_year = StringVar(value="")
             self.var_season = StringVar(value="1")
@@ -497,9 +502,9 @@ if TK_AVAILABLE:
             r1 = ttk.Frame(self.manual_frame)
             r1.pack(fill=X)
             ttk.Label(r1, text="Type:").pack(side=LEFT)
-            cbo_kind = ttk.Combobox(r1, textvariable=self.var_kind, values=["movie", "series", "music"], state="readonly", width=8)
+            cbo_kind = ttk.Combobox(r1, textvariable=self.var_kind, values=["movie", "series", "music", "audiobook"], state="readonly", width=10)
             cbo_kind.pack(side=LEFT, padx=5)
-            Tooltip(cbo_kind, "Choose movie, series, or music (audio CD via abcde).")
+            Tooltip(cbo_kind, "Choose movie, series, music (audio CD), or audiobook workflow.")
             ttk.Label(r1, text="Title:").pack(side=LEFT)
             ent_title = ttk.Entry(r1, textvariable=self.var_title, width=30)
             ent_title.pack(side=LEFT, padx=5)
@@ -526,6 +531,30 @@ if TK_AVAILABLE:
             ent_artist = ttk.Entry(self.artist_row, textvariable=self.var_cd_artist, width=30)
             ent_artist.pack(side=LEFT, padx=5)
             Tooltip(ent_artist, "Artist folder name used for CD/music mode in Jellyfin (example: Daft Punk).")
+
+            self.audiobook_row = ttk.Frame(self.manual_frame)
+            self.audiobook_row.pack(fill=X, pady=(6, 0))
+            chk_sync = ttk.Checkbutton(self.audiobook_row, text="Run Audible sync first", variable=self.var_audible_sync)
+            chk_sync.pack(side=LEFT)
+            Tooltip(chk_sync, "Run your configured Audible downloader command before generating book.nfo files.")
+            ttk.Label(self.audiobook_row, text="Downloader cmd:").pack(side=LEFT, padx=(10, 0))
+            ent_sync_cmd = ttk.Entry(self.audiobook_row, textvariable=self.var_audible_download_cmd, width=42)
+            ent_sync_cmd.pack(side=LEFT, padx=5)
+            Tooltip(ent_sync_cmd, "Command used with --audible-sync. Use {books_dir} as the destination placeholder.")
+
+            self.audiobook_row2 = ttk.Frame(self.manual_frame)
+            self.audiobook_row2.pack(fill=X, pady=(6, 0))
+            ttk.Label(self.audiobook_row2, text="Metadata JSON:").pack(side=LEFT)
+            ent_json = ttk.Entry(self.audiobook_row2, textvariable=self.var_audible_library_json, width=33)
+            ent_json.pack(side=LEFT, padx=5)
+            Tooltip(ent_json, "Optional Audible library export JSON used to enrich book.nfo fields.")
+            ttk.Label(self.audiobook_row2, text="Tag script:").pack(side=LEFT)
+            ent_tag = ttk.Entry(self.audiobook_row2, textvariable=self.var_tagbooks_script, width=22)
+            ent_tag.pack(side=LEFT, padx=5)
+            Tooltip(ent_tag, "Optional path to tagbooks.sh. Leave blank for auto-discovery.")
+            chk_tags = ttk.Checkbutton(self.audiobook_row2, text="Run tagbooks", variable=self.var_run_tagbooks)
+            chk_tags.pack(side=LEFT, padx=(6, 0))
+            Tooltip(chk_tags, "If enabled, run tagbooks.sh after generating book.nfo files.")
 
             self.season_row = ttk.Frame(self.manual_frame)
             self.season_row.pack(fill=X, pady=(6, 0))
@@ -810,6 +839,11 @@ if TK_AVAILABLE:
                 self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
                 self.var_kind.set(str(data.get("kind", self.var_kind.get())))
                 self.var_cd_artist.set(str(data.get("cd_artist", self.var_cd_artist.get())))
+                self.var_audible_sync.set(bool(data.get("audible_sync", self.var_audible_sync.get())))
+                self.var_audible_download_cmd.set(str(data.get("audible_download_cmd", self.var_audible_download_cmd.get())))
+                self.var_audible_library_json.set(str(data.get("audible_library_json", self.var_audible_library_json.get())))
+                self.var_tagbooks_script.set(str(data.get("tagbooks_script", self.var_tagbooks_script.get())))
+                self.var_run_tagbooks.set(bool(data.get("run_tagbooks", self.var_run_tagbooks.get())))
                 self.var_title.set(str(data.get("title", self.var_title.get())))
                 self.var_year.set(str(data.get("year", self.var_year.get())))
                 self.var_season.set(str(data.get("season", self.var_season.get())))
@@ -854,6 +888,11 @@ if TK_AVAILABLE:
                 "csv_path": self.var_csv_path.get(),
                 "kind": self.var_kind.get(),
                 "cd_artist": self.var_cd_artist.get(),
+                "audible_sync": bool(self.var_audible_sync.get()),
+                "audible_download_cmd": self.var_audible_download_cmd.get(),
+                "audible_library_json": self.var_audible_library_json.get(),
+                "tagbooks_script": self.var_tagbooks_script.get(),
+                "run_tagbooks": bool(self.var_run_tagbooks.get()),
                 "title": self.var_title.get(),
                 "year": self.var_year.get(),
                 "season": self.var_season.get(),
@@ -934,6 +973,8 @@ if TK_AVAILABLE:
                 # Always hide manual-only rows in CSV mode.
                 self.season_row.pack_forget()
                 self.artist_row.pack_forget()
+                self.audiobook_row.pack_forget()
+                self.audiobook_row2.pack_forget()
                 return
 
             kind = (self.var_kind.get() or "movie").strip().lower()
@@ -954,6 +995,8 @@ if TK_AVAILABLE:
                 except Exception:
                     pass
                 self.season_row.pack_forget()
+                self.audiobook_row.pack_forget()
+                self.audiobook_row2.pack_forget()
                 try:
                     self.artist_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
                 except Exception:
@@ -968,9 +1011,30 @@ if TK_AVAILABLE:
                 except Exception:
                     pass
                 return
+            elif kind == "audiobook":
+                self.season_row.pack_forget()
+                self.artist_row.pack_forget()
+                try:
+                    self.disc_row.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.tmdb_row.pack_forget()
+                    self.btn_tmdb_lookup.configure(state="disabled")
+                except Exception:
+                    pass
+                try:
+                    self.audiobook_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
+                    self.audiobook_row2.pack(fill=X, pady=(6, 0), before=self.disc_row)
+                except Exception:
+                    self.audiobook_row.pack(fill=X, pady=(6, 0))
+                    self.audiobook_row2.pack(fill=X, pady=(6, 0))
+                return
             else:
                 self.season_row.pack_forget()
                 self.artist_row.pack_forget()
+                self.audiobook_row.pack_forget()
+                self.audiobook_row2.pack_forget()
                 try:
                     self.btn_tmdb_lookup.configure(state="normal")
                 except Exception:
@@ -998,8 +1062,8 @@ if TK_AVAILABLE:
 
         def _lookup_tmdb_matches(self) -> None:
             try:
-                if (self.var_kind.get() or "").strip().lower() == "music":
-                    raise ValueError("TMDB lookup is for movies/series. CD metadata comes from abcde (MusicBrainz/CDDB) during rip.")
+                if (self.var_kind.get() or "").strip().lower() in {"music", "audiobook"}:
+                    raise ValueError("TMDB lookup is for movies/series only.")
                 cfg = self._validate()
                 query = (self.var_title.get() or "").strip()
                 year = (self.var_year.get() or "").strip()
@@ -2559,6 +2623,26 @@ if TK_AVAILABLE:
                         self._start_remote_job(cfg, remote_script, None, extra_args=extra)
                         return
 
+                    if kind == "audiobook":
+                        if exec_mode != EXEC_MODE_REMOTE:
+                            raise ValueError("Audiobook workflow currently supports remote mode only.")
+                        extra = ["--audiobook-workflow", "--books-dir", self.var_books_dir.get().strip()]
+                        library_json = (self.var_audible_library_json.get() or "").strip()
+                        if library_json:
+                            extra += ["--audible-library-json", library_json]
+                        if bool(self.var_audible_sync.get()):
+                            sync_cmd = (self.var_audible_download_cmd.get() or "").strip()
+                            if not sync_cmd:
+                                raise ValueError("Provide an Audible downloader command when 'Run Audible sync first' is enabled.")
+                            extra += ["--audible-sync", "--audible-download-cmd", sync_cmd]
+                        if not bool(self.var_run_tagbooks.get()):
+                            extra += ["--skip-tagbooks"]
+                        tag_script = (self.var_tagbooks_script.get() or "").strip()
+                        if tag_script:
+                            extra += ["--tagbooks-script", tag_script]
+                        self._start_remote_job(cfg, remote_script, None, extra_args=extra)
+                        return
+
                     total_discs = int(self.var_disc_count.get())
                     start_disc = int(self.var_start_disc.get())
                     if total_discs < 1:
@@ -2722,6 +2806,8 @@ if TK_AVAILABLE:
                     str(out_movies),
                     "--series-dir",
                     str(out_series),
+                    "--books-dir",
+                    str(self.var_books_dir.get().strip()),
                     "--music-dir",
                     str(self.var_music_dir.get().strip()),
                     "--disc-type",
@@ -2844,6 +2930,8 @@ if TK_AVAILABLE:
                 self.var_movies_dir.get().strip(),
                 "--series-dir",
                 self.var_series_dir.get().strip(),
+                "--books-dir",
+                self.var_books_dir.get().strip(),
                 "--music-dir",
                 self.var_music_dir.get().strip(),
                 "--disc-type",

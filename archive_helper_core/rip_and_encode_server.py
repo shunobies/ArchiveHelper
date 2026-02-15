@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import getpass
 import gzip
+import html
 import json
 import os
 import re
@@ -2632,10 +2634,37 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     p.add_argument("--movies-dir", default="/storage/Movies", help="Movies output directory (default: /storage/Movies)")
     p.add_argument("--series-dir", default="/storage/Series", help="Series output directory (default: /storage/Series)")
+    p.add_argument("--books-dir", default="/storage/Books", help="Audiobook output directory (default: /storage/Books)")
     p.add_argument("--music-dir", default="/storage/Music", help="Music output directory (default: /storage/Music)")
     p.add_argument("--cd-artist", default="", help="Optional artist override hint for CD logging/organization")
     p.add_argument("--cd-album", default="", help="Optional album override hint for CD logging/organization")
     p.add_argument("--cd-year", default="", help="Optional 4-digit album year for CD folder naming")
+
+    p.add_argument(
+        "--audiobook-workflow",
+        action="store_true",
+        help="Run audiobook post-processing: clean Audible-style names, generate book.nfo, and optionally run tagbooks.sh.",
+    )
+    p.add_argument(
+        "--audible-sync",
+        action="store_true",
+        help="Before audiobook post-processing, run an external Audible downloader command (credentials are not persisted).",
+    )
+    p.add_argument(
+        "--audible-download-cmd",
+        default=os.environ.get("AUDIBLE_DOWNLOAD_CMD", ""),
+        help="Shell command to sync/download Audible books. Supports {books_dir} placeholder; credentials are passed via AUDIBLE_USERNAME/AUDIBLE_PASSWORD env vars.",
+    )
+    p.add_argument("--audible-username", default="", help="Audible login username/email (optional; prompted if missing when --audible-sync is used)")
+    p.add_argument("--audible-password", default="", help="Audible login password (optional; prompted if missing when --audible-sync is used)")
+    p.add_argument("--audible-locale", default="us", help="Audible marketplace locale hint for downloader command (default: us)")
+    p.add_argument("--audible-library-json", default="", help="Optional Audible metadata export JSON used to enrich generated book.nfo files")
+    p.add_argument(
+        "--skip-tagbooks",
+        action="store_true",
+        help="When used with --audiobook-workflow, do not run tagbooks.sh after generating NFO files.",
+    )
+    p.add_argument("--tagbooks-script", default="", help="Path to tagbooks.sh (defaults to ./tagbooks.sh or <books-dir>/tagbooks.sh)")
 
     p.add_argument("--csv", dest="csv_file", default="", help="Drive continuous mode from a CSV schedule (implies --continuous)")
 
@@ -2883,6 +2912,305 @@ def run_cd_rip_with_abcde(*, music_dir: str, artist_hint: str = "", album_hint: 
     return 0
 
 
+
+
+def _sanitize_audible_name(value: str) -> str:
+    s = (value or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"\(\s*unabridged\s*\)", "", s, flags=re.I)
+    s = re.sub(r"\[[A-Z0-9]{8,}\]", "", s)
+    s = re.sub(r"\s+", " ", s).strip(" .-_")
+    return s
+
+
+def _normalize_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _extract_meta_author(entry: dict[str, object]) -> str:
+    authors = entry.get("authors")
+    if isinstance(authors, list):
+        vals = []
+        for a in authors:
+            if isinstance(a, dict):
+                name = str(a.get("name") or "").strip()
+                if name:
+                    vals.append(name)
+            elif isinstance(a, str) and a.strip():
+                vals.append(a.strip())
+        if vals:
+            return ", ".join(vals)
+    if isinstance(authors, str):
+        return authors.strip()
+    return str(entry.get("author") or "").strip()
+
+
+def _load_audible_library_index(path: str) -> dict[str, dict[str, str]]:
+    if not path:
+        return {}
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    items = data.get("items") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        raise RuntimeError("Audible metadata JSON must be an array or an object with an 'items' array.")
+
+    index: dict[str, dict[str, str]] = {}
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or "").strip()
+        asin = str(row.get("asin") or "").strip()
+        author = _extract_meta_author(row)
+        if not title and not asin:
+            continue
+
+        meta = {
+            "title": title,
+            "author": author,
+            "summary": str(row.get("summary") or row.get("description") or "").strip(),
+            "language": str(row.get("language") or "").strip(),
+            "publisher": str(row.get("publisher") or "").strip(),
+            "year": str(row.get("year") or row.get("release_year") or "").strip(),
+            "genre": str(row.get("genre") or "").strip(),
+            "sorttitle": str(row.get("sort_title") or "").strip(),
+            "series_name": "",
+            "series_number": "",
+            "collection": "",
+        }
+
+        series = row.get("series")
+        if isinstance(series, dict):
+            meta["series_name"] = str(series.get("name") or "").strip()
+            meta["series_number"] = str(series.get("sequence") or series.get("number") or "").strip()
+        elif isinstance(series, list) and series:
+            first = series[0]
+            if isinstance(first, dict):
+                meta["series_name"] = str(first.get("name") or "").strip()
+                meta["series_number"] = str(first.get("sequence") or first.get("number") or "").strip()
+
+        collection = row.get("collection")
+        if isinstance(collection, dict):
+            meta["collection"] = str(collection.get("name") or "").strip()
+        elif isinstance(collection, str):
+            meta["collection"] = collection.strip()
+
+        keys = {_normalize_key(title), _normalize_key(_sanitize_audible_name(title)), _normalize_key(asin)}
+        for k in keys:
+            if k:
+                index[k] = meta
+    return index
+
+
+def _render_book_nfo(*, title: str, cover_name: str, meta: dict[str, str]) -> str:
+    def x(v: str) -> str:
+        return html.escape((v or "").strip())
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<book>',
+        f'  <title>{x(title)}</title>',
+    ]
+    for k in ("author", "genre", "year", "summary", "language", "publisher", "sorttitle"):
+        v = (meta.get(k) or "").strip()
+        if v:
+            lines.append(f'  <{k}>{x(v)}</{k}>')
+    sn = (meta.get("series_name") or "").strip()
+    si = (meta.get("series_number") or "").strip()
+    if sn or si:
+        lines.append("  <series>")
+        if sn:
+            lines.append(f'    <name>{x(sn)}</name>')
+        if si:
+            lines.append(f'    <number>{x(si)}</number>')
+        lines.append("  </series>")
+    coll = (meta.get("collection") or "").strip()
+    if coll:
+        lines.append(f'  <collection>{x(coll)}</collection>')
+    lines.append(f'  <thumb>{x(cover_name)}</thumb>')
+    lines.append('</book>')
+    return "\n".join(lines) + "\n"
+
+
+def _run_audible_sync(*, books_dir: Path, command_template: str, username: str, password: str, locale: str) -> None:
+    cmd_tpl = (command_template or "").strip()
+    if not cmd_tpl:
+        raise RuntimeError("--audible-sync requires --audible-download-cmd (or AUDIBLE_DOWNLOAD_CMD env var).")
+
+    if not username:
+        username = input("Audible email/username: ").strip()
+    if not password:
+        password = getpass.getpass("Audible password: ").strip()
+
+    command = cmd_tpl.format(books_dir=shlex.quote(str(books_dir)))
+    env = os.environ.copy()
+    env["AUDIBLE_USERNAME"] = username
+    env["AUDIBLE_PASSWORD"] = password
+    env["AUDIBLE_LOCALE"] = (locale or "us").strip() or "us"
+
+    print("Starting Audible library sync...")
+    cp = subprocess.run(["bash", "-lc", command], env=env, check=False)
+    env.pop("AUDIBLE_USERNAME", None)
+    env.pop("AUDIBLE_PASSWORD", None)
+    if cp.returncode != 0:
+        raise RuntimeError(f"Audible sync command failed with exit code {cp.returncode}")
+
+
+def _safe_path_component(value: str, *, fallback: str) -> str:
+    v = _sanitize_audible_name(value)
+    v = re.sub(r'[\\/:*?"<>|]', " ", v)
+    v = re.sub(r"\s+", " ", v).strip(" .")
+    return v or fallback
+
+
+def _unique_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    stem = path.name
+    i = 2
+    while True:
+        candidate = path.with_name(f"{stem} ({i})")
+        if not candidate.exists():
+            return candidate
+        i += 1
+
+
+def _find_cover_image(dir_path: Path) -> Path | None:
+    for name in ["cover.jpg", "cover.jpeg", "folder.jpg", "Folder.jpg", "thumb.jpg"]:
+        p = dir_path / name
+        if p.exists() and p.is_file():
+            return p
+    return None
+
+
+def run_audiobook_workflow(
+    *,
+    books_dir: str,
+    metadata_json: str = "",
+    run_tagging: bool = True,
+    tagbooks_script: str = "",
+    audible_sync: bool = False,
+    audible_download_cmd: str = "",
+    audible_username: str = "",
+    audible_password: str = "",
+    audible_locale: str = "us",
+) -> int:
+    root = Path(books_dir).expanduser()
+    root.mkdir(parents=True, exist_ok=True)
+    library_root = root / "Audiobooks"
+    library_root.mkdir(parents=True, exist_ok=True)
+
+    if audible_sync:
+        _run_audible_sync(
+            books_dir=root,
+            command_template=audible_download_cmd,
+            username=(audible_username or "").strip(),
+            password=(audible_password or "").strip(),
+            locale=audible_locale,
+        )
+
+    meta_idx = _load_audible_library_index(metadata_json) if metadata_json else {}
+
+    m4b_files = sorted(root.rglob("*.m4b"))
+    m4b_files = [p for p in m4b_files if p.is_file()]
+    if not m4b_files:
+        print(f"No .m4b files found under: {root}")
+
+    created = 0
+    renamed = 0
+    moved = 0
+
+    for m4b in m4b_files:
+        if not m4b.exists():
+            continue
+
+        src_parent = m4b.parent
+        clean_file_name = _sanitize_audible_name(m4b.stem)
+        if clean_file_name and clean_file_name != m4b.stem:
+            new_file = m4b.with_name(clean_file_name + m4b.suffix)
+            if not new_file.exists():
+                m4b.rename(new_file)
+                m4b = new_file
+                renamed += 1
+
+        title_guess = _sanitize_audible_name(src_parent.name) or _sanitize_audible_name(m4b.stem) or src_parent.name
+        asin_match = re.search(r"\[([A-Z0-9]{8,})\]", src_parent.name + " " + m4b.stem)
+        asin = asin_match.group(1) if asin_match else ""
+        meta = meta_idx.get(_normalize_key(asin)) or meta_idx.get(_normalize_key(title_guess)) or {}
+
+        title = (meta.get("title") or title_guess or m4b.stem).strip()
+        author = (meta.get("author") or "Unknown Author").strip() or "Unknown Author"
+        year = (meta.get("year") or "").strip()
+        year = year if re.fullmatch(r"\d{4}", year) else ""
+
+        author_dir_name = _safe_path_component(author, fallback="Unknown Author")
+        title_dir_name = _safe_path_component(title, fallback="Unknown Title")
+        if year:
+            title_dir_name = f"{title_dir_name} ({year})"
+
+        target_dir = library_root / author_dir_name / title_dir_name
+        target_dir = _unique_path(target_dir) if target_dir.exists() and m4b.parent.resolve() != target_dir.resolve() else target_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        target_file = target_dir / (_safe_path_component(title, fallback="Unknown Title") + ".m4b")
+        if target_file.exists() and m4b.resolve() != target_file.resolve():
+            suffix = 2
+            base = _safe_path_component(title, fallback="Unknown Title")
+            while True:
+                cand = target_dir / f"{base} ({suffix}).m4b"
+                if not cand.exists():
+                    target_file = cand
+                    break
+                suffix += 1
+
+        if m4b.resolve() != target_file.resolve():
+            m4b.rename(target_file)
+            m4b = target_file
+            moved += 1
+
+        src_cover = _find_cover_image(src_parent)
+        if src_cover is not None:
+            dest_cover = target_dir / "cover.jpg"
+            if src_cover.resolve() != dest_cover.resolve() and not dest_cover.exists():
+                shutil.copy2(src_cover, dest_cover)
+
+        cover = _find_cover_image(target_dir)
+        cover_name = cover.name if cover else "cover.jpg"
+
+        nfo_path = target_dir / "book.nfo"
+        nfo_path.write_text(
+            _render_book_nfo(title=title, cover_name=cover_name, meta=meta),
+            encoding="utf-8",
+        )
+        created += 1
+
+    print(f"Audiobook workflow: library root is {library_root}")
+    print(f"Audiobook workflow: generated {created} book.nfo file(s).")
+    if renamed:
+        print(f"Audiobook workflow: renamed {renamed} file name(s).")
+    if moved:
+        print(f"Audiobook workflow: moved {moved} audiobook file(s) into Jellyfin structure.")
+
+    if run_tagging:
+        script = (tagbooks_script or "").strip()
+        if not script:
+            candidate = root / "tagbooks.sh"
+            if candidate.exists():
+                script = str(candidate)
+            else:
+                candidate = Path.cwd() / "tagbooks.sh"
+                if candidate.exists():
+                    script = str(candidate)
+        if script:
+            print(f"Running tagbook metadata pass: {script}")
+            cp = subprocess.run(["bash", str(Path(script).expanduser())], cwd=str(library_root), check=False)
+            if cp.returncode != 0:
+                raise RuntimeError(f"tagbooks script failed with exit code {cp.returncode}")
+        else:
+            print("Skipping tag pass: tagbooks.sh not found. Use --tagbooks-script to specify it.")
+
+    print("Audiobook workflow complete.")
+    return 0
+
 def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str) -> int:
     """Conservatively remove *work directories* created by this script.
 
@@ -3043,6 +3371,23 @@ def main(argv: list[str]) -> int:
 
     if ns.check_deps:
         return check_deps(ns.movies_dir, ns.series_dir)
+
+    if ns.audiobook_workflow:
+        try:
+            return run_audiobook_workflow(
+                books_dir=ns.books_dir,
+                metadata_json=ns.audible_library_json,
+                run_tagging=(not ns.skip_tagbooks),
+                tagbooks_script=ns.tagbooks_script,
+                audible_sync=bool(ns.audible_sync),
+                audible_download_cmd=ns.audible_download_cmd,
+                audible_username=ns.audible_username,
+                audible_password=ns.audible_password,
+                audible_locale=ns.audible_locale,
+            )
+        except Exception as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
 
     if getattr(ns, "disc_type", "dvd") == "cd" and ns.csv_file:
         print("--csv is not used in CD mode. Start CD jobs from manual mode.", file=sys.stderr)

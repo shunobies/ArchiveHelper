@@ -1,6 +1,6 @@
 # Archive Helper for Jellyfin
 
-![Archive Helper GUI main window](screenshots/archive-helper-main.png)
+![Archive Helper GUI main window](screenshots/Screenshot%202026-02-15%20102336.png)
 
 Archive Helper is a small Python app that helps you copy DVDs/Blu-rays on a Linux “rip server”, convert them to a Jellyfin-friendly format, and put them into the right folders so Jellyfin can automatically scan and organize your library.
 

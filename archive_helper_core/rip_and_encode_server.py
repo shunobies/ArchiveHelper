@@ -2067,7 +2067,7 @@ def process_movie_disc(
             else:
                 hb_encode(analysis.main_mkv, ctx.output_movie_main, preset, subtitle_mode=subtitle_mode)
 
-        for f in mkvs:
+        for f in _series_plan_order(mkvs):
             if analysis.main_mkv and f == analysis.main_mkv:
                 continue
             name = clean_title(analysis.titlemap.get(f, "Extra") or "Extra")
@@ -2114,6 +2114,84 @@ def series_next_episode_number(season_dir: Path) -> int:
     return (max(ep_nums) if ep_nums else 0) + 1
 
 
+def _natural_key(text: str) -> list[object]:
+    parts = re.split(r"(\d+)", text or "")
+    key: list[object] = []
+    for p in parts:
+        if not p:
+            continue
+        if p.isdigit():
+            key.append(int(p))
+        else:
+            key.append(p.lower())
+    return key
+
+
+def _episode_hint_from_text(text: str) -> Optional[int]:
+    s = (text or "").strip()
+    if not s:
+        return None
+
+    patterns = (
+        r"\bS\d{1,2}E(\d{1,3})\b",
+        r"\bE(?:P(?:ISODE)?)?\s*[-_. ]?(\d{1,3})\b",
+        r"\b(\d{1,2})x(\d{1,3})\b",
+        r"\bPART\s*(\d{1,3})\b",
+    )
+    for pat in patterns:
+        m = re.search(pat, s, flags=re.I)
+        if not m:
+            continue
+        try:
+            if len(m.groups()) >= 2 and m.group(2):
+                n = int(m.group(2))
+            else:
+                n = int(m.group(1))
+            if 1 <= n <= 999:
+                return n
+        except Exception:
+            continue
+    return None
+
+
+def _source_title_order_hint(path: Path) -> Optional[int]:
+    stem = path.stem
+    for pat in (r"(?:^|[^a-z])t(?:itle)?[_\- ]?(\d{1,3})(?:[^a-z]|$)", r"\btitle[_\- ]?(\d{1,3})\b"):
+        m = re.search(pat, stem, flags=re.I)
+        if not m:
+            continue
+        try:
+            n = int(m.group(1))
+            if 0 <= n <= 999:
+                return n
+        except Exception:
+            continue
+    return None
+
+
+def _series_plan_order(mkvs: list[Path]) -> list[Path]:
+    """Return MKVs in a more episode-friendly order.
+
+    Priority:
+    1) episode number parsed from ffprobe metadata title
+    2) MakeMKV-style title index hinted in filename (e.g. title_t02.mkv)
+    3) natural filename order
+    """
+
+    def _key(path: Path) -> tuple[int, int, int, list[object]]:
+        meta_title = ffprobe_meta_title(path)
+        ep_hint = _episode_hint_from_text(meta_title or "")
+        source_hint = _source_title_order_hint(path)
+        return (
+            0 if ep_hint is not None else 1,
+            ep_hint if ep_hint is not None else 10_000,
+            source_hint if source_hint is not None else 10_000,
+            _natural_key(path.name),
+        )
+
+    return sorted(mkvs, key=_key)
+
+
 def process_series_disc(
     *,
     ctx: TitleContext,
@@ -2146,7 +2224,7 @@ def process_series_disc(
         # First time (or legacy runs): build a deterministic plan and persist it.
         ep_num = series_next_episode_number(ctx.output_season_dir)
         used_outputs: set[str] = set()
-        for f in mkvs:
+        for f in _series_plan_order(mkvs):
             meta_title = ffprobe_meta_title(f)
             dur = ffprobe_duration_seconds(f)
             chapters = ffprobe_chapter_count(f)

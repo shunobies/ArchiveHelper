@@ -34,6 +34,7 @@ Note: The first two modes are stable. The third mode (local rip + encode upload)
 - **Disk space checks**: The app now checks that you have enough free space before ripping each disc (default: 20 GB). If space is low, it pauses and prompts you to free up space before continuing.
 - **Better overlap mode**: When encoding a disc while ripping the next one, HandBrake no longer gets confused by keypresses. This means encodes keep running smoothly while you work on the next disc.
 - **Faster DVD ripping**: MakeMKV now uses more cache memory (512 MB instead of 128 MB) when ripping DVDs, which makes rips more stable and can reduce errors.
+- **Smarter series episode ordering**: During series processing, episode files are now planned using metadata and source-title hints (when available) before assigning `SxxExx` numbers, reducing mis-numbered episodes on tricky discs.
 
 ## How it works (two-computer model)
 

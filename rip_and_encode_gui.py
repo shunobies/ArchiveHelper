@@ -37,9 +37,10 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from rip_and_encode import csv_disc_prompt_for_row, load_csv_schedule, sanitize_title_for_dir
+from archive_helper_core.schedule_csv import csv_disc_prompt_for_row, load_csv_schedule
+from rip_and_encode import sanitize_title_for_dir
 
 from archive_helper_gui.log_patterns import (
     CSV_LOADED_RE,
@@ -71,6 +72,35 @@ from archive_helper_gui.tailer import reader_loop as tailer_reader_loop
 from archive_helper_gui.tailer import start_tail as tailer_start_tail
 from archive_helper_gui.tailer import stop_tail as tailer_stop_tail
 from archive_helper_gui.tooltip import Tooltip
+from archive_helper_gui.ssh_utils import (
+    REMOTE_SCRIPT_RUN_PATH,
+    EXEC_MODE_LOCAL_RIP_ENCODE,
+    EXEC_MODE_LOCAL_RIP_ONLY,
+    EXEC_MODE_REMOTE,
+    build_scp_base_args,
+    build_ssh_base_args,
+    exec_mode_label,
+    normalize_remote_script_path,
+    ssh_target,
+)
+from archive_helper_gui.tk_compat import (
+    BOTH,
+    END,
+    LEFT,
+    RIGHT,
+    X,
+    BooleanVar,
+    IntVar,
+    Menu,
+    ScrolledText,
+    StringVar,
+    TK_AVAILABLE,
+    Tk,
+    Toplevel,
+    filedialog,
+    messagebox,
+    ttk,
+)
 
 # Optional dependencies: define symbols on all paths so static analyzers (Pylance)
 # don't report hundreds of "possibly unbound" errors.
@@ -89,118 +119,6 @@ try:
     PARAMIKO_AVAILABLE = True
 except Exception:
     PARAMIKO_AVAILABLE = False
-
-try:
-    from tkinter import (  # type: ignore
-        BOTH as _TK_BOTH,
-        END as _TK_END,
-        LEFT as _TK_LEFT,
-        RIGHT as _TK_RIGHT,
-        X as _TK_X,
-        BooleanVar as _TK_BooleanVar,
-        IntVar as _TK_IntVar,
-        Menu as _TK_Menu,
-        StringVar as _TK_StringVar,
-        Tk as _TK_Tk,
-        Toplevel as _TK_Toplevel,
-        filedialog as _TK_filedialog,
-        messagebox as _TK_messagebox,
-    )
-    from tkinter import ttk as _TK_ttk  # type: ignore
-    from tkinter.scrolledtext import ScrolledText as _TK_ScrolledText  # type: ignore
-
-    BOTH = _TK_BOTH
-    END = _TK_END
-    LEFT = _TK_LEFT
-    RIGHT = _TK_RIGHT
-    X = _TK_X
-    BooleanVar = _TK_BooleanVar
-    IntVar = _TK_IntVar
-    Menu = _TK_Menu
-    StringVar = _TK_StringVar
-    Tk = _TK_Tk
-    Toplevel = _TK_Toplevel
-    filedialog = _TK_filedialog
-    messagebox = _TK_messagebox
-    ttk = _TK_ttk
-    ScrolledText = _TK_ScrolledText
-
-    TK_AVAILABLE = True
-except ModuleNotFoundError:
-    TK_AVAILABLE = False
-
-    # Define placeholders so references are always bound for type checking.
-    # These are never used at runtime because the GUI exits early when TK_AVAILABLE is False.
-    BOTH = cast(Any, "both")
-    X = cast(Any, "x")
-    LEFT = cast(Any, "left")
-    RIGHT = cast(Any, "right")
-    END = cast(Any, "end")
-
-    StringVar = cast(Any, lambda *args, **kwargs: None)
-    BooleanVar = cast(Any, lambda *args, **kwargs: None)
-    IntVar = cast(Any, lambda *args, **kwargs: None)
-    Menu = cast(Any, lambda *args, **kwargs: None)
-    Tk = cast(Any, object)
-    Toplevel = cast(Any, object)
-    ttk = cast(Any, None)
-    filedialog = cast(Any, None)
-    messagebox = cast(Any, None)
-    ScrolledText = cast(Any, object)
-
-
-
-def _ssh_target(user: str, host: str) -> str:
-    if not host.strip():
-        return ""
-    if "@" in host:
-        return host.strip()
-    if user.strip():
-        return f"{user.strip()}@{host.strip()}"
-    return host.strip()
-
-
-def _build_ssh_base_args(target: str, port: str, keyfile: str) -> list[str]:
-    args = ["ssh", "-tt"]
-    if port.strip():
-        args += ["-p", port.strip()]
-    if keyfile.strip():
-        args += ["-i", keyfile.strip()]
-    args.append(target)
-    return args
-
-
-def _build_scp_base_args(port: str, keyfile: str) -> list[str]:
-    args = ["scp"]
-    if port.strip():
-        args += ["-P", port.strip()]
-    if keyfile.strip():
-        args += ["-i", keyfile.strip()]
-    return args
-
-
-def _normalize_remote_script_path(remote_script: str) -> str:
-    s = (remote_script or "").strip()
-    if not s:
-        return "rip_and_encode.py"
-    if "/" in s or s.startswith("~"):
-        return s
-    return f"~/{s}"
-
-
-REMOTE_SCRIPT_RUN_PATH = "~/.archive_helper_for_jellyfin/rip_and_encode.py"
-EXEC_MODE_REMOTE = "remote"  # rip+encode on server (current behavior)
-EXEC_MODE_LOCAL_RIP_ONLY = "local_rip_only"  # rip locally, encode on server (planned)
-EXEC_MODE_LOCAL_RIP_ENCODE = "local_rip_encode"  # rip+encode locally, upload results (planned)
-
-def _exec_mode_label(mode: str) -> str:
-    m = (mode or "").strip()
-    if m == EXEC_MODE_LOCAL_RIP_ONLY:
-        return "Rip locally (encode on server)"
-    if m == EXEC_MODE_LOCAL_RIP_ENCODE:
-        return "Rip + encode locally (upload results)"
-    return "Rip + encode on server (remote)"
-
 
 if TK_AVAILABLE:
 
@@ -396,7 +314,7 @@ if TK_AVAILABLE:
             note = ttk.Label(settings, text="Connection and output directories are set under Settings.")
             note.pack(anchor="w", pady=(6, 0))
 
-            self.lbl_exec_mode = ttk.Label(settings, text=f"Rip mode: {_exec_mode_label(self.var_exec_mode.get())}")
+            self.lbl_exec_mode = ttk.Label(settings, text=f"Rip mode: {exec_mode_label(self.var_exec_mode.get())}")
             self.lbl_exec_mode.pack(anchor="w", pady=(2, 0))
 
             # Mode frame
@@ -753,7 +671,7 @@ if TK_AVAILABLE:
 
             try:
                 if hasattr(self, "lbl_exec_mode"):
-                    self.lbl_exec_mode.configure(text=f"Rip mode: {_exec_mode_label(self.var_exec_mode.get())}")
+                    self.lbl_exec_mode.configure(text=f"Rip mode: {exec_mode_label(self.var_exec_mode.get())}")
             except Exception:
                 pass
 
@@ -1579,7 +1497,7 @@ if TK_AVAILABLE:
             if not host:
                 return
 
-            target = _ssh_target(self.var_user.get(), host)
+            target = ssh_target(self.var_user.get(), host)
             if not target:
                 return
 
@@ -1933,7 +1851,7 @@ if TK_AVAILABLE:
                 messagebox.showerror("Error", str(e))
 
         def _validate(self) -> ConnectionInfo:
-            target = _ssh_target(self.var_user.get(), self.var_host.get())
+            target = ssh_target(self.var_user.get(), self.var_host.get())
             if not target:
                 raise ValueError("Host is required.")
 
@@ -2094,7 +2012,7 @@ if TK_AVAILABLE:
             This keeps the GUI runnable for users who don't have the script pre-installed
             on the remote host.
             """
-            normalized = _normalize_remote_script_path(remote_script)
+            normalized = normalize_remote_script_path(remote_script)
             password = (self.var_password.get() or "").strip()
 
             # Ensure python3 exists and our remote directory is present.

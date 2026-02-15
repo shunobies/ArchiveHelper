@@ -34,6 +34,13 @@ def parse_for_progress(gui, text_chunk: str) -> None:
 
     line = (text_chunk or "").rstrip("\n")
 
+    def _clear_waiting_prompt() -> None:
+        if gui.state.waiting_for_enter:
+            gui.state.waiting_for_enter = False
+            gui.var_prompt.set("")
+            gui.btn_continue.configure(state="disabled")
+            gui.state.next_disc_prompt = ""
+
     def _format_disc_prompt(raw: str) -> str:
         shown = (raw or "").strip()
         if shown.lower().startswith("next up:"):
@@ -47,11 +54,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
     m = MAKEMKV_OPERATION_RE.match(line)
     if m:
         op = m.group(1).strip()
-        if gui.state.waiting_for_enter:
-            gui.state.waiting_for_enter = False
-            gui.var_prompt.set("")
-            gui.btn_continue.configure(state="disabled")
-            gui.state.next_disc_prompt = ""
+        _clear_waiting_prompt()
 
         if re.search(r"analy", op, flags=re.IGNORECASE):
             gui.state.makemkv_phase = "analyze"
@@ -75,11 +78,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
     m = MAKEMKV_ACTION_RE.match(line)
     if m:
         act = m.group(1).strip()
-        if gui.state.waiting_for_enter:
-            gui.state.waiting_for_enter = False
-            gui.var_prompt.set("")
-            gui.btn_continue.configure(state="disabled")
-            gui.state.next_disc_prompt = ""
+        _clear_waiting_prompt()
 
         if re.search(r"analy", act, flags=re.IGNORECASE):
             gui.state.makemkv_phase = "analyze"
@@ -105,11 +104,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             pct = float(m.group(1))
         except ValueError:
             pct = 0.0
-        if gui.state.waiting_for_enter:
-            gui.state.waiting_for_enter = False
-            gui.var_prompt.set("")
-            gui.btn_continue.configure(state="disabled")
-            gui.state.next_disc_prompt = ""
+        _clear_waiting_prompt()
 
         gui.state.last_makemkv_total_pct = pct
         phase = gui.state.makemkv_phase or "process"
@@ -127,11 +122,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             pct = float(m.group(1))
         except ValueError:
             pct = 0.0
-        if gui.state.waiting_for_enter:
-            gui.state.waiting_for_enter = False
-            gui.var_prompt.set("")
-            gui.btn_continue.configure(state="disabled")
-            gui.state.next_disc_prompt = ""
+        _clear_waiting_prompt()
 
         phase = gui.state.makemkv_phase or "process"
         gui.var_step.set("Analyzing (MakeMKV)" if phase == "analyze" else "Ripping (MakeMKV)")
@@ -200,11 +191,7 @@ def parse_for_progress(gui, text_chunk: str) -> None:
 
     m = MAKE_MKV_PROGRESS_RE.search(line)
     if m:
-        if gui.state.waiting_for_enter:
-            gui.state.waiting_for_enter = False
-            gui.var_prompt.set("")
-            gui.btn_continue.configure(state="disabled")
-            gui.state.next_disc_prompt = ""
+        _clear_waiting_prompt()
         gui.var_step.set("Ripping (MakeMKV)")
         gui.progress.configure(mode="determinate")
         gui.progress.stop()

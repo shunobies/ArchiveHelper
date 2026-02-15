@@ -37,6 +37,9 @@ def load_csv_schedule(file: Path) -> list[ScheduleRow]:
 
     for n, raw in enumerate(file.read_text(errors="ignore").splitlines(), start=1):
         line = raw.rstrip("\r")
+        if n == 1:
+            # Accept UTF-8 BOM-prefixed files exported by spreadsheet editors.
+            line = line.lstrip("\ufeff")
         if not line.strip():
             continue
         if line.lstrip().startswith("#"):

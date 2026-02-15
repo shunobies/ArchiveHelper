@@ -38,6 +38,8 @@ Note: The first two modes are stable. The third mode (local rip + encode upload)
 - **Faster DVD ripping**: MakeMKV now uses more cache memory (512 MB instead of 128 MB) when ripping DVDs, which makes rips more stable and can reduce errors.
 - **Smarter series episode ordering**: During series processing, episode files are now planned using metadata and source-title hints (when available) before assigning `SxxExx` numbers, reducing mis-numbered episodes on tricky discs.
 - **CD (music) workflow**: You can now select **Disc type = cd** and **Type = music** in manual mode. The server runs `abcde` (with MusicBrainz/CDDB lookup) and writes tracks under your configured Music directory using Jellyfin-friendly layout: `Artist/Album (Year)/01 - Track.flac`.
+- **Audiobook post-processing workflow**: Added a server-side `--audiobook-workflow` mode that can normalize Audible-style names (removes `(Unabridged)` + bracketed catalog tags), generate `book.nfo` files for Jellyfin, and optionally execute `tagbooks.sh` so metadata is embedded into `.m4b` files.
+- **GUI access for audiobook sync**: In Manual schedule mode, set **Type = audiobook** to expose Audible options including **Run Audible sync first** and the downloader command field, plus optional JSON metadata and tag script settings.
 
 ## How it works (two-computer model)
 
@@ -287,3 +289,29 @@ This repository does not currently include a license file. If you plan to redist
 For external subtitle mode, sidecar names are generated beside the video using two-letter language tags, for example `MovieName.en.srt`.
 
 For DVD/BD image-based subtitles, MKV is recommended for best soft-subtitle compatibility in Jellyfin.
+
+
+## Audiobooks (Audible-style library to Jellyfin)
+
+Archive Helper now includes a utility mode in `rip_and_encode.py` for audiobook libraries:
+
+```bash
+python3 rip_and_encode.py   --audiobook-workflow   --books-dir /storage/Books   --audible-library-json /path/to/audible_library.json
+```
+
+What it does:
+
+- Scans `.m4b` files under `--books-dir`
+- Creates/uses `Audiobooks/` under your configured Books directory
+- Cleans Audible-style names (`(Unabridged)` and bracketed IDs like `[9ZFD12334]`)
+- Re-homes books into Jellyfin-friendly layout: `Books/Audiobooks/Author/Title (Year)/Title.m4b`
+- Writes `book.nfo` next to each book (title/author/series/summary/etc. when metadata JSON is provided)
+- Runs `tagbooks.sh` if present (or use `--tagbooks-script`) to embed tags into each `.m4b`
+
+Optional sync step (external downloader command):
+
+```bash
+python3 rip_and_encode.py   --audiobook-workflow   --audible-sync   --audible-download-cmd 'your-audible-downloader --all --output {books_dir}'
+```
+
+When `--audible-sync` is used, credentials are prompted at runtime (if omitted), passed only via process environment variables for that single command invocation, and are not persisted by Archive Helper.

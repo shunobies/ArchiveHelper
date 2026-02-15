@@ -507,16 +507,16 @@ if TK_AVAILABLE:
             ent_year = ttk.Entry(r1, textvariable=self.var_year, width=6)
             ent_year.pack(side=LEFT, padx=5)
             Tooltip(ent_year, "4-digit release year (example: 2008).")
-            self.btn_tmdb_lookup = ttk.Button(r1, text="TMDB Lookup", command=self._lookup_tmdb_matches)
+            self.btn_tmdb_lookup = ttk.Button(r1, text="Scan Disc + TMDB", command=self._lookup_tmdb_matches)
             self.btn_tmdb_lookup.pack(side=LEFT, padx=(10, 0))
-            Tooltip(self.btn_tmdb_lookup, "Search TMDB on the server using your API key and title/year.")
+            Tooltip(self.btn_tmdb_lookup, "Probe the inserted disc on the server, then search TMDB for likely matches.")
 
             self.tmdb_row = ttk.Frame(self.manual_frame)
             self.tmdb_row.pack(fill=X, pady=(6, 0))
             ttk.Label(self.tmdb_row, text="TMDB matches:").pack(side=LEFT)
             self.cbo_tmdb_matches = ttk.Combobox(self.tmdb_row, textvariable=self.var_tmdb_match, width=65, state="readonly")
             self.cbo_tmdb_matches.pack(side=LEFT, padx=5)
-            Tooltip(self.cbo_tmdb_matches, "Choose the best TMDB match to auto-fill title and year.")
+            Tooltip(self.cbo_tmdb_matches, "Choose a suggestion to auto-fill type, title, and year. Use No match to keep manual entry.")
             self.cbo_tmdb_matches.bind("<<ComboboxSelected>>", self._apply_tmdb_match_selection)
 
             self.season_row = ttk.Frame(self.manual_frame)
@@ -936,6 +936,8 @@ if TK_AVAILABLE:
                 self.season_row.pack_forget()
 
         def _build_tmdb_match_label(self, match: dict[str, str]) -> str:
+            if str(match.get("no_match") or "").strip().lower() in {"1", "true", "yes"}:
+                return "No match (enter details manually)"
             title = (match.get("title") or "").strip() or "(untitled)"
             year = (match.get("year") or "").strip() or "????"
             media = (match.get("media_type") or "movie").strip().lower()
@@ -952,28 +954,19 @@ if TK_AVAILABLE:
                 api_key = (self.var_tmdb_api_key.get() or "").strip()
                 if not api_key:
                     raise ValueError("TMDB API key is required (Settings → Connection).")
-                if not query:
-                    raise ValueError("Enter a title first, then run TMDB lookup.")
 
                 self._persist_state()
                 remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
-                kind = (self.var_kind.get() or "movie").strip().lower()
-                media_type = "tv" if kind == "series" else "movie"
 
-                cmd_parts = [
-                    "python3",
-                    remote_script,
-                    "--tmdb-search",
-                    query,
-                    "--tmdb-api-key",
-                    api_key,
-                    "--tmdb-media-type",
-                    media_type,
-                    "--tmdb-limit",
-                    "12",
-                ]
-                if re.fullmatch(r"\d{4}", year):
-                    cmd_parts += ["--tmdb-year", year]
+                cmd_parts = ["python3", remote_script, "--tmdb-api-key", api_key, "--tmdb-limit", "12"]
+                if query:
+                    kind = (self.var_kind.get() or "movie").strip().lower()
+                    media_type = "tv" if kind == "series" else "movie"
+                    cmd_parts += ["--tmdb-search", query, "--tmdb-media-type", media_type]
+                    if re.fullmatch(r"\d{4}", year):
+                        cmd_parts += ["--tmdb-year", year]
+                else:
+                    cmd_parts += ["--tmdb-suggest-from-disc", "--tmdb-disc-media-type", "auto"]
 
                 remote_cmd = " ".join(shlex.quote(x) for x in cmd_parts)
                 code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_cmd)
@@ -993,7 +986,8 @@ if TK_AVAILABLE:
                 results = payload.get("results") if isinstance(payload, dict) else None
                 if not isinstance(results, list):
                     results = []
-                clean: list[dict[str, str]] = []
+
+                clean: list[dict[str, str]] = [{"no_match": "1", "title": "No match"}]
                 for it in results:
                     if isinstance(it, dict):
                         clean.append({k: str(v or "") for k, v in it.items()})
@@ -1001,15 +995,19 @@ if TK_AVAILABLE:
 
                 labels = [self._build_tmdb_match_label(m) for m in self._tmdb_matches]
                 self.cbo_tmdb_matches.configure(values=labels)
-                if labels:
-                    self.cbo_tmdb_matches.current(0)
-                    self.var_tmdb_match.set(labels[0])
-                    self._apply_tmdb_match_selection(None)
-                    self._append_log(f"(Info) TMDB lookup found {len(labels)} match(es).\n")
+                self.cbo_tmdb_matches.current(0)
+                self.var_tmdb_match.set(labels[0])
+
+                hints = payload.get("hints") if isinstance(payload, dict) else None
+                if isinstance(hints, list) and hints:
+                    self._append_log("(Info) Disc hints: " + "; ".join(str(x) for x in hints[:3]) + "\n")
+
+                found = max(0, len(labels) - 1)
+                if found:
+                    self._append_log(f"(Info) TMDB lookup found {found} match(es).\n")
                 else:
-                    self.var_tmdb_match.set("")
                     self._append_log("(Info) TMDB lookup returned no matches.\n")
-                    messagebox.showinfo("TMDB", "No TMDB matches found for the current title.")
+                    messagebox.showinfo("TMDB", "No TMDB matches found from the inserted disc. Select 'No match' and enter details manually.")
             except Exception as e:
                 messagebox.showerror("TMDB", str(e))
 
@@ -1023,6 +1021,8 @@ if TK_AVAILABLE:
                 return
 
             match = self._tmdb_matches[idx]
+            if str(match.get("no_match") or "").strip().lower() in {"1", "true", "yes"}:
+                return
             title = (match.get("title") or "").strip()
             year = (match.get("year") or "").strip()
             media_type = (match.get("media_type") or "movie").strip().lower()

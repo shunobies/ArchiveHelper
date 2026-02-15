@@ -25,6 +25,7 @@ using --csv for determinism.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import queue
 import re
@@ -181,6 +182,9 @@ if TK_AVAILABLE:
             self.var_port = StringVar(value="")
             self.var_key = StringVar(value="")
             self.var_password = StringVar(value="")
+            self.var_tmdb_api_key = StringVar(value="")
+            self.var_tmdb_match = StringVar(value="")
+            self._tmdb_matches: list[dict[str, str]] = []
 
             # Remote executor (OpenSSH/Paramiko). Initialized after connection vars exist.
             self.remote = RemoteExecutor(
@@ -356,6 +360,17 @@ if TK_AVAILABLE:
             ent_year = ttk.Entry(r1, textvariable=self.var_year, width=6)
             ent_year.pack(side=LEFT, padx=5)
             Tooltip(ent_year, "4-digit release year (example: 2008).")
+            self.btn_tmdb_lookup = ttk.Button(r1, text="TMDB Lookup", command=self._lookup_tmdb_matches)
+            self.btn_tmdb_lookup.pack(side=LEFT, padx=(10, 0))
+            Tooltip(self.btn_tmdb_lookup, "Search TMDB on the server using your API key and title/year.")
+
+            self.tmdb_row = ttk.Frame(self.manual_frame)
+            self.tmdb_row.pack(fill=X, pady=(6, 0))
+            ttk.Label(self.tmdb_row, text="TMDB matches:").pack(side=LEFT)
+            self.cbo_tmdb_matches = ttk.Combobox(self.tmdb_row, textvariable=self.var_tmdb_match, width=65, state="readonly")
+            self.cbo_tmdb_matches.pack(side=LEFT, padx=5)
+            Tooltip(self.cbo_tmdb_matches, "Choose the best TMDB match to auto-fill title and year.")
+            self.cbo_tmdb_matches.bind("<<ComboboxSelected>>", self._apply_tmdb_match_selection)
 
             self.season_row = ttk.Frame(self.manual_frame)
             self.season_row.pack(fill=X, pady=(6, 0))
@@ -607,6 +622,7 @@ if TK_AVAILABLE:
                 self.var_user.set(str(data.get("user", self.var_user.get())))
                 self.var_port.set(str(data.get("port", self.var_port.get())))
                 self.var_key.set(str(data.get("key", self.var_key.get())))
+                self.var_tmdb_api_key.set(str(data.get("tmdb_api_key", self.var_tmdb_api_key.get())))
 
                 self.var_movies_dir.set(str(data.get("movies_dir", self.var_movies_dir.get())))
                 self.var_series_dir.set(str(data.get("series_dir", self.var_series_dir.get())))
@@ -654,6 +670,7 @@ if TK_AVAILABLE:
                 "user": self.var_user.get(),
                 "port": self.var_port.get(),
                 "key": self.var_key.get(),
+                "tmdb_api_key": self.var_tmdb_api_key.get(),
                 "movies_dir": self.var_movies_dir.get(),
                 "series_dir": self.var_series_dir.get(),
                 "books_dir": self.var_books_dir.get(),
@@ -757,6 +774,106 @@ if TK_AVAILABLE:
             else:
                 # Unconditionally hide so startup doesn't depend on Tk mapping state.
                 self.season_row.pack_forget()
+
+        def _build_tmdb_match_label(self, match: dict[str, str]) -> str:
+            title = (match.get("title") or "").strip() or "(untitled)"
+            year = (match.get("year") or "").strip() or "????"
+            media = (match.get("media_type") or "movie").strip().lower()
+            orig = (match.get("original_title") or "").strip()
+            if orig and orig.lower() != title.lower():
+                return f"{title} ({year}) [{media}] — original: {orig}"
+            return f"{title} ({year}) [{media}]"
+
+        def _lookup_tmdb_matches(self) -> None:
+            try:
+                cfg = self._validate()
+                query = (self.var_title.get() or "").strip()
+                year = (self.var_year.get() or "").strip()
+                api_key = (self.var_tmdb_api_key.get() or "").strip()
+                if not api_key:
+                    raise ValueError("TMDB API key is required (Settings → Connection).")
+                if not query:
+                    raise ValueError("Enter a title first, then run TMDB lookup.")
+
+                self._persist_state()
+                remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
+                kind = (self.var_kind.get() or "movie").strip().lower()
+                media_type = "tv" if kind == "series" else "movie"
+
+                cmd_parts = [
+                    "python3",
+                    remote_script,
+                    "--tmdb-search",
+                    query,
+                    "--tmdb-api-key",
+                    api_key,
+                    "--tmdb-media-type",
+                    media_type,
+                    "--tmdb-limit",
+                    "12",
+                ]
+                if re.fullmatch(r"\d{4}", year):
+                    cmd_parts += ["--tmdb-year", year]
+
+                remote_cmd = " ".join(shlex.quote(x) for x in cmd_parts)
+                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_cmd)
+                if code != 0:
+                    detail = (out or "").strip() or "TMDB lookup failed."
+                    raise ValueError(detail)
+
+                payload_line = ""
+                for line in reversed((out or "").splitlines()):
+                    if line.strip().startswith("{"):
+                        payload_line = line.strip()
+                        break
+                if not payload_line:
+                    raise ValueError("TMDB lookup returned no JSON payload.")
+
+                payload = json.loads(payload_line)
+                results = payload.get("results") if isinstance(payload, dict) else None
+                if not isinstance(results, list):
+                    results = []
+                clean: list[dict[str, str]] = []
+                for it in results:
+                    if isinstance(it, dict):
+                        clean.append({k: str(v or "") for k, v in it.items()})
+                self._tmdb_matches = clean
+
+                labels = [self._build_tmdb_match_label(m) for m in self._tmdb_matches]
+                self.cbo_tmdb_matches.configure(values=labels)
+                if labels:
+                    self.cbo_tmdb_matches.current(0)
+                    self.var_tmdb_match.set(labels[0])
+                    self._apply_tmdb_match_selection(None)
+                    self._append_log(f"(Info) TMDB lookup found {len(labels)} match(es).\n")
+                else:
+                    self.var_tmdb_match.set("")
+                    self._append_log("(Info) TMDB lookup returned no matches.\n")
+                    messagebox.showinfo("TMDB", "No TMDB matches found for the current title.")
+            except Exception as e:
+                messagebox.showerror("TMDB", str(e))
+
+        def _apply_tmdb_match_selection(self, _event: Any | None) -> None:
+            idx = -1
+            try:
+                idx = int(self.cbo_tmdb_matches.current())
+            except Exception:
+                idx = -1
+            if idx < 0 or idx >= len(self._tmdb_matches):
+                return
+
+            match = self._tmdb_matches[idx]
+            title = (match.get("title") or "").strip()
+            year = (match.get("year") or "").strip()
+            media_type = (match.get("media_type") or "movie").strip().lower()
+            if title:
+                self.var_title.set(title)
+            if re.fullmatch(r"\d{4}", year):
+                self.var_year.set(year)
+            if media_type == "tv":
+                self.var_kind.set("series")
+            elif media_type == "movie":
+                self.var_kind.set("movie")
 
         def _browse_key(self) -> None:
             p = filedialog.askopenfilename(title="Select SSH private key")
@@ -874,6 +991,7 @@ if TK_AVAILABLE:
                 port_var=self.var_port,
                 key_var=self.var_key,
                 password_var=self.var_password,
+                tmdb_api_key_var=self.var_tmdb_api_key,
                 browse_key=self._browse_key,
                 validate=self._validate,
                 persist_state=self._persist_state,

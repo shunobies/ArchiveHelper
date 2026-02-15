@@ -32,6 +32,9 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -43,6 +46,92 @@ from archive_helper_core.schedule_csv import (
     csv_next_up_note,
     load_csv_schedule,
 )
+
+
+def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "movie", limit: int = 8) -> list[dict[str, str]]:
+    api_key_s = (api_key or "").strip()
+    query_s = (query or "").strip()
+    if not api_key_s:
+        raise RuntimeError("TMDB API key is required.")
+    if not query_s:
+        raise RuntimeError("TMDB query is required.")
+
+    mt = (media_type or "movie").strip().lower()
+    if mt not in {"movie", "tv"}:
+        raise RuntimeError("TMDB media type must be 'movie' or 'tv'.")
+
+    try:
+        lim = max(1, min(20, int(limit)))
+    except Exception:
+        lim = 8
+
+    params: dict[str, str] = {
+        "api_key": api_key_s,
+        "query": query_s,
+        "include_adult": "false",
+        "page": "1",
+    }
+    year_s = (year or "").strip()
+    if year_s and re.fullmatch(r"\d{4}", year_s):
+        if mt == "movie":
+            params["year"] = year_s
+        else:
+            params["first_air_date_year"] = year_s
+
+    url = f"https://api.themoviedb.org/3/search/{mt}?" + urllib.parse.urlencode(params)
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "ArchiveHelper/1.0",
+        },
+        method="GET",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        body = (e.read() or b"").decode("utf-8", errors="replace").strip()
+        if e.code == 401:
+            raise RuntimeError("TMDB rejected the API key (HTTP 401).")
+        raise RuntimeError(f"TMDB search failed (HTTP {e.code}). {body}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"TMDB network error: {e}")
+
+    try:
+        data = json.loads(payload)
+    except Exception:
+        raise RuntimeError("TMDB returned invalid JSON.")
+
+    items = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return []
+
+    results: list[dict[str, str]] = []
+    for it in items[:lim]:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("title") or it.get("name") or "").strip()
+        if not name:
+            continue
+        date_raw = str(it.get("release_date") or it.get("first_air_date") or "").strip()
+        match_year = date_raw[:4] if re.fullmatch(r"\d{4}(-\d{2}-\d{2})?", date_raw) else ""
+        overview = str(it.get("overview") or "").strip()
+        results.append(
+            {
+                "id": str(it.get("id") or ""),
+                "media_type": mt,
+                "title": name,
+                "year": match_year,
+                "original_title": str(it.get("original_title") or it.get("original_name") or "").strip(),
+                "popularity": str(it.get("popularity") or ""),
+                "overview": overview,
+            }
+        )
+
+    return results
 
 
 # ----------------------------
@@ -1874,6 +1963,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
 
+    p.add_argument("--tmdb-search", default="", help="Search TMDB and print JSON results (non-interactive utility mode)")
+    p.add_argument("--tmdb-api-key", default="", help="TMDB API key used with --tmdb-search")
+    p.add_argument("--tmdb-year", default="", help="Optional 4-digit year hint used with --tmdb-search")
+    p.add_argument(
+        "--tmdb-media-type",
+        choices=["movie", "tv"],
+        default="movie",
+        help="TMDB search media type for --tmdb-search (default: movie)",
+    )
+    p.add_argument("--tmdb-limit", type=int, default=8, help="Max TMDB matches to return with --tmdb-search (default: 8)")
+
     return p.parse_args(argv)
 
 
@@ -2141,6 +2241,21 @@ def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str)
 
 def main(argv: list[str]) -> int:
     ns = parse_args(argv)
+
+    if ns.tmdb_search:
+        try:
+            matches = tmdb_search(
+                api_key=ns.tmdb_api_key,
+                query=ns.tmdb_search,
+                year=ns.tmdb_year,
+                media_type=ns.tmdb_media_type,
+                limit=ns.tmdb_limit,
+            )
+            print(json.dumps({"query": ns.tmdb_search, "results": matches}, ensure_ascii=False))
+            return 0
+        except Exception as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
 
     if ns.cleanup_mkvs:
         home = Path.home()

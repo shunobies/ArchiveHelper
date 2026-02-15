@@ -2006,6 +2006,46 @@ if TK_AVAILABLE:
         def _sftp_put(self, client, local_path: str, remote_path: str) -> None:
             self.remote.sftp_put(client, local_path, remote_path)
 
+        def _sftp_put_tree(self, client, local_dir: Path, remote_dir: str) -> None:
+            sftp = client.open_sftp()
+            try:
+                def _mkdir_p(path: str) -> None:
+                    path = path.rstrip("/")
+                    if not path:
+                        return
+                    parts = path.split("/")
+                    cur = ""
+                    for part in parts:
+                        if not part:
+                            cur = "/"
+                            continue
+                        if cur in ("", "/"):
+                            cur = ("/" + part) if cur == "/" else part
+                        else:
+                            cur = cur + "/" + part
+                        try:
+                            sftp.stat(cur)
+                        except Exception:
+                            try:
+                                sftp.mkdir(cur)
+                            except Exception:
+                                pass
+
+                _mkdir_p(remote_dir)
+                for src in sorted(local_dir.rglob("*")):
+                    rel = src.relative_to(local_dir).as_posix()
+                    dst = f"{remote_dir.rstrip('/')}/{rel}"
+                    if src.is_dir():
+                        _mkdir_p(dst)
+                    else:
+                        _mkdir_p(dst.rsplit("/", 1)[0])
+                        sftp.put(str(src), dst)
+            finally:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+
         def _ensure_remote_script(self, target: str, port: str, keyfile: str, remote_script: str) -> str:
             """Ensure the rip script exists on the remote; upload it if missing.
 
@@ -2041,6 +2081,10 @@ if TK_AVAILABLE:
             if not local_script.exists():
                 raise ValueError(f"Local script not found: {local_script}")
 
+            local_core_dir = script_dir / "archive_helper_core"
+            if not local_core_dir.exists():
+                raise ValueError(f"Local package directory not found: {local_core_dir}")
+
             # Always upload so the remote host matches the GUI's version.
             self._append_log(f"Uploading rip script to remote ({normalized})...\n")
             if password:
@@ -2048,6 +2092,9 @@ if TK_AVAILABLE:
                 try:
                     abs_path = self._remote_abs_path_paramiko(client, normalized)
                     self._sftp_put(client, str(local_script), abs_path)
+                    remote_core_dir = self._remote_abs_path_paramiko(client, f"{remote_dir}/archive_helper_core")
+                    self._append_log("Syncing archive_helper_core package to remote...\n")
+                    self._sftp_put_tree(client, local_core_dir, remote_core_dir)
                     return abs_path
                 finally:
                     try:
@@ -2067,6 +2114,26 @@ if TK_AVAILABLE:
                     )
                     if res.stdout:
                         self._append_log(res.stdout)
+
+                    remote_core_dir = self._remote_abs_path_ssh(target, port, keyfile, f"{remote_dir}/archive_helper_core")
+                    self._append_log("Syncing archive_helper_core package to remote...\n")
+                    subprocess.run(
+                        self._ssh_args(target, port, keyfile, tty=False)
+                        + ["bash", "-lc", shlex.quote(f"rm -rf -- {shlex.quote(remote_core_dir)}")],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False,
+                    )
+                    res2 = subprocess.run(
+                        scp_args + ["-r", str(local_core_dir), f"{target}:{remote_dir}"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=True,
+                    )
+                    if res2.stdout:
+                        self._append_log(res2.stdout)
                 except subprocess.CalledProcessError as e:
                     detail = ((e.stdout or "").strip())
                     raise ValueError(

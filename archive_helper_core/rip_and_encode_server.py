@@ -1152,12 +1152,18 @@ def _subtitle_output_path(base: Path, ext: str) -> Path:
 def extract_external_subtitles(input_: Path, video_output: Path) -> None:
     streams = ffprobe_subtitle_streams(input_)
     if not streams:
+        print(f"Subtitle extraction done: {input_.name} (no subtitle streams found)")
         return
 
     out_dir = video_output.parent
     stem = video_output.stem
+    total_streams = len(streams)
+    extracted_ok = 0
+    extracted_failed = 0
 
-    for st in streams:
+    print(f"Subtitle extraction start: {input_.name} ({total_streams} streams)")
+
+    for idx, st in enumerate(streams, start=1):
         stream_index = st.get("index")
         if not isinstance(stream_index, int):
             continue
@@ -1215,14 +1221,20 @@ def extract_external_subtitles(input_: Path, video_output: Path) -> None:
                 str(out),
             ]
 
-        print(f"Subtitle extract: {input_.name} stream {stream_index} -> {out.name}")
+        print(f"Subtitle extraction progress: {idx}/{total_streams}: {input_.name} stream {stream_index} -> {out.name}")
         cp = run_cmd(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if cp.returncode != 0:
             try:
                 out.unlink(missing_ok=True)
             except Exception:
                 pass
+            extracted_failed += 1
             print(f"Warning: subtitle extraction failed for stream {stream_index} ({codec or 'unknown'})")
+            continue
+
+        extracted_ok += 1
+
+    print(f"Subtitle extraction done: {input_.name} ({extracted_ok} succeeded, {extracted_failed} failed)")
 
 
 def hb_encode(input_: Path, output: Path, preset: str, *, subtitle_mode: str = "preset") -> None:

@@ -9,6 +9,9 @@ from archive_helper_gui.log_patterns import (
     HB_PROGRESS_RE,
     HB_START_RE,
     HB_TASK_RE,
+    SUBTITLE_DONE_RE,
+    SUBTITLE_PROGRESS_RE,
+    SUBTITLE_START_RE,
     MAKEMKV_ACCESS_ERROR_RE,
     MAKEMKV_ACTION_RE,
     MAKEMKV_CURRENT_PROGRESS_RE,
@@ -250,6 +253,36 @@ def parse_for_progress(gui, text_chunk: str) -> None:
         gui.btn_continue.configure(state="normal")
         gui.progress.configure(mode="indeterminate")
         gui.progress.start(10)
+        return
+
+    m = SUBTITLE_START_RE.match(line)
+    if m:
+        source_name = m.group(1).strip()
+        total = max(1, int(m.group(2)))
+        gui.var_step.set(f"Extracting subtitles 0 of {total} ({source_name})")
+        gui._eta_reset("subtitle")
+        gui.progress.configure(mode="determinate")
+        gui.progress.stop()
+        gui.progress["value"] = 0
+        return
+
+    m = SUBTITLE_PROGRESS_RE.match(line)
+    if m:
+        current = max(0, int(m.group(1)))
+        total = max(1, int(m.group(2)))
+        gui.var_step.set(f"Extracting subtitles {min(current, total)} of {total}")
+        gui.progress.configure(mode="determinate")
+        gui.progress.stop()
+        gui.progress["value"] = (min(current, total) / total) * 100
+        return
+
+    m = SUBTITLE_DONE_RE.match(line)
+    if m:
+        details = m.group(2).strip()
+        gui.var_step.set(f"Subtitle extraction complete ({details})")
+        gui.progress.configure(mode="determinate")
+        gui.progress.stop()
+        gui.progress["value"] = 100
         return
 
     if line.startswith("Queued encode:"):

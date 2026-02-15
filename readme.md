@@ -1,6 +1,6 @@
 # Archive Helper for Jellyfin
 
-![Archive Helper GUI main window](screenshots/archive-helper-main.png)
+![Archive Helper GUI main window (latest)](screenshots/archive-helper-main.png)
 
 Archive Helper is a small Python app that helps you copy DVDs/Blu-rays on a Linux “rip server”, convert them to a Jellyfin-friendly format, and put them into the right folders so Jellyfin can automatically scan and organize your library.
 
@@ -229,6 +229,7 @@ If you prefer copy/paste templates, starter launchers are included in `launchers
 
 - `launchers/linux.desktop`
 - `launchers/build_linux_exe.sh`
+- `launchers/build_windows_exe.cmd` (recommended on Windows 11; avoids PowerShell execution policy issues)
 - `launchers/build_windows_exe.ps1`
 - `launchers/build_macos_app.sh`
 - `launchers/macos.command`
@@ -236,7 +237,8 @@ If you prefer copy/paste templates, starter launchers are included in `launchers
 Build-style launchers:
 
 - Linux: run `./launchers/build_linux_exe.sh` to produce `dist/ArchiveHelper`.
-- Windows: run `launchers/build_windows_exe.ps1` from PowerShell to produce `dist/ArchiveHelper.exe`.
+- Windows (recommended): run `launchers\build_windows_exe.cmd` from Command Prompt to produce `dist\ArchiveHelper.exe`.
+- Windows (PowerShell alternative): run `launchers/build_windows_exe.ps1` from PowerShell. Note that many Windows 11 systems block `.ps1` scripts by default unless execution policy is adjusted or bypassed for the command.
 - macOS: run `./launchers/build_macos_app.sh` to produce `dist/ArchiveHelper.app`.
 
 On first run (or if settings are missing), the app will prompt you to configure:

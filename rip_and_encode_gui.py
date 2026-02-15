@@ -241,6 +241,7 @@ if TK_AVAILABLE:
 
             self._load_persisted_state()
 
+            self._apply_jellyfin_theme()
             self._build_ui()
             self.var_kind.trace_add("write", lambda *_: self._refresh_kind())
             self._refresh_kind()
@@ -269,6 +270,91 @@ if TK_AVAILABLE:
                 v.trace_add("write", lambda *_: self._maybe_load_presets_async())
             self._maybe_load_presets_async()
 
+        def _apply_jellyfin_theme(self) -> None:
+            """Apply a modern dark theme with a Jellyfin-inspired accent."""
+
+            try:
+                style = ttk.Style(self.root)
+                if "clam" in style.theme_names():
+                    style.theme_use("clam")
+
+                colors = {
+                    "bg": "#101726",
+                    "panel": "#18233a",
+                    "panel_alt": "#1f2d49",
+                    "text": "#e5e7eb",
+                    "muted": "#9ca3af",
+                    "accent": "#7c3aed",
+                    "accent_hover": "#8b5cf6",
+                    "border": "#334155",
+                    "entry": "#0f172a",
+                    "entry_text": "#f3f4f6",
+                    "disabled": "#64748b",
+                }
+
+                self._theme_colors = colors
+
+                self.root.configure(bg=colors["bg"])
+
+                style.configure(".", background=colors["bg"], foreground=colors["text"])
+                style.configure("TFrame", background=colors["bg"])
+                style.configure("TLabel", background=colors["bg"], foreground=colors["text"])
+                style.configure("TLabelframe", background=colors["panel"], bordercolor=colors["border"], relief="solid")
+                style.configure("TLabelframe.Label", background=colors["panel"], foreground=colors["text"], font=("TkDefaultFont", 10, "bold"))
+
+                style.configure(
+                    "TButton",
+                    background=colors["accent"],
+                    foreground="#ffffff",
+                    borderwidth=0,
+                    focusthickness=0,
+                    padding=(10, 6),
+                )
+                style.map(
+                    "TButton",
+                    background=[("active", colors["accent_hover"]), ("pressed", colors["accent_hover"]), ("disabled", colors["disabled"])],
+                    foreground=[("disabled", "#d1d5db")],
+                )
+
+                style.configure(
+                    "TEntry",
+                    fieldbackground=colors["entry"],
+                    foreground=colors["entry_text"],
+                    bordercolor=colors["border"],
+                    lightcolor=colors["border"],
+                    darkcolor=colors["border"],
+                    insertcolor=colors["entry_text"],
+                )
+                style.configure(
+                    "TCombobox",
+                    fieldbackground=colors["entry"],
+                    foreground=colors["entry_text"],
+                    background=colors["panel_alt"],
+                    arrowcolor=colors["entry_text"],
+                    bordercolor=colors["border"],
+                )
+                style.map("TCombobox", fieldbackground=[("readonly", colors["entry"])] , foreground=[("readonly", colors["entry_text"])])
+
+                style.configure("TRadiobutton", background=colors["panel"], foreground=colors["text"])
+                style.configure("TCheckbutton", background=colors["panel"], foreground=colors["text"])
+
+                style.configure(
+                    "Horizontal.TProgressbar",
+                    background=colors["accent"],
+                    troughcolor=colors["entry"],
+                    bordercolor=colors["border"],
+                    lightcolor=colors["accent"],
+                    darkcolor=colors["accent"],
+                )
+            except Exception:
+                self._theme_colors = {
+                    "bg": "#f3f4f6",
+                    "panel": "#ffffff",
+                    "text": "#111827",
+                    "muted": "#444444",
+                    "accent": "#2563eb",
+                }
+
         def _build_ui(self) -> None:
             menubar = Menu(self.root)
             settings_menu = Menu(menubar, tearoff=0)
@@ -291,7 +377,7 @@ if TK_AVAILABLE:
             menubar.add_cascade(label="Settings", menu=settings_menu)
             self.root.config(menu=menubar)
 
-            main = ttk.Frame(self.root, padding=10)
+            main = ttk.Frame(self.root, padding=12)
             main.pack(fill=BOTH, expand=True)
             self.main_frame = main
 
@@ -328,7 +414,11 @@ if TK_AVAILABLE:
             cbo_sub_mode.pack(side=LEFT, padx=5)
             Tooltip(cbo_sub_mode, "preset: use preset behavior; soft: keep selectable tracks in output; external: extract subtitles with ffmpeg sidecars; none: remove subtitle tracks.")
 
-            note = ttk.Label(settings, text="Connection and output directories are set under Settings.")
+            note = ttk.Label(
+                settings,
+                text="Connection and output directories are set under Settings.",
+                foreground=self._theme_colors.get("muted", "#444"),
+            )
             note.pack(anchor="w", pady=(6, 0))
 
             self.lbl_exec_mode = ttk.Label(settings, text=f"Rip mode: {exec_mode_label(self.var_exec_mode.get())}")
@@ -419,7 +509,11 @@ if TK_AVAILABLE:
             self.progress = ttk.Progressbar(status, orient="horizontal", mode="determinate", maximum=100)
             self.progress.pack(fill=X, pady=(6, 0))
 
-            ttk.Label(status, textvariable=self.var_prompt, foreground="#444").pack(anchor="w", pady=(6, 0))
+            ttk.Label(
+                status,
+                textvariable=self.var_prompt,
+                foreground=self._theme_colors.get("muted", "#444"),
+            ).pack(anchor="w", pady=(6, 0))
 
             # Controls
             controls = ttk.Frame(main)
@@ -455,6 +549,14 @@ if TK_AVAILABLE:
             self.log_text = ScrolledText(self.log_frame, height=18)
             self.log_text.pack(fill=BOTH, expand=True)
             self.log_text.configure(state="disabled")
+            try:
+                self.log_text.configure(
+                    bg=self._theme_colors.get("entry", "#111827"),
+                    fg=self._theme_colors.get("entry_text", "#f9fafb"),
+                    insertbackground=self._theme_colors.get("entry_text", "#f9fafb"),
+                )
+            except Exception:
+                pass
 
             # Default collapsed
             self._set_log_visible(False)
@@ -481,17 +583,18 @@ if TK_AVAILABLE:
             if canvas is not None:
                 canvas.pack(side=LEFT)
 
-                # Colors: neutral + cool accent (not Jellyfin-branded artwork).
-                bg = "#f3f4f6"  # light neutral
-                accent = "#2563eb"  # blue
-                dark = "#111827"  # near-black
+                # Colors align with the app theme and use a Jellyfin-like accent.
+                bg = self._theme_colors.get("bg", "#101726")
+                panel = self._theme_colors.get("panel", "#18233a")
+                accent = self._theme_colors.get("accent", "#7c3aed")
+                dark = self._theme_colors.get("text", "#e5e7eb")
 
                 canvas.configure(bg=bg)
 
                 # Archive box (stylized document/box) with a lid.
                 x0, y0 = 10, 10
                 w, h = 34, 30
-                canvas.create_rectangle(x0, y0 + 6, x0 + w, y0 + h, outline=dark, width=2, fill=bg)
+                canvas.create_rectangle(x0, y0 + 6, x0 + w, y0 + h, outline=dark, width=2, fill=panel)
                 canvas.create_line(x0, y0 + 12, x0 + w, y0 + 12, fill=dark, width=2)
                 canvas.create_line(x0 + 6, y0 + 6, x0 + 6, y0 + h, fill=dark, width=2)
 

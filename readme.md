@@ -28,7 +28,7 @@ Note: The first two modes are ready to use. The third mode (local rip and encode
 
 ## Recent improvements (January 2026)
 
-- **TMDB-assisted title matching**: In manual schedule mode, you can now run a TMDB lookup from the GUI, review candidate matches returned by the server, and apply the best match to the title/year fields before starting the rip.
+- **TMDB-assisted title matching**: In manual schedule mode, the GUI can probe the inserted disc on the server (volume/title hints via Linux CLI tools), query TMDB automatically, and present suggestions. Selecting a suggestion fills type/title/year; a built-in **No match** option keeps manual entry available.
 - **TMDB API key setting**: You can store your TMDB API key in Settings → Connection so lookups are one click.
 - **Local destination setting**: When using local rip mode, you can now set where temporary files are stored on your desktop. Go to Settings → Directories to configure this.
 - **Disk space checks**: The app now checks that you have enough free space before ripping each disc (default: 20 GB). If space is low, it pauses and prompts you to free up space before continuing.
@@ -191,9 +191,9 @@ On first run (or if settings are missing), the app will prompt you to configure:
 - Connection (SSH host/user/key/password)
 - Output directories (Movies/Series and other placeholders)
 
-After that, you can enter a title manually or load a CSV schedule and press Start.
+After that, you can load a CSV schedule and press Start, or use manual mode.
 
-Tip: in manual mode, use **TMDB Lookup** to fetch likely matches from the server and select the best one before starting.
+Tip: in manual mode, click **Scan Disc + TMDB** first. The server will inspect the inserted disc and return TMDB suggestions. Choose a match to auto-fill type/title/year, or choose **No match** and enter details manually.
 
 ## Common questions
 

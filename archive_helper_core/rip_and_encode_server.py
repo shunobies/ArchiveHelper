@@ -134,6 +134,118 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
     return results
 
 
+def _cmd_stdout(argv: list[str], *, timeout_s: int = 8) -> str:
+    try:
+        cp = run_cmd(argv, check=False, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=timeout_s)
+        return (cp.stdout or "").strip()
+    except Exception:
+        return ""
+
+
+def _extract_year_hint(text: str) -> str:
+    m = re.search(r"\b(19\d{2}|20\d{2})\b", text or "")
+    return m.group(1) if m else ""
+
+
+def _normalize_disc_hint(text: str) -> str:
+    s = (text or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"[_\.]+", " ", s)
+    s = re.sub(r"\b(disc|disk|dvd|video_ts|vol|volume|title|copy)\b", " ", s, flags=re.I)
+    s = re.sub(r"\s+", " ", s).strip(" -_")
+    return s
+
+
+def probe_disc_metadata(*, disc_device: str = "/dev/sr0") -> dict[str, object]:
+    raw_hints: list[str] = []
+
+    blkid = _cmd_stdout(["blkid", "-o", "export", disc_device])
+    if blkid:
+        for ln in blkid.splitlines():
+            if ln.startswith("LABEL="):
+                raw_hints.append(ln.split("=", 1)[1].strip())
+
+    if shutil.which("isoinfo"):
+        iso = _cmd_stdout(["isoinfo", "-d", "-i", disc_device])
+        for ln in iso.splitlines():
+            if "Volume id:" in ln:
+                raw_hints.append(ln.split("Volume id:", 1)[1].strip())
+
+    if shutil.which("lsdvd"):
+        lsdvd_out = _cmd_stdout(["lsdvd", disc_device])
+        for ln in lsdvd_out.splitlines():
+            m = re.search(r"Disc Title:\s*(.+)", ln, flags=re.I)
+            if m:
+                raw_hints.append(m.group(1).strip())
+
+    if shutil.which("makemkvcon"):
+        mkv_info = _cmd_stdout(["makemkvcon", "-r", "--noscan", "info", "disc:0"], timeout_s=12)
+        for ln in mkv_info.splitlines():
+            if not ln.startswith("CINFO:"):
+                continue
+            vals = re.findall(r'"([^\"]+)"', ln)
+            for v in vals:
+                if len(v.strip()) >= 3:
+                    raw_hints.append(v.strip())
+
+    hints: list[str] = []
+    seen_hints: set[str] = set()
+    for raw in raw_hints:
+        n = _normalize_disc_hint(raw)
+        if len(n) < 2:
+            continue
+        k = n.lower()
+        if k in seen_hints:
+            continue
+        seen_hints.add(k)
+        hints.append(n)
+
+    queries = hints[:6]
+    year_hint = ""
+    for q in queries:
+        year_hint = _extract_year_hint(q)
+        if year_hint:
+            break
+
+    return {"device": disc_device, "hints": hints, "queries": queries, "year_hint": year_hint}
+
+
+def tmdb_suggest_from_disc(*, api_key: str, disc_device: str = "/dev/sr0", media_type: str = "auto", limit: int = 8) -> dict[str, object]:
+    mt = (media_type or "auto").strip().lower()
+    if mt not in {"auto", "movie", "tv"}:
+        raise RuntimeError("TMDB disc media type must be 'auto', 'movie', or 'tv'.")
+
+    meta = probe_disc_metadata(disc_device=disc_device)
+    queries = [str(q) for q in (meta.get("queries") or []) if str(q).strip()]
+    year_hint = str(meta.get("year_hint") or "")
+    if not queries:
+        return {**meta, "results": []}
+
+    search_types = ["movie", "tv"] if mt == "auto" else [mt]
+    dedup: dict[str, dict[str, str]] = {}
+    for q in queries[:4]:
+        for search_mt in search_types:
+            try:
+                rows = tmdb_search(api_key=api_key, query=q, year=year_hint, media_type=search_mt, limit=max(3, min(10, limit)))
+            except Exception:
+                continue
+            for row in rows:
+                key = f"{row.get('media_type','')}:{row.get('id','')}"
+                if not row.get("id"):
+                    key = f"{row.get('media_type','')}:{(row.get('title') or '').lower()}:{row.get('year') or ''}"
+                if key not in dedup:
+                    dedup[key] = row
+                if len(dedup) >= max(1, min(20, int(limit))):
+                    break
+            if len(dedup) >= max(1, min(20, int(limit))):
+                break
+        if len(dedup) >= max(1, min(20, int(limit))):
+            break
+
+    return {**meta, "results": list(dedup.values())[: max(1, min(20, int(limit)))]}
+
+
 # ----------------------------
 # Debian hints / deps
 # ----------------------------
@@ -1964,7 +2076,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
 
     p.add_argument("--tmdb-search", default="", help="Search TMDB and print JSON results (non-interactive utility mode)")
+    p.add_argument(
+        "--tmdb-suggest-from-disc",
+        action="store_true",
+        help="Probe the inserted disc with Linux tools and return TMDB suggestions as JSON.",
+    )
     p.add_argument("--tmdb-api-key", default="", help="TMDB API key used with --tmdb-search")
+    p.add_argument("--disc-device", default="/dev/sr0", help="Optical disc device path used by --tmdb-suggest-from-disc")
     p.add_argument("--tmdb-year", default="", help="Optional 4-digit year hint used with --tmdb-search")
     p.add_argument(
         "--tmdb-media-type",
@@ -1973,6 +2091,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="TMDB search media type for --tmdb-search (default: movie)",
     )
     p.add_argument("--tmdb-limit", type=int, default=8, help="Max TMDB matches to return with --tmdb-search (default: 8)")
+    p.add_argument(
+        "--tmdb-disc-media-type",
+        choices=["auto", "movie", "tv"],
+        default="auto",
+        help="TMDB type filter for --tmdb-suggest-from-disc (default: auto)",
+    )
 
     return p.parse_args(argv)
 
@@ -2241,6 +2365,20 @@ def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str)
 
 def main(argv: list[str]) -> int:
     ns = parse_args(argv)
+
+    if ns.tmdb_suggest_from_disc:
+        try:
+            payload = tmdb_suggest_from_disc(
+                api_key=ns.tmdb_api_key,
+                disc_device=ns.disc_device,
+                media_type=ns.tmdb_disc_media_type,
+                limit=ns.tmdb_limit,
+            )
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+        except Exception as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
 
     if ns.tmdb_search:
         try:

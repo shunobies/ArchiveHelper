@@ -232,6 +232,7 @@ if TK_AVAILABLE:
             self.var_csv_path = StringVar(value="")
 
             self.var_kind = StringVar(value="movie")
+            self.var_cd_artist = StringVar(value="")
             self.var_title = StringVar(value="")
             self.var_year = StringVar(value="")
             self.var_season = StringVar(value="1")
@@ -449,9 +450,9 @@ if TK_AVAILABLE:
             s1 = ttk.Frame(settings)
             s1.pack(fill=X)
             ttk.Label(s1, text="Disc type:").pack(side=LEFT)
-            cbo_disc = ttk.Combobox(s1, textvariable=self.var_disc_type, values=["dvd", "bluray"], state="readonly", width=8)
+            cbo_disc = ttk.Combobox(s1, textvariable=self.var_disc_type, values=["dvd", "bluray", "cd"], state="readonly", width=8)
             cbo_disc.pack(side=LEFT, padx=5)
-            Tooltip(cbo_disc, "Select 'bluray' for Blu-ray discs (uses a larger MakeMKV cache: 1024MB vs 128MB).")
+            Tooltip(cbo_disc, "Select 'bluray' for Blu-ray discs (larger MakeMKV cache). Select 'cd' to use abcde + MusicBrainz metadata for audio CDs.")
 
             s2 = ttk.Frame(settings)
             s2.pack(fill=X, pady=(6, 0))
@@ -496,9 +497,9 @@ if TK_AVAILABLE:
             r1 = ttk.Frame(self.manual_frame)
             r1.pack(fill=X)
             ttk.Label(r1, text="Type:").pack(side=LEFT)
-            cbo_kind = ttk.Combobox(r1, textvariable=self.var_kind, values=["movie", "series"], state="readonly", width=8)
+            cbo_kind = ttk.Combobox(r1, textvariable=self.var_kind, values=["movie", "series", "music"], state="readonly", width=8)
             cbo_kind.pack(side=LEFT, padx=5)
-            Tooltip(cbo_kind, "Choose whether this schedule is a movie or a series.")
+            Tooltip(cbo_kind, "Choose movie, series, or music (audio CD via abcde).")
             ttk.Label(r1, text="Title:").pack(side=LEFT)
             ent_title = ttk.Entry(r1, textvariable=self.var_title, width=30)
             ent_title.pack(side=LEFT, padx=5)
@@ -518,6 +519,13 @@ if TK_AVAILABLE:
             self.cbo_tmdb_matches.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_tmdb_matches, "Choose a suggestion to auto-fill type, title, and year. Use No match to keep manual entry.")
             self.cbo_tmdb_matches.bind("<<ComboboxSelected>>", self._apply_tmdb_match_selection)
+
+            self.artist_row = ttk.Frame(self.manual_frame)
+            self.artist_row.pack(fill=X, pady=(6, 0))
+            ttk.Label(self.artist_row, text="Artist (music):").pack(side=LEFT)
+            ent_artist = ttk.Entry(self.artist_row, textvariable=self.var_cd_artist, width=30)
+            ent_artist.pack(side=LEFT, padx=5)
+            Tooltip(ent_artist, "Artist folder name used for CD/music mode in Jellyfin (example: Daft Punk).")
 
             self.season_row = ttk.Frame(self.manual_frame)
             self.season_row.pack(fill=X, pady=(6, 0))
@@ -801,6 +809,7 @@ if TK_AVAILABLE:
                 self.var_mode.set(str(data.get("mode", self.var_mode.get())))
                 self.var_csv_path.set(str(data.get("csv_path", self.var_csv_path.get())))
                 self.var_kind.set(str(data.get("kind", self.var_kind.get())))
+                self.var_cd_artist.set(str(data.get("cd_artist", self.var_cd_artist.get())))
                 self.var_title.set(str(data.get("title", self.var_title.get())))
                 self.var_year.set(str(data.get("year", self.var_year.get())))
                 self.var_season.set(str(data.get("season", self.var_season.get())))
@@ -844,6 +853,7 @@ if TK_AVAILABLE:
                 "mode": self.var_mode.get(),
                 "csv_path": self.var_csv_path.get(),
                 "kind": self.var_kind.get(),
+                "cd_artist": self.var_cd_artist.get(),
                 "title": self.var_title.get(),
                 "year": self.var_year.get(),
                 "season": self.var_season.get(),
@@ -921,19 +931,59 @@ if TK_AVAILABLE:
             if not hasattr(self, "season_row"):
                 return
             if self.var_mode.get() != "manual":
-                # Always hide Season row in CSV mode.
+                # Always hide manual-only rows in CSV mode.
                 self.season_row.pack_forget()
+                self.artist_row.pack_forget()
                 return
 
-            if self.var_kind.get() == "series":
+            kind = (self.var_kind.get() or "movie").strip().lower()
+            if kind == "series":
                 # Ensure consistent placement above the disc row.
                 try:
                     self.season_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
                 except Exception:
                     self.season_row.pack(fill=X, pady=(6, 0))
-            else:
-                # Unconditionally hide so startup doesn't depend on Tk mapping state.
+                self.artist_row.pack_forget()
+                try:
+                    self.btn_tmdb_lookup.configure(state="normal")
+                except Exception:
+                    pass
+            elif kind == "music":
+                try:
+                    self.var_disc_type.set("cd")
+                except Exception:
+                    pass
                 self.season_row.pack_forget()
+                try:
+                    self.artist_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
+                except Exception:
+                    self.artist_row.pack(fill=X, pady=(6, 0))
+                try:
+                    self.disc_row.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.tmdb_row.pack_forget()
+                    self.btn_tmdb_lookup.configure(state="disabled")
+                except Exception:
+                    pass
+                return
+            else:
+                self.season_row.pack_forget()
+                self.artist_row.pack_forget()
+                try:
+                    self.btn_tmdb_lookup.configure(state="normal")
+                except Exception:
+                    pass
+
+            try:
+                self.disc_row.pack(fill=X, pady=(6, 0))
+            except Exception:
+                pass
+            try:
+                self.tmdb_row.pack(fill=X, pady=(6, 0))
+            except Exception:
+                pass
 
         def _build_tmdb_match_label(self, match: dict[str, str]) -> str:
             if str(match.get("no_match") or "").strip().lower() in {"1", "true", "yes"}:
@@ -948,6 +998,8 @@ if TK_AVAILABLE:
 
         def _lookup_tmdb_matches(self) -> None:
             try:
+                if (self.var_kind.get() or "").strip().lower() == "music":
+                    raise ValueError("TMDB lookup is for movies/series. CD metadata comes from abcde (MusicBrainz/CDDB) during rip.")
                 cfg = self._validate()
                 query = (self.var_title.get() or "").strip()
                 year = (self.var_year.get() or "").strip()
@@ -2490,7 +2542,23 @@ if TK_AVAILABLE:
                     if not re.fullmatch(r"\d{4}", year):
                         raise ValueError("Year must be 4 digits.")
 
-                    kind = self.var_kind.get()
+                    kind = (self.var_kind.get() or "movie").strip().lower()
+                    if kind == "music":
+                        if exec_mode != EXEC_MODE_REMOTE:
+                            raise ValueError("Music/CD workflow currently supports remote mode only.")
+                        if (self.var_disc_type.get() or "").strip().lower() != "cd":
+                            raise ValueError("For music jobs, set Disc type to 'cd'.")
+                        extra = [
+                            "--music-dir", self.var_music_dir.get().strip(),
+                            "--cd-album", title,
+                            "--cd-year", year,
+                        ]
+                        artist = (self.var_cd_artist.get() or "").strip()
+                        if artist:
+                            extra += ["--cd-artist", artist]
+                        self._start_remote_job(cfg, remote_script, None, extra_args=extra)
+                        return
+
                     total_discs = int(self.var_disc_count.get())
                     start_disc = int(self.var_start_disc.get())
                     if total_discs < 1:
@@ -2654,6 +2722,8 @@ if TK_AVAILABLE:
                     str(out_movies),
                     "--series-dir",
                     str(out_series),
+                    "--music-dir",
+                    str(self.var_music_dir.get().strip()),
                     "--disc-type",
                     (self.var_disc_type.get().strip() or "dvd"),
                     "--preset",
@@ -2760,7 +2830,7 @@ if TK_AVAILABLE:
             self,
             cfg: ConnectionInfo,
             remote_script: str,
-            remote_csv: str,
+            remote_csv: str | None,
             *,
             extra_args: list[str] | None = None,
         ) -> None:
@@ -2770,12 +2840,12 @@ if TK_AVAILABLE:
                 "RIP_AND_ENCODE_IN_SCREEN=1",
                 "python3",
                 remote_script,
-                "--csv",
-                remote_csv,
                 "--movies-dir",
                 self.var_movies_dir.get().strip(),
                 "--series-dir",
                 self.var_series_dir.get().strip(),
+                "--music-dir",
+                self.var_music_dir.get().strip(),
                 "--disc-type",
                 (self.var_disc_type.get().strip() or "dvd"),
                 "--preset",
@@ -2785,6 +2855,8 @@ if TK_AVAILABLE:
                 "--subtitle-mode",
                 (self.var_subtitle_mode.get().strip() or "external"),
             ]
+            if remote_csv:
+                cmd_parts += ["--csv", remote_csv]
 
             if self.var_ensure_jellyfin.get():
                 cmd_parts += ["--ensure-jellyfin"]

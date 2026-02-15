@@ -28,10 +28,12 @@ import gzip
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -2539,6 +2541,11 @@ def usage_text() -> str:
         "  - MultiDisc must be y/n (not 1/0) to avoid ambiguity with Season 1.\n"
         "  - Blank lines and lines starting with # are ignored.\n"
         "  - Windows CRLF is supported.\n"
+        "\n"
+        "CD music mode:\n"
+        "  - Use --disc-type cd to rip audio CDs with abcde.\n"
+        "  - Metadata lookup uses MusicBrainz/CDDB via abcde (album/artist/tracks).\n"
+        "  - Output is arranged for Jellyfin as: Artist/Album (Year)/01 - Track.ext\n"
     )
 
 
@@ -2555,9 +2562,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     p.add_argument(
         "--disc-type",
-        choices=["dvd", "bluray"],
+        choices=["dvd", "bluray", "cd"],
         default="dvd",
-        help="Disc type hint for ripping. 'bluray' increases MakeMKV cache (1024MB vs 128MB).",
+        help="Disc type hint for ripping. 'bluray' increases MakeMKV cache (1024MB vs 512MB); 'cd' uses abcde for music CDs.",
     )
 
     p.add_argument(
@@ -2625,6 +2632,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     p.add_argument("--movies-dir", default="/storage/Movies", help="Movies output directory (default: /storage/Movies)")
     p.add_argument("--series-dir", default="/storage/Series", help="Series output directory (default: /storage/Series)")
+    p.add_argument("--music-dir", default="/storage/Music", help="Music output directory (default: /storage/Music)")
+    p.add_argument("--cd-artist", default="", help="Optional artist override hint for CD logging/organization")
+    p.add_argument("--cd-album", default="", help="Optional album override hint for CD logging/organization")
+    p.add_argument("--cd-year", default="", help="Optional 4-digit album year for CD folder naming")
 
     p.add_argument("--csv", dest="csv_file", default="", help="Drive continuous mode from a CSV schedule (implies --continuous)")
 
@@ -2818,6 +2829,60 @@ def _human_bytes(n: int) -> str:
     return f"{int(n)} B"
 
 
+def run_cd_rip_with_abcde(*, music_dir: str, artist_hint: str = "", album_hint: str = "", year_hint: str = "") -> int:
+    if not shutil.which("abcde"):
+        raise RuntimeError("Missing required command for CD workflow: abcde")
+
+    out_root = Path(music_dir).expanduser()
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    year = (year_hint or "").strip()
+    if year and not re.fullmatch(r"\d{4}", year):
+        year = ""
+
+    album_expr = "${ALBUMFILE}"
+    if year:
+        album_expr = f"${{ALBUMFILE}} ({year})"
+
+    conf_lines = [
+        "CDDBMETHOD=musicbrainz,cddb",
+        "OUTPUTTYPE=flac",
+        "PADTRACKS=y",
+        f"OUTPUTDIR={shlex.quote(str(out_root))}",
+        f"OUTPUTFORMAT='${{ARTISTFILE}}/{album_expr}/${{TRACKNUM}} - ${{TRACKFILE}}'",
+        f"VAOUTPUTFORMAT='Various Artists/{album_expr}/${{TRACKNUM}} - ${{ARTISTFILE}} - ${{TRACKFILE}}'",
+    ]
+
+    with tempfile.TemporaryDirectory(prefix="archive_helper_abcde_") as td:
+        conf_path = Path(td) / "abcde_archive_helper.conf"
+        conf_path.write_text("\n".join(conf_lines) + "\n", encoding="utf-8")
+
+        print("CD workflow: ripping with abcde (MusicBrainz/CDDB metadata lookup).")
+        print("Jellyfin naming target: Artist/Album (Year)/01 - Track.flac")
+        if artist_hint:
+            print(f"CD artist hint: {artist_hint}")
+        if album_hint:
+            print(f"CD album hint: {album_hint}")
+        if year:
+            print(f"CD year hint: {year}")
+
+        cp = subprocess.run(
+            ["abcde", "-c", str(conf_path), "-o", "flac"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        out = (cp.stdout or "").strip()
+        if out:
+            print(out)
+        if cp.returncode != 0:
+            raise RuntimeError(f"abcde failed with exit code {cp.returncode}")
+
+    print(f"CD workflow complete. Music written under: {out_root}")
+    return 0
+
+
 def cleanup_mkvs(home: Path, *, dry_run: bool, movies_dir: str, series_dir: str) -> int:
     """Conservatively remove *work directories* created by this script.
 
@@ -2979,6 +3044,10 @@ def main(argv: list[str]) -> int:
     if ns.check_deps:
         return check_deps(ns.movies_dir, ns.series_dir)
 
+    if getattr(ns, "disc_type", "dvd") == "cd" and ns.csv_file:
+        print("--csv is not used in CD mode. Start CD jobs from manual mode.", file=sys.stderr)
+        return 2
+
     csv_path: Optional[Path] = None
     if ns.csv_file:
         csv_path = Path(ns.csv_file)
@@ -3016,6 +3085,18 @@ def main(argv: list[str]) -> int:
     sys.stderr = Tee(sys.__stderr__, log_fh)  # type: ignore[assignment]
 
     print(f"Log file: {log_file}")
+
+    if getattr(ns, "disc_type", "dvd") == "cd":
+        try:
+            return run_cd_rip_with_abcde(
+                music_dir=ns.music_dir,
+                artist_hint=ns.cd_artist,
+                album_hint=ns.cd_album,
+                year_hint=ns.cd_year,
+            )
+        except Exception as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
 
     if ns.ensure_jellyfin:
         try:

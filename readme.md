@@ -4,6 +4,8 @@
 
 Archive Helper is a small Python app that helps you copy DVDs/Blu-rays on a Linux “rip server”, convert them to a Jellyfin-friendly format, and put them into the right folders so Jellyfin can automatically scan and organize your library.
 
+Audio CDs are also supported via `abcde` (using MusicBrainz/CDDB metadata) with Jellyfin-friendly music naming.
+
 If you are brand new to Linux and Python: this project is meant to reduce how much terminal work you need to do. You still need a Linux server with the right tools installed, but day-to-day ripping is driven from a simple desktop GUI.
 
 ## What this app is for
@@ -35,6 +37,7 @@ Note: The first two modes are stable. The third mode (local rip + encode upload)
 - **Better overlap mode**: When encoding a disc while ripping the next one, HandBrake no longer gets confused by keypresses. This means encodes keep running smoothly while you work on the next disc.
 - **Faster DVD ripping**: MakeMKV now uses more cache memory (512 MB instead of 128 MB) when ripping DVDs, which makes rips more stable and can reduce errors.
 - **Smarter series episode ordering**: During series processing, episode files are now planned using metadata and source-title hints (when available) before assigning `SxxExx` numbers, reducing mis-numbered episodes on tricky discs.
+- **CD (music) workflow**: You can now select **Disc type = cd** and **Type = music** in manual mode. The server runs `abcde` (with MusicBrainz/CDDB lookup) and writes tracks under your configured Music directory using Jellyfin-friendly layout: `Artist/Album (Year)/01 - Track.flac`.
 
 ## How it works (two-computer model)
 

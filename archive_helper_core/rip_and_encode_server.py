@@ -23,6 +23,7 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import difflib
 import gzip
 import json
 import os
@@ -57,8 +58,8 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
         raise RuntimeError("TMDB query is required.")
 
     mt = (media_type or "movie").strip().lower()
-    if mt not in {"movie", "tv"}:
-        raise RuntimeError("TMDB media type must be 'movie' or 'tv'.")
+    if mt not in {"movie", "tv", "multi"}:
+        raise RuntimeError("TMDB media type must be 'movie', 'tv', or 'multi'.")
 
     try:
         lim = max(1, min(20, int(limit)))
@@ -72,7 +73,7 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
         "page": "1",
     }
     year_s = (year or "").strip()
-    if year_s and re.fullmatch(r"\d{4}", year_s):
+    if year_s and re.fullmatch(r"\d{4}", year_s) and mt != "multi":
         if mt == "movie":
             params["year"] = year_s
         else:
@@ -113,6 +114,11 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
     for it in items[:lim]:
         if not isinstance(it, dict):
             continue
+        result_mt = str(it.get("media_type") or mt).strip().lower()
+        if result_mt == "person":
+            continue
+        if result_mt not in {"movie", "tv"}:
+            result_mt = "tv" if it.get("name") and not it.get("title") else "movie"
         name = str(it.get("title") or it.get("name") or "").strip()
         if not name:
             continue
@@ -122,7 +128,7 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
         results.append(
             {
                 "id": str(it.get("id") or ""),
-                "media_type": mt,
+                "media_type": result_mt,
                 "title": name,
                 "year": match_year,
                 "original_title": str(it.get("original_title") or it.get("original_name") or "").strip(),
@@ -147,11 +153,30 @@ def _extract_year_hint(text: str) -> str:
     return m.group(1) if m else ""
 
 
+def _title_tokens(text: str) -> set[str]:
+    cleaned = re.sub(r"[^a-z0-9]+", " ", (text or "").lower())
+    stop = {"the", "a", "an", "and", "of", "edition", "extended", "unrated", "remastered", "cut"}
+    return {t for t in cleaned.split() if len(t) >= 2 and t not in stop}
+
+
+def _clean_query_for_tmdb(text: str) -> str:
+    s = (text or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"[\[\(\{].*?[\]\)\}]", " ", s)
+    s = re.sub(r"\b(?:1080p|2160p|720p|480p|x264|x265|h264|h265|hevc|hdr10?\+?|uhd|web[- ]?dl|webrip|blu[- ]?ray|brrip|dvdrip|remux|proper|repack)\b", " ", s, flags=re.I)
+    s = re.sub(r"\b(?:disc|disk|dvd|bd|cd|title|copy|backup|retail|ntsc|pal|r1|r2|r3)\b", " ", s, flags=re.I)
+    s = re.sub(r"[_\.\-]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip(" -_")
+    return s
+
+
 def _normalize_disc_hint(text: str) -> str:
     s = (text or "").strip()
     if not s:
         return ""
     s = re.sub(r"[_\.]+", " ", s)
+    s = re.sub(r"\b(?:1080p|2160p|720p|480p|x264|x265|h264|h265|hevc|hdr|uhd|web[- ]?dl|blu[- ]?ray|brrip|dvdrip)\b", " ", s, flags=re.I)
     s = re.sub(r"\b(disc|disk|dvd|video_ts|vol|volume|title|copy)\b", " ", s, flags=re.I)
     s = re.sub(r"\s+", " ", s).strip(" -_")
     return s
@@ -193,6 +218,7 @@ def _query_variants_from_hint(text: str) -> list[str]:
     norm = _normalize_disc_hint(raw)
     _add(raw)
     _add(norm)
+    _add(_clean_query_for_tmdb(raw))
 
     for base in [raw, norm]:
         stripped = re.sub(r"\b(?:disc|disk|dvd|cd|part)\s*[-_:#]*\s*\d{1,2}\b", "", base, flags=re.I)
@@ -202,8 +228,61 @@ def _query_variants_from_hint(text: str) -> list[str]:
         # Labels often include extra detail after separators; try the title-first fragment.
         first_fragment = re.split(r"\s(?:[-–—:|]|/)+\s", stripped, maxsplit=1)[0]
         _add(_normalize_disc_hint(first_fragment))
+        _add(_clean_query_for_tmdb(first_fragment))
+
+    # If the hint still has many words, include a compact first-N-word variant.
+    compact = _clean_query_for_tmdb(norm)
+    words = compact.split()
+    if len(words) >= 5:
+        _add(" ".join(words[:4]))
 
     return variants
+
+
+def _title_similarity(a: str, b: str) -> float:
+    aa = re.sub(r"[^a-z0-9]+", " ", (a or "").lower()).strip()
+    bb = re.sub(r"[^a-z0-9]+", " ", (b or "").lower()).strip()
+    if not aa or not bb:
+        return 0.0
+    if aa == bb:
+        return 1.0
+    return difflib.SequenceMatcher(None, aa, bb).ratio()
+
+
+def _row_quality_score(*, query: str, row: dict[str, str], year_hint: str = "") -> float:
+    title = str(row.get("title") or "")
+    original = str(row.get("original_title") or "")
+    similarity = max(_title_similarity(query, title), _title_similarity(query, original))
+    score = similarity
+
+    q_tokens = _title_tokens(query)
+    t_tokens = _title_tokens(title)
+    o_tokens = _title_tokens(original)
+    overlap_t = (len(q_tokens & t_tokens) / len(q_tokens)) if q_tokens else 0.0
+    overlap_o = (len(q_tokens & o_tokens) / len(q_tokens)) if q_tokens else 0.0
+    overlap = max(overlap_t, overlap_o)
+    score += 0.35 * overlap
+
+    if q_tokens and (q_tokens <= t_tokens or q_tokens <= o_tokens):
+        score += 0.15
+
+    row_year = str(row.get("year") or "")
+    if year_hint and row_year:
+        if year_hint == row_year:
+            score += 0.2
+        else:
+            try:
+                if abs(int(year_hint) - int(row_year)) <= 1:
+                    score += 0.08
+            except Exception:
+                pass
+
+    try:
+        popularity = float(str(row.get("popularity") or "0"))
+    except Exception:
+        popularity = 0.0
+    score += min(0.15, popularity / 800.0)
+    return score
 
 
 def probe_disc_metadata(*, disc_device: str = "/dev/sr0") -> dict[str, object]:
@@ -291,28 +370,54 @@ def tmdb_suggest_from_disc(*, api_key: str, disc_device: str = "/dev/sr0", media
     if not queries:
         return {**meta, "results": []}
 
-    search_types = ["movie", "tv"] if mt == "auto" else [mt]
-    dedup: dict[str, dict[str, str]] = {}
-    for q in queries[:4]:
-        for search_mt in search_types:
-            try:
-                rows = tmdb_search(api_key=api_key, query=q, year=year_hint, media_type=search_mt, limit=max(3, min(10, limit)))
-            except Exception:
+    # For auto mode, multi search tends to recover noisy disc labels better;
+    # keep direct movie/tv probes as a fallback.
+    search_types = ["multi", "movie", "tv"] if mt == "auto" else [mt]
+    dedup: dict[str, tuple[float, dict[str, str]]] = {}
+
+    expanded_queries: list[str] = []
+    seen_queries: set[str] = set()
+    for q in queries:
+        for variant in (q, re.sub(r"\b(19\d{2}|20\d{2})\b", "", q).strip()):
+            key = variant.lower()
+            if len(variant) < 2 or key in seen_queries:
                 continue
-            for row in rows:
-                key = f"{row.get('media_type','')}:{row.get('id','')}"
-                if not row.get("id"):
-                    key = f"{row.get('media_type','')}:{(row.get('title') or '').lower()}:{row.get('year') or ''}"
-                if key not in dedup:
-                    dedup[key] = row
-                if len(dedup) >= max(1, min(20, int(limit))):
-                    break
-            if len(dedup) >= max(1, min(20, int(limit))):
-                break
-        if len(dedup) >= max(1, min(20, int(limit))):
+            seen_queries.add(key)
+            expanded_queries.append(variant)
+        if len(expanded_queries) >= 10:
             break
 
-    return {**meta, "results": list(dedup.values())[: max(1, min(20, int(limit)))]}
+    for q in expanded_queries:
+        for search_mt in search_types:
+            year_attempts = [year_hint] if year_hint else [""]
+            if year_hint:
+                year_attempts.append("")
+            for y in year_attempts:
+                try:
+                    rows = tmdb_search(api_key=api_key, query=q, year=y, media_type=search_mt, limit=max(5, min(16, limit)))
+                except Exception:
+                    continue
+                for row in rows:
+                    key = f"{row.get('media_type','')}:{row.get('id','')}"
+                    if not row.get("id"):
+                        key = f"{row.get('media_type','')}:{(row.get('title') or '').lower()}:{row.get('year') or ''}"
+                    score = _row_quality_score(query=q, row=row, year_hint=year_hint)
+                    existing = dedup.get(key)
+                    if existing is None or score > existing[0]:
+                        dedup[key] = (score, row)
+                    if len(dedup) >= 40:
+                        break
+                if len(dedup) >= 40:
+                    break
+            if len(dedup) >= 40:
+                break
+        if len(dedup) >= 40:
+            break
+
+    ranked = [pair for pair in dedup.values()]
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    results = [row for _, row in ranked[: max(1, min(20, int(limit)))]]
+    return {**meta, "results": results}
 
 
 # ----------------------------

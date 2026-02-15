@@ -1094,17 +1094,23 @@ if TK_AVAILABLE:
 
             ttk.Radiobutton(
                 options,
-                text="Rip locally, encode on server (planned)",
+                text="Rip locally, encode on server",
                 variable=choice,
                 value=EXEC_MODE_LOCAL_RIP_ONLY,
             ).pack(anchor="w", pady=(4, 0))
 
             ttk.Radiobutton(
                 options,
-                text="Rip + encode locally, upload results (planned)",
+                text="Rip + encode locally, upload results (beta)",
                 variable=choice,
                 value=EXEC_MODE_LOCAL_RIP_ENCODE,
             ).pack(anchor="w", pady=(4, 0))
+
+            ttk.Label(
+                container,
+                text="Beta: local rip+encode requires local MakeMKV + HandBrakeCLI, then uploads results.",
+                foreground=self._theme_colors.get("muted", "#444"),
+            ).pack(anchor="w", pady=(6, 0))
 
             btns = ttk.Frame(container)
             btns.pack(fill=X, pady=(12, 0))
@@ -2444,13 +2450,6 @@ if TK_AVAILABLE:
                 return
 
             exec_mode = (self.var_exec_mode.get() or EXEC_MODE_REMOTE).strip() or EXEC_MODE_REMOTE
-            if exec_mode == EXEC_MODE_LOCAL_RIP_ENCODE:
-                messagebox.showinfo(
-                    "Rip mode",
-                    "Rip + encode locally is planned but not implemented yet.\n\n"
-                    "For now, please use: Rip locally (encode on server) or Rip + encode on server (remote).",
-                )
-                return
 
             if not self._is_setup_complete():
                 self._run_setup_wizard(force=False)
@@ -2523,6 +2522,10 @@ if TK_AVAILABLE:
                     self._begin_local_rip_only(cfg, remote_script, local_csv, schedule)
                     return
 
+                if exec_mode == EXEC_MODE_LOCAL_RIP_ENCODE:
+                    self._begin_local_rip_encode(cfg, local_csv)
+                    return
+
                 remote_csv = self._upload_schedule_to_remote(cfg, local_csv)
                 self._start_remote_job(cfg, remote_script, remote_csv)
 
@@ -2530,6 +2533,191 @@ if TK_AVAILABLE:
 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
+
+        def _local_script_path(self) -> Path:
+            return (Path(__file__).resolve().parent / "rip_and_encode.py").resolve()
+
+        def _remote_path_only(self, value: str) -> str:
+            s = (value or "").strip()
+            if not s:
+                return s
+            if s.startswith("/") or s.startswith("~"):
+                return s
+            if ":" in s and "/" not in s.split(":", 1)[0]:
+                return s.split(":", 1)[1].strip()
+            return s
+
+        def _begin_local_rip_encode(self, cfg: ConnectionInfo, local_csv: Path) -> None:
+            if self.state.running:
+                raise RuntimeError("Already running.")
+
+            self._append_log("Local rip mode: rip + encode locally, then upload encoded results.\n")
+            if self.var_ensure_jellyfin.get():
+                self._append_log("(Info) 'Install Jellyfin if missing' only applies to remote-run mode; skipping for local encoding.\n")
+
+            self._local_stop_requested.clear()
+            self._local_ripping_active = False
+
+            self.state.running = True
+            self.state.waiting_for_enter = False
+            self.state.run_started_ts = time.time()
+            self.var_step.set("Running")
+            self.var_prompt.set("")
+            self.var_eta.set("")
+            self.progress.configure(mode="indeterminate")
+            self.progress.start(10)
+
+            self.btn_start.configure(state="disabled")
+            self.btn_stop.configure(state="normal")
+            self.btn_continue.configure(state="disabled")
+            self._set_inputs_enabled(False)
+
+            self._local_thread = threading.Thread(
+                target=self._local_rip_encode_worker,
+                args=(cfg, local_csv),
+                daemon=True,
+            )
+            self._local_thread.start()
+
+        def _upload_local_tree_to_remote(self, cfg: ConnectionInfo, local_dir: Path, remote_dest: str, label: str) -> None:
+            if not local_dir.exists():
+                return
+            has_files = any(p.is_file() for p in local_dir.rglob("*"))
+            if not has_files:
+                self.ui_queue.put(("log", f"(Local) No encoded {label} files to upload.\n"))
+                return
+
+            remote_path = self._remote_path_only(remote_dest)
+            if not remote_path:
+                raise ValueError(f"Remote {label} directory is empty.")
+
+            self.ui_queue.put(("log", f"(Local) Uploading encoded {label} files to: {remote_path}\n"))
+            self._ensure_remote_dir(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_path)
+
+            if PARAMIKO_AVAILABLE:
+                try:
+                    client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
+                    try:
+                        abs_root = self._remote_abs_path_paramiko(client, remote_path)
+                        self._sftp_put_tree(client, local_dir, abs_root)
+                    finally:
+                        try:
+                            client.close()
+                        except Exception:
+                            pass
+                    return
+                except Exception:
+                    # Fall back to OpenSSH/SCP path when possible.
+                    pass
+
+            abs_root = self._remote_abs_path_ssh(cfg.target, cfg.port, cfg.keyfile, remote_path)
+            scp_args = self._scp_args(cfg.target, cfg.port, cfg.keyfile)
+            for child in sorted(local_dir.iterdir()):
+                dest = f"{cfg.target}:{shlex.quote(abs_root)}"
+                res = subprocess.run(
+                    scp_args + ["-r", str(child), dest],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+                if res.stdout:
+                    self.ui_queue.put(("log", res.stdout))
+                if res.returncode != 0:
+                    raise ValueError(
+                        f"Failed to upload encoded {label} files to {remote_path}.\n\n"
+                        + ((res.stdout or "").strip() or "(No additional details.)")
+                    )
+
+        def _local_rip_encode_worker(self, cfg: ConnectionInfo, local_csv: Path) -> None:
+            proc = None
+            try:
+                script = self._local_script_path()
+                if not script.exists():
+                    raise RuntimeError(f"Local script not found: {script}")
+
+                local_base = self._local_staging_base()
+                local_base.mkdir(parents=True, exist_ok=True)
+
+                out_root = local_base / "encoded_upload"
+                out_movies = out_root / "Movies"
+                out_series = out_root / "Series"
+                out_movies.mkdir(parents=True, exist_ok=True)
+                out_series.mkdir(parents=True, exist_ok=True)
+
+                argv = [
+                    "python3",
+                    str(script),
+                    "--csv",
+                    str(local_csv),
+                    "--movies-dir",
+                    str(out_movies),
+                    "--series-dir",
+                    str(out_series),
+                    "--disc-type",
+                    (self.var_disc_type.get().strip() or "dvd"),
+                    "--preset",
+                    self.var_preset.get().strip(),
+                    "--output-container",
+                    (self.var_output_container.get().strip() or "mp4"),
+                    "--subtitle-mode",
+                    (self.var_subtitle_mode.get().strip() or "external"),
+                    "--overlap",
+                    "--encode-jobs",
+                    "1",
+                    "--keep-mkvs",
+                ]
+
+                env = os.environ.copy()
+                env["HOME"] = str(local_base)
+
+                proc = subprocess.Popen(
+                    argv,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env=env,
+                )
+                self.proc = proc
+
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    if self._local_stop_requested.is_set():
+                        break
+                    self.ui_queue.put(("log", line))
+
+                if self._local_stop_requested.is_set():
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    self.ui_queue.put(("done", "Stopped"))
+                    return
+
+                code = proc.wait()
+                if code != 0:
+                    raise RuntimeError(f"Local rip+encode failed with exit code {code}")
+
+                self.ui_queue.put(("log", "(Local) Local encoding complete. Starting upload to server...\n"))
+                self._upload_local_tree_to_remote(cfg, out_movies, self.var_movies_dir.get().strip(), "movie")
+                self._upload_local_tree_to_remote(cfg, out_series, self.var_series_dir.get().strip(), "series")
+
+                self.ui_queue.put(("done", "ok"))
+            except Exception as e:
+                msg = (str(e) or "").strip()
+                if msg.lower() == "stopped":
+                    self.ui_queue.put(("done", "Stopped"))
+                else:
+                    self.ui_queue.put(("done", f"Local rip+encode failed: {e}"))
+            finally:
+                try:
+                    if proc is not None and proc.poll() is None:
+                        proc.terminate()
+                except Exception:
+                    pass
+                self.proc = None
 
         def _upload_schedule_to_remote(self, cfg: ConnectionInfo, local_csv: Path) -> str:
             remote_csv = f"/tmp/rip_and_encode_schedule_{int(time.time())}.csv"
@@ -2600,6 +2788,7 @@ if TK_AVAILABLE:
 
             if self.var_ensure_jellyfin.get():
                 cmd_parts += ["--ensure-jellyfin"]
+                self._append_log("(Info) Install Jellyfin if missing: enabled for this run.\n")
 
             # Defaults: always overlap with 1 encode job, and always keep MKVs (fail-safe).
             cmd_parts += ["--overlap", "--encode-jobs", "1", "--keep-mkvs"]

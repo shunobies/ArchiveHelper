@@ -20,11 +20,11 @@ Three modes are available:
 
 - **Rip + encode on server (remote)** (default): Everything happens on the server. The GUI controls the server over SSH and shows progress.
 - **Rip locally, encode on server**: Your desktop rips the disc. The app uploads the raw MKV files to the server, then the server encodes them to MP4 or MKV (configurable).
-- **Rip + encode locally, upload results** (planned): Your desktop does all the work. When finished, the app uploads the final encoded files to the server.
+- **Rip + encode locally, upload results** (beta): Your desktop does all the work, then uploads final encoded files to the server.
 
 If you do not pick a mode, the app uses **Rip + encode on server (remote)**.
 
-Note: The first two modes are ready to use. The third mode (local rip and encode) is still being built.
+Note: The first two modes are stable. The third mode (local rip + encode upload) is now available as **beta**.
 
 ## Recent improvements (January 2026)
 
@@ -50,7 +50,7 @@ The rip server does the heavy work with:
 
 The GUI connects to the server using SSH. It can use a password, but SSH keys are strongly recommended.
 
-Note: **Rip + encode locally, upload results** is still planned. The other two modes are usable.
+Note: **Rip + encode locally, upload results** is currently beta. The other two modes are stable.
 
 ## What you need
 
@@ -59,7 +59,8 @@ Note: **Rip + encode locally, upload results** is still planned. The other two m
 - Python 3
 - Tkinter for Python (often packaged as `python3-tk` on Debian/Ubuntu)
 - Python packages: `paramiko` and `keyring`
-- MakeMKV (only required if you use **Rip locally, encode on server** mode)
+- MakeMKV (required for local ripping modes)
+- HandBrakeCLI (required for **Rip + encode locally, upload results** mode)
 - At least 20 GB free disk space (for local ripping modes; configurable in Settings)
 - Network access to your server’s SSH port
 

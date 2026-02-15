@@ -228,8 +228,16 @@ After that, Archive Helper appears in your app menu and can be pinned to the doc
 If you prefer copy/paste templates, starter launchers are included in `launchers/`:
 
 - `launchers/linux.desktop`
-- `launchers/windows.bat`
+- `launchers/build_linux_exe.sh`
+- `launchers/build_windows_exe.ps1`
+- `launchers/build_macos_app.sh`
 - `launchers/macos.command`
+
+Build-style launchers:
+
+- Linux: run `./launchers/build_linux_exe.sh` to produce `dist/ArchiveHelper`.
+- Windows: run `launchers/build_windows_exe.ps1` from PowerShell to produce `dist/ArchiveHelper.exe`.
+- macOS: run `./launchers/build_macos_app.sh` to produce `dist/ArchiveHelper.app`.
 
 On first run (or if settings are missing), the app will prompt you to configure:
 

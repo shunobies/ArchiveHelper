@@ -157,6 +157,55 @@ def _normalize_disc_hint(text: str) -> str:
     return s
 
 
+def _is_probable_disc_hint(text: str) -> bool:
+    s = (text or "").strip().strip("\"'")
+    if len(s) < 2 or len(s) > 160:
+        return False
+    if not re.search(r"[A-Za-z]", s):
+        return False
+    if re.fullmatch(r"[\d\W_]+", s):
+        return False
+    if s.lower().startswith(("http://", "https://")):
+        return False
+    if s.count("/") >= 2 or s.count("\\") >= 2:
+        return False
+    return True
+
+
+def _query_variants_from_hint(text: str) -> list[str]:
+    """Build likely TMDB query variants from a raw disc label/title."""
+    raw = (text or "").strip()
+    if not _is_probable_disc_hint(raw):
+        return []
+
+    variants: list[str] = []
+    seen: set[str] = set()
+
+    def _add(candidate: str) -> None:
+        c = re.sub(r"\s+", " ", (candidate or "").strip(" -_\"'"))
+        if len(c) < 2:
+            return
+        key = c.lower()
+        if key not in seen:
+            seen.add(key)
+            variants.append(c)
+
+    norm = _normalize_disc_hint(raw)
+    _add(raw)
+    _add(norm)
+
+    for base in [raw, norm]:
+        stripped = re.sub(r"\b(?:disc|disk|dvd|cd|part)\s*[-_:#]*\s*\d{1,2}\b", "", base, flags=re.I)
+        stripped = re.sub(r"\b(?:copy|backup|retail|r1|r2|nts[cp]|pal)\b", "", stripped, flags=re.I)
+        _add(_normalize_disc_hint(stripped))
+
+        # Labels often include extra detail after separators; try the title-first fragment.
+        first_fragment = re.split(r"\s(?:[-–—:|]|/)+\s", stripped, maxsplit=1)[0]
+        _add(_normalize_disc_hint(first_fragment))
+
+    return variants
+
+
 def probe_disc_metadata(*, disc_device: str = "/dev/sr0") -> dict[str, object]:
     raw_hints: list[str] = []
 
@@ -192,6 +241,8 @@ def probe_disc_metadata(*, disc_device: str = "/dev/sr0") -> dict[str, object]:
     hints: list[str] = []
     seen_hints: set[str] = set()
     for raw in raw_hints:
+        if not _is_probable_disc_hint(raw):
+            continue
         n = _normalize_disc_hint(raw)
         if len(n) < 2:
             continue
@@ -201,7 +252,25 @@ def probe_disc_metadata(*, disc_device: str = "/dev/sr0") -> dict[str, object]:
         seen_hints.add(k)
         hints.append(n)
 
-    queries = hints[:6]
+    queries: list[str] = []
+    seen_queries: set[str] = set()
+    for raw in raw_hints:
+        if not _is_probable_disc_hint(raw):
+            continue
+        for q in _query_variants_from_hint(raw):
+            key = q.lower()
+            if key in seen_queries:
+                continue
+            seen_queries.add(key)
+            queries.append(q)
+            if len(queries) >= 8:
+                break
+        if len(queries) >= 8:
+            break
+
+    if not queries:
+        queries = hints[:6]
+
     year_hint = ""
     for q in queries:
         year_hint = _extract_year_hint(q)

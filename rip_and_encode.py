@@ -37,6 +37,31 @@ from pathlib import Path
 from threading import Lock
 from typing import IO, Iterable, Optional
 
+from archive_helper_core.schedule_csv import (
+    ScheduleRow,
+    csv_disc_prompt_for_row,
+    csv_next_up_note,
+    load_csv_schedule,
+)
+
+from archive_helper_core.cli_utils import (
+    append_extra_nfo_if_missing,
+    clean_title,
+    close_extras_nfo,
+    ensure_simple_ssh_host,
+    ffprobe_chapter_count,
+    ffprobe_duration_seconds,
+    ffprobe_meta_title,
+    file_size_mb,
+    init_extras_nfo,
+    is_safe_work_dir,
+    prompt_int,
+    prompt_nonempty,
+    prompt_year,
+    prompt_yes_no,
+    sanitize_title_for_dir,
+)
+
 
 # ----------------------------
 # Debian hints / deps
@@ -423,308 +448,6 @@ def remote_exists(dest: str, subpath: str) -> bool:
 def remote_copy_dir_into(local_dir: Path, remote_dest: str) -> None:
     rpath = remote_path_part(remote_dest)
     run_cmd(["scp", "-r", str(local_dir), f"{remote_host_part(remote_dest)}:{rpath}/"])
-
-
-# ----------------------------
-# Simple-mode SSH config helpers
-# ----------------------------
-
-
-def ssh_config_file(home: Path) -> Path:
-    return home / ".ssh" / "config"
-
-
-def ensure_ssh_dir(home: Path) -> None:
-    (home / ".ssh").mkdir(parents=True, exist_ok=True)
-    try:
-        os.chmod(home / ".ssh", 0o700)
-    except OSError:
-        pass
-
-
-def ssh_config_has_host(cfg: Path, host: str) -> bool:
-    if not cfg.exists():
-        return False
-
-    # Minimal parser: look for `Host <name>` lines and match tokens.
-    for line in cfg.read_text(errors="ignore").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.lower().startswith("host "):
-            tokens = line.split()[1:]
-            if host in tokens:
-                return True
-    return False
-
-
-def prompt_default(prompt: str, default: str) -> str:
-    value = input(f"{prompt} [{default}]: ").replace("\r", "").strip()
-    return value or default
-
-
-def expand_tilde(home: Path, p: str) -> str:
-    if p.startswith("~/"):
-        return str(home / p[2:])
-    return p
-
-
-def append_ssh_host_block(cfg: Path, host: str, hostname: str, user: str, port: str, identityfile: str) -> None:
-    ensure_ssh_dir(cfg.parent.parent)
-    cfg.parent.mkdir(parents=True, exist_ok=True)
-    cfg.touch(exist_ok=True)
-    try:
-        os.chmod(cfg, 0o600)
-    except OSError:
-        pass
-
-    with cfg.open("a", encoding="utf-8") as f:
-        f.write(
-            "\n"
-            f"Host {host}\n"
-            f"  HostName {hostname}\n"
-            f"  User {user}\n"
-            f"  Port {port}\n"
-            f"  IdentityFile {identityfile}\n"
-            "  IdentitiesOnly yes\n"
-        )
-
-
-def ensure_simple_ssh_host(home: Path, host: str) -> None:
-    cfg = ssh_config_file(home)
-    if ssh_config_has_host(cfg, host):
-        return
-
-    print("--------------------------------------------")
-    print("SSH setup for remote Jellyfin copy")
-    print("--------------------------------------------")
-    print(f"No SSH config entry found for Host '{host}'.")
-    print(f"We'll add one to {cfg}.")
-    print()
-
-    hostname = prompt_default("HostName (IP or DNS name)", "172.29.114.183")
-    user = prompt_default("User", os.environ.get("USER", "shuno"))
-    port = prompt_default("Port", "22")
-    identityfile = prompt_default("IdentityFile (SSH key path)", "~/.ssh/id_ed25519")
-    identityfile_expanded = expand_tilde(home, identityfile)
-
-    append_ssh_host_block(cfg, host, hostname, user, port, identityfile_expanded)
-
-    if not Path(identityfile_expanded).exists():
-        print(f"Warning: IdentityFile does not exist yet: {identityfile_expanded}", file=sys.stderr)
-        print(f"Debian hint: ssh-keygen -t ed25519 -f '{identityfile_expanded}'", file=sys.stderr)
-        print("Then copy the public key to the server (example):", file=sys.stderr)
-        print(f"  ssh-copy-id -i '{identityfile_expanded}.pub' {host}", file=sys.stderr)
-
-    print()
-    print(f"SSH config updated. You can test with: ssh {host}")
-
-
-# ----------------------------
-# Prompts
-# ----------------------------
-
-
-def prompt_nonempty(prompt: str) -> str:
-    while True:
-        v = input(prompt)
-        if v.strip():
-            return v
-        print("Input cannot be empty. Try again.", file=sys.stderr)
-
-
-def prompt_year(prompt: str) -> str:
-    while True:
-        v = input(prompt).strip()
-        if re.fullmatch(r"\d{4}", v):
-            return v
-        print("Year must be a 4-digit number. Try again.", file=sys.stderr)
-
-
-def prompt_yes_no(prompt: str) -> str:
-    while True:
-        v = input(prompt).strip().lower()
-        if v in ("y", "n"):
-            return v
-        print("Please answer y or n.", file=sys.stderr)
-
-
-def prompt_int(prompt: str) -> int:
-    while True:
-        v = input(prompt).strip()
-        if re.fullmatch(r"\d+", v):
-            return int(v)
-        print("Please enter a number.", file=sys.stderr)
-
-
-# ----------------------------
-# Work dir safety / naming
-# ----------------------------
-
-
-def clean_title(s: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9 ]", "", s).replace(" ", "_")
-
-
-def sanitize_title_for_dir(title_raw: str) -> str:
-    # Linux/shell-friendly folder name: avoid spaces/quotes and other special chars.
-    # Goal: user can `cd` into folders without needing quoting.
-    s = (title_raw or "").strip()
-    if not s:
-        return "Untitled"
-
-    # Normalize obvious path separators.
-    s = s.replace("/", "_").replace(os.sep, "_")
-
-    # Replace anything outside a conservative allowlist.
-    # Allowed: letters, digits, dot, underscore, dash, space (space -> underscore below).
-    s = re.sub(r"[^A-Za-z0-9._\- ]+", "_", s)
-
-    # Spaces -> underscores (consistent with the existing behavior).
-    s = s.replace(" ", "_")
-
-    # Collapse repeated separators and trim edges.
-    s = re.sub(r"_+", "_", s)
-    s = s.strip("._-_")
-    return s or "Untitled"
-
-
-def is_safe_work_dir(home: Path, work_dir: Path) -> bool:
-    try:
-        work_dir = work_dir.resolve()
-        home = home.resolve()
-    except OSError:
-        return False
-
-    if not str(work_dir).startswith(str(home) + os.sep):
-        return False
-    rel = str(work_dir)[len(str(home) + os.sep) :]
-    if not rel:
-        return False
-    if "/" in rel or os.sep in rel:
-        # must be exactly one segment under home
-        return False
-    if work_dir == home:
-        return False
-    return True
-
-
-# ----------------------------
-# Extras NFO
-# ----------------------------
-
-
-def init_extras_nfo(nfo: Path) -> None:
-    if not nfo.exists():
-        nfo.write_text("<extras>\n", encoding="utf-8")
-
-
-def close_extras_nfo(nfo: Path) -> None:
-    if not nfo.exists():
-        return
-    txt = nfo.read_text(errors="ignore")
-    if "</extras>" not in txt:
-        with nfo.open("a", encoding="utf-8") as f:
-            f.write("</extras>\n")
-
-
-def append_extra_nfo_if_missing(nfo: Path, title: str, filename: str) -> None:
-    if nfo.exists() and f"<filename>{filename}</filename>" in nfo.read_text(errors="ignore"):
-        return
-
-    with nfo.open("a", encoding="utf-8") as f:
-        f.write(
-            "  <video>\n"
-            f"    <title>{title}</title>\n"
-            f"    <filename>{filename}</filename>\n"
-            "  </video>\n"
-        )
-
-
-# ----------------------------
-# ffprobe helpers
-# ----------------------------
-
-
-def ffprobe_meta_title(f: Path) -> str:
-    def _probe(tag: str) -> str:
-        try:
-            cp = run_cmd(
-                [
-                    "ffprobe",
-                    "-v",
-                    "error",
-                    "-show_entries",
-                    f"format_tags={tag}",
-                    "-of",
-                    "default=noprint_wrappers=1:nokey=1",
-                    str(f),
-                ],
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-            return (cp.stdout or "").strip()
-        except Exception:
-            return ""
-
-    title_tag = _probe("title")
-    desc_tag = _probe("description")
-    return desc_tag or title_tag
-
-
-def ffprobe_duration_seconds(f: Path) -> int:
-    try:
-        cp = run_cmd(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(f),
-            ],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-        raw = (cp.stdout or "0").splitlines()[0].strip()
-        if re.fullmatch(r"\d+(\.\d+)?", raw):
-            return int(raw.split(".")[0])
-    except Exception:
-        pass
-    return 0
-
-
-def ffprobe_chapter_count(f: Path) -> int:
-    try:
-        cp = run_cmd(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "chapters=chapter",
-                "-of",
-                "csv=p=0",
-                str(f),
-            ],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-        return len([ln for ln in (cp.stdout or "").splitlines() if ln.strip()])
-    except Exception:
-        return 0
-
-
-def file_size_mb(f: Path) -> int:
-    try:
-        return int(f.stat().st_size // 1048576)
-    except OSError:
-        return 0
 
 
 # ----------------------------
@@ -1504,104 +1227,6 @@ def process_series_disc(
             raise
 
     close_extras_nfo(ctx.output_extras_nfo)
-
-
-# ----------------------------
-# CSV schedule
-# ----------------------------
-
-
-def trim_ws(s: str) -> str:
-    return s.strip()
-
-
-def is_bool_yn(s: str) -> bool:
-    return s.strip().lower() in {"y", "n", "yes", "no", "true", "false"}
-
-
-def normalize_bool_yn(s: str) -> str:
-    v = s.strip().lower()
-    if v in {"y", "yes", "true"}:
-        return "y"
-    if v in {"n", "no", "false"}:
-        return "n"
-    return ""
-
-
-@dataclass
-class ScheduleRow:
-    kind: str  # "movie" or "series"
-    name: str
-    year: str
-    third: str  # MultiDisc y/n OR season integer string
-    disc: int
-    line: int
-
-
-def load_csv_schedule(file: Path) -> list[ScheduleRow]:
-    rows: list[ScheduleRow] = []
-
-    for n, raw in enumerate(file.read_text(errors="ignore").splitlines(), start=1):
-        line = raw.rstrip("\r")
-        if not line.strip():
-            continue
-        if line.lstrip().startswith("#"):
-            continue
-
-        # Skip common header rows.
-        if re.match(r"^\s*(movie|series)?\s*name\s*,\s*year\s*,", line, flags=re.I):
-            continue
-
-        parts = [trim_ws(p) for p in line.split(",")]
-        if len(parts) != 4 or any(p == "" for p in parts[:4]):
-            raise RuntimeError(
-                f"CSV parse error at line {n}: expected exactly 4 comma-separated columns\n  Line: {line}"
-            )
-
-        name, year, third, disc_s = parts
-
-        if not re.fullmatch(r"\d{4}", year):
-            raise RuntimeError(f"CSV validation error at line {n}: year must be 4 digits\n  Line: {line}")
-
-        if not disc_s.isdigit() or int(disc_s) < 1:
-            raise RuntimeError(
-                f"CSV validation error at line {n}: disc must be an integer >= 1\n  Line: {line}"
-            )
-        disc = int(disc_s)
-
-        if is_bool_yn(third):
-            kind = "movie"
-            third_n = normalize_bool_yn(third)
-            if not third_n:
-                raise RuntimeError(
-                    f"CSV validation error at line {n}: MultiDisc must be y/n\n  Line: {line}"
-                )
-            third = third_n
-        else:
-            kind = "series"
-            if not third.isdigit() or int(third) < 1:
-                raise RuntimeError(
-                    f"CSV validation error at line {n}: season must be an integer >= 1\n  Line: {line}"
-                )
-
-        rows.append(ScheduleRow(kind=kind, name=name, year=year, third=third, disc=disc, line=n))
-
-    if not rows:
-        raise RuntimeError(f"CSV schedule is empty: {file}")
-
-    return rows
-
-
-def csv_disc_prompt_for_row(r: ScheduleRow) -> str:
-    if r.kind == "movie":
-        if r.third == "y":
-            return f"Insert: Movie '{r.name} ({r.year})' Disc {r.disc} (MultiDisc=y). Press Enter when ready."
-        return f"Insert: Movie '{r.name} ({r.year})' Disc {r.disc}. Press Enter when ready."
-    return f"Insert: Series '{r.name} ({r.year})' Season {r.third} Disc {r.disc}. Press Enter when ready."
-
-
-def csv_next_up_note(next_row: ScheduleRow) -> None:
-    print(f"Next up: {csv_disc_prompt_for_row(next_row)}")
 
 
 # ----------------------------

@@ -187,6 +187,50 @@ source .venv/bin/activate
 python3 ./rip_and_encode_gui.py
 ```
 
+### Optional: make GUI launch with a double-click icon
+
+Yes—this is achievable, and your Python choice is good for cross-platform support.
+
+The easiest options are:
+
+- **Linux desktop launcher (`.desktop`)**: create a launcher icon that runs your virtual environment Python with `rip_and_encode_gui.py`.
+- **Windows shortcut (`.lnk`)**: point a shortcut at `pythonw.exe` (or a packaged `.exe`) and pass `rip_and_encode_gui.py`.
+- **macOS app bundle**: package with a tool like `py2app`/`Briefcase` so users launch like a normal app.
+
+For non-technical users, a packaged installer is usually best:
+
+- **PyInstaller** can build a standalone executable for each platform.
+- Build per-OS (Windows build on Windows, macOS on macOS, Linux on Linux).
+- You can then distribute a zip/installer and users just double-click to run.
+
+Example Linux `.desktop` file (adjust paths):
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Archive Helper
+Comment=Launch Archive Helper GUI
+Exec=/home/YOURUSER/ArchiveHelper/.venv/bin/python /home/YOURUSER/ArchiveHelper/rip_and_encode_gui.py
+Path=/home/YOURUSER/ArchiveHelper
+Terminal=false
+Categories=Utility;
+```
+
+Save as `~/.local/share/applications/archive-helper.desktop`, then run:
+
+```bash
+chmod +x ~/.local/share/applications/archive-helper.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+After that, Archive Helper appears in your app menu and can be pinned to the dock/taskbar.
+
+If you prefer copy/paste templates, starter launchers are included in `launchers/`:
+
+- `launchers/linux.desktop`
+- `launchers/windows.bat`
+- `launchers/macos.command`
+
 On first run (or if settings are missing), the app will prompt you to configure:
 
 - Connection (SSH host/user/key/password)

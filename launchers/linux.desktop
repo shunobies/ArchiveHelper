@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Archive Helper
+Comment=Launch Archive Helper GUI
+Exec=/home/YOURUSER/ArchiveHelper/.venv/bin/python /home/YOURUSER/ArchiveHelper/rip_and_encode_gui.py
+Path=/home/YOURUSER/ArchiveHelper
+Terminal=false
+Categories=Utility;

@@ -39,7 +39,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import IO, Iterable, Optional
+from typing import IO, Callable, Iterable, Optional
 
 from archive_helper_core.schedule_csv import (
     ScheduleRow,
@@ -138,6 +138,54 @@ def tmdb_search(*, api_key: str, query: str, year: str = "", media_type: str = "
         )
 
     return results
+
+
+def tmdb_movie_runtime_minutes(*, api_key: str, title: str, year: str = "") -> Optional[int]:
+    """Best-effort lookup of a movie runtime (in minutes) from TMDB.
+
+    Returns None if no runtime can be determined.
+    """
+
+    api_key_s = (api_key or "").strip()
+    title_s = (title or "").strip()
+    if not api_key_s or not title_s:
+        return None
+
+    try:
+        matches = tmdb_search(api_key=api_key_s, query=title_s, year=year, media_type="movie", limit=6)
+    except Exception:
+        return None
+
+    for match in matches:
+        tmdb_id = str(match.get("id") or "").strip()
+        if not tmdb_id.isdigit():
+            continue
+
+        url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?" + urllib.parse.urlencode({"api_key": api_key_s})
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "ArchiveHelper/1.0",
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                payload = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(payload)
+        except Exception:
+            continue
+
+        runtime = data.get("runtime") if isinstance(data, dict) else None
+        try:
+            runtime_i = int(runtime)
+        except Exception:
+            runtime_i = 0
+        if runtime_i > 0:
+            return runtime_i
+
+    return None
 
 
 def _cmd_stdout(argv: list[str], *, timeout_s: int = 8) -> str:
@@ -1787,43 +1835,73 @@ def setup_title_context(
 # ----------------------------
 
 
-def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool = True, makemkv_cache_mb: int = 128) -> list[Path]:
-    mkvs = find_mkvs_in_dir(disc_dir)
-    if mkvs:
-        print(f"Resume: found existing MKVs in {disc_dir}; skipping rip.")
-        return mkvs
-
-    print(prompt_msg)
-    if wait_for_enter:
-        input()
-
-    auto_retry_used = False
-    direct_error: Optional[Exception] = None
-    while True:
+def rip_disc_if_needed(
+    disc_dir: Path,
+    prompt_msg: str,
+    *,
+    wait_for_enter: bool = True,
+    makemkv_cache_mb: int = 128,
+    validate_rip: Optional[Callable[[list[Path]], tuple[bool, str]]] = None,
+) -> list[Path]:
+    def _has_acceptable_rip() -> tuple[bool, str]:
+        mkvs_now = find_mkvs_in_dir(disc_dir)
+        if not mkvs_now:
+            return False, "No MKVs found after rip attempt."
+        if validate_rip is None:
+            return True, ""
         try:
-            run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
-            direct_error = None
-            break
-        except MakeMKVError as e:
-            # Exit code 11 commonly corresponds to a transient "Failed to open disc"
-            # (disc not fully ready, drive hiccup, tray state). Treat it as recoverable.
-            if int(getattr(e, "code", -1)) == 11:
-                if not auto_retry_used:
-                    auto_retry_used = True
-                    print("MakeMKV could not open the disc (exit 11). Retrying once in 8 seconds...")
-                    try:
-                        run_cmd(["eject", "-t", "/dev/sr0"], check=False)
-                    except Exception:
-                        pass
-                    time.sleep(8)
-                    continue
+            ok, reason = validate_rip(mkvs_now)
+            return bool(ok), (reason or "")
+        except Exception as e:
+            # Validation itself should not abort a run; continue with current output.
+            return True, f"Rip validation check failed unexpectedly ({e}); continuing with current output."
 
-                print("MakeMKV could not open the disc (exit 11).")
-                print("Check the disc/drive and press Enter to retry (or Ctrl-C / Stop to abort).")
-                input()
-                continue
-            direct_error = e
-            break
+    existing_mkvs = find_mkvs_in_dir(disc_dir)
+    direct_error: Optional[Exception] = None
+
+    if existing_mkvs:
+        print(f"Resume: found existing MKVs in {disc_dir}; validating rip before encode.")
+        acceptable, reason = _has_acceptable_rip()
+        if acceptable:
+            return existing_mkvs
+        print(f"Resume: existing rip failed validation; entering fallback flow: {reason}")
+        direct_error = RuntimeError(reason or "Existing MKVs failed validation.")
+    else:
+        print(prompt_msg)
+        if wait_for_enter:
+            input()
+
+        auto_retry_used = False
+        while True:
+            try:
+                run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
+                direct_error = None
+                break
+            except MakeMKVError as e:
+                # Exit code 11 commonly corresponds to a transient "Failed to open disc"
+                # (disc not fully ready, drive hiccup, tray state). Treat it as recoverable.
+                if int(getattr(e, "code", -1)) == 11:
+                    if not auto_retry_used:
+                        auto_retry_used = True
+                        print("MakeMKV could not open the disc (exit 11). Retrying once in 8 seconds...")
+                        try:
+                            run_cmd(["eject", "-t", "/dev/sr0"], check=False)
+                        except Exception:
+                            pass
+                        time.sleep(8)
+                        continue
+
+                    print("MakeMKV could not open the disc (exit 11).")
+                    print("Check the disc/drive and press Enter to retry (or Ctrl-C / Stop to abort).")
+                    input()
+                    continue
+                direct_error = e
+                break
+
+    if direct_error is None:
+        acceptable, reason = _has_acceptable_rip()
+        if not acceptable:
+            direct_error = RuntimeError(reason or "Rip output did not pass validation.")
 
     if direct_error is not None:
         print(f"Fallback: direct MakeMKV rip failed: {direct_error}")
@@ -1841,8 +1919,9 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
             else:
                 print("Fallback: success from ddrescue image.")
 
-        mkvs_after_stage1 = find_mkvs_in_dir(disc_dir)
-        if not mkvs_after_stage1:
+        acceptable, reason = _has_acceptable_rip()
+        if not acceptable:
+            print(f"Fallback: stage 1 output still not acceptable: {reason}")
             print("Fallback: stage 2/3: dvdbackup structure copy + MakeMKV from VIDEO_TS.")
             dvdbackup_source = _run_dvdbackup_recovery(disc_dir=disc_dir)
             if dvdbackup_source is not None:
@@ -1857,8 +1936,9 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
                 else:
                     print("Fallback: success from dvdbackup output.")
 
-        mkvs_after_stage2 = find_mkvs_in_dir(disc_dir)
-        if not mkvs_after_stage2:
+        acceptable, reason = _has_acceptable_rip()
+        if not acceptable:
+            print(f"Fallback: stage 2 output still not acceptable: {reason}")
             print("Fallback: stage 3/3: vobcopy extraction + MakeMKV from fallback output.")
             vobcopy_source = _run_vobcopy_recovery(disc_dir=disc_dir)
             if vobcopy_source is not None:
@@ -1873,9 +1953,11 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
                 else:
                     print("Fallback: success from vobcopy output.")
 
-        if not find_mkvs_in_dir(disc_dir):
+        acceptable, reason = _has_acceptable_rip()
+        if not acceptable:
             raise RuntimeError(
-                "Fallback: all recovery stages failed (direct_makemkv, ddrescue, dvdbackup, vobcopy)."
+                "Fallback: all recovery stages failed "
+                f"(direct_makemkv, ddrescue, dvdbackup, vobcopy). Last reason: {reason}"
             )
     try:
         run_cmd(["eject", "/dev/sr0"], check=False)
@@ -1886,7 +1968,6 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
     if not mkvs:
         raise RuntimeError(f"No MKVs found in {disc_dir} after rip step.")
     return mkvs
-
 
 def _disc_manifest_path(disc_dir: Path) -> Path:
     for name in DISC_MANIFEST_NAMES:
@@ -2101,6 +2182,43 @@ def process_movie_disc(
             )
 
     close_extras_nfo(ctx.output_extras_nfo)
+
+
+def movie_disc_has_main_feature(
+    *,
+    mkvs: list[Path],
+    tmdb_runtime_min: Optional[int] = None,
+) -> tuple[bool, str]:
+    """Heuristic check that disc output contains a plausible main movie title."""
+
+    if not mkvs:
+        return False, "No MKVs were produced."
+
+    durations = [ffprobe_duration_seconds(f) for f in mkvs]
+    valid_durations = [d for d in durations if d > 0]
+    if not valid_durations:
+        return True, "Could not read MKV durations; skipping movie-runtime validation."
+
+    longest = max(valid_durations)
+
+    if tmdb_runtime_min and tmdb_runtime_min > 0:
+        expected_s = int(tmdb_runtime_min) * 60
+        # Allow director's/extended cuts and PAL/NTSC drift while still catching
+        # obvious extras-only rips.
+        min_ok_s = max(1800, int(expected_s * 0.55))
+        if longest < min_ok_s:
+            return (
+                False,
+                f"Longest ripped title is {longest // 60} min, well below TMDB runtime "
+                f"({tmdb_runtime_min} min).",
+            )
+        return True, ""
+
+    # No TMDB runtime available: very conservative guard for obvious misses.
+    if longest < 2400:
+        return False, f"Longest ripped title is only {longest // 60} min; likely extras-only rip."
+
+    return True, ""
 
 
 def series_next_episode_number(season_dir: Path) -> int:
@@ -3093,6 +3211,33 @@ def main(argv: list[str]) -> int:
     # Batch tracking for finalize.
     batch_seen: set[str] = set()
     batch: list[TitleContext] = []
+    tmdb_runtime_cache: dict[tuple[str, str], Optional[int]] = {}
+
+    def _movie_disc_validator_for_ctx(ctx: TitleContext, disc_index: int):
+        if ctx.is_series or disc_index != 1:
+            return None
+
+        cache_key = (ctx.title_raw.strip().lower(), ctx.year.strip())
+
+        def _validator(mkvs: list[Path]) -> tuple[bool, str]:
+            runtime_min: Optional[int] = None
+            if cache_key in tmdb_runtime_cache:
+                runtime_min = tmdb_runtime_cache[cache_key]
+            else:
+                runtime_min = tmdb_movie_runtime_minutes(
+                    api_key=getattr(ns, "tmdb_api_key", ""),
+                    title=ctx.title_raw,
+                    year=ctx.year,
+                )
+                tmdb_runtime_cache[cache_key] = runtime_min
+                if runtime_min:
+                    print(f"TMDB runtime check: expected runtime for '{ctx.title_raw}' is {runtime_min} min.")
+                else:
+                    print(f"TMDB runtime check: no runtime found for '{ctx.title_raw}'; using local heuristic only.")
+
+            return movie_disc_has_main_feature(mkvs=mkvs, tmdb_runtime_min=runtime_min)
+
+        return _validator
 
     def batch_key(ctx: TitleContext) -> str:
         if ctx.is_series:
@@ -3163,6 +3308,7 @@ def main(argv: list[str]) -> int:
                             prompt_msg,
                             wait_for_enter=not csv_next_confirmed,
                             makemkv_cache_mb=makemkv_cache_mb,
+                            validate_rip=_movie_disc_validator_for_ctx(ctx, row.disc),
                         )
                     except Exception as e:
                         print(
@@ -3248,6 +3394,7 @@ def main(argv: list[str]) -> int:
                         "Insert disc now (then press Enter)",
                         wait_for_enter=True,
                         makemkv_cache_mb=makemkv_cache_mb,
+                        validate_rip=_movie_disc_validator_for_ctx(ctx, disc_index),
                     )
 
                     if ctx.is_series:

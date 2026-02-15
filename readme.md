@@ -40,6 +40,7 @@ Note: The first two modes are stable. The third mode (local rip + encode upload)
 - **CD (music) workflow**: You can now select **Disc type = cd** and **Type = music** in manual mode. The server runs `abcde` (with MusicBrainz/CDDB lookup) and writes tracks under your configured Music directory using Jellyfin-friendly layout: `Artist/Album (Year)/01 - Track.flac`.
 - **Audiobook post-processing workflow**: Added a server-side `--audiobook-workflow` mode that can normalize Audible-style names (removes `(Unabridged)` + bracketed catalog tags), generate `book.nfo` files for Jellyfin, and optionally execute `tagbooks.sh` so metadata is embedded into `.m4b` files.
 - **GUI access for audiobook sync**: In Manual schedule mode, set **Type = audiobook** to expose Audible options including **Run Audible sync first** and the downloader command field, plus optional JSON metadata and tag script settings.
+- **EPUB books uploader**: Added a dedicated GUI section to select one or more local `.epub` files and upload them directly to the server via SSH. The app reads EPUB metadata (title/author/year) when available, supports manual fallback fields, and places files under your configured Books directory in Jellyfin-friendly layout: `Author/Title (Year)/Title.epub`.
 
 ## How it works (two-computer model)
 

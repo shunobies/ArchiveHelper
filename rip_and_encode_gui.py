@@ -71,6 +71,7 @@ from archive_helper_gui.handbrake_presets import fetch_handbrake_presets
 from archive_helper_gui.connection_dialog import open_connection_settings_dialog
 from archive_helper_gui.directories_dialog import open_directories_settings_dialog
 from archive_helper_gui.help_dialog import show_help_dialog
+from archive_helper_gui.epub_utils import extract_epub_metadata
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
 from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
@@ -180,6 +181,7 @@ if TK_AVAILABLE:
             self._stop_requested = threading.Event()
             self._done_emitted = False
             self._done_handled = False
+            self._selected_epub_files: list[Path] = []
 
             # Connection
             self.var_host = StringVar(value="")
@@ -238,6 +240,9 @@ if TK_AVAILABLE:
             self.var_audible_library_json = StringVar(value="")
             self.var_tagbooks_script = StringVar(value="")
             self.var_run_tagbooks = BooleanVar(value=True)
+            self.var_book_title = StringVar(value="")
+            self.var_book_author = StringVar(value="")
+            self.var_book_year = StringVar(value="")
             self.var_title = StringVar(value="")
             self.var_year = StringVar(value="")
             self.var_season = StringVar(value="1")
@@ -587,6 +592,38 @@ if TK_AVAILABLE:
             btn_csv.pack(side=LEFT)
             Tooltip(btn_csv, "Pick a CSV schedule file.")
 
+            books_upload = ttk.LabelFrame(main, text="Books (EPUB upload)", padding=10)
+            books_upload.pack(fill=X, pady=(10, 0))
+
+            b1 = ttk.Frame(books_upload)
+            b1.pack(fill=X)
+            self.lbl_epub_selection = ttk.Label(b1, text="No EPUB files selected.")
+            self.lbl_epub_selection.pack(side=LEFT)
+            self.btn_select_epubs = ttk.Button(b1, text="Select EPUB files", command=self._select_epub_files)
+            self.btn_select_epubs.pack(side=RIGHT)
+            Tooltip(self.btn_select_epubs, "Choose one or more local .epub files to upload into Jellyfin Books layout.")
+
+            b2 = ttk.Frame(books_upload)
+            b2.pack(fill=X, pady=(6, 0))
+            ttk.Label(b2, text="Fallback Author:").pack(side=LEFT)
+            ent_book_author = ttk.Entry(b2, textvariable=self.var_book_author, width=24)
+            ent_book_author.pack(side=LEFT, padx=5)
+            ttk.Label(b2, text="Fallback Title:").pack(side=LEFT)
+            ent_book_title = ttk.Entry(b2, textvariable=self.var_book_title, width=26)
+            ent_book_title.pack(side=LEFT, padx=5)
+            ttk.Label(b2, text="Year:").pack(side=LEFT)
+            ent_book_year = ttk.Entry(b2, textvariable=self.var_book_year, width=7)
+            ent_book_year.pack(side=LEFT, padx=5)
+            Tooltip(ent_book_author, "Used when an EPUB is missing creator metadata.")
+            Tooltip(ent_book_title, "Used when an EPUB is missing title metadata (especially helpful for single-file uploads).")
+            Tooltip(ent_book_year, "Optional 4-digit year appended to the destination folder name.")
+
+            b3 = ttk.Frame(books_upload)
+            b3.pack(fill=X, pady=(6, 0))
+            self.btn_upload_books = ttk.Button(b3, text="Upload EPUBs", command=self.upload_epub_books)
+            self.btn_upload_books.pack(side=LEFT)
+            Tooltip(self.btn_upload_books, "Upload selected EPUBs to server using SCP/SFTP and Jellyfin book folder naming.")
+
             self._refresh_mode()
             self._refresh_kind()
 
@@ -844,6 +881,9 @@ if TK_AVAILABLE:
                 self.var_audible_library_json.set(str(data.get("audible_library_json", self.var_audible_library_json.get())))
                 self.var_tagbooks_script.set(str(data.get("tagbooks_script", self.var_tagbooks_script.get())))
                 self.var_run_tagbooks.set(bool(data.get("run_tagbooks", self.var_run_tagbooks.get())))
+                self.var_book_title.set(str(data.get("book_title", self.var_book_title.get())))
+                self.var_book_author.set(str(data.get("book_author", self.var_book_author.get())))
+                self.var_book_year.set(str(data.get("book_year", self.var_book_year.get())))
                 self.var_title.set(str(data.get("title", self.var_title.get())))
                 self.var_year.set(str(data.get("year", self.var_year.get())))
                 self.var_season.set(str(data.get("season", self.var_season.get())))
@@ -893,6 +933,9 @@ if TK_AVAILABLE:
                 "audible_library_json": self.var_audible_library_json.get(),
                 "tagbooks_script": self.var_tagbooks_script.get(),
                 "run_tagbooks": bool(self.var_run_tagbooks.get()),
+                "book_title": self.var_book_title.get(),
+                "book_author": self.var_book_author.get(),
+                "book_year": self.var_book_year.get(),
                 "title": self.var_title.get(),
                 "year": self.var_year.get(),
                 "season": self.var_season.get(),
@@ -1363,6 +1406,11 @@ if TK_AVAILABLE:
                     self.btn_cleanup.configure(state=("normal" if (ready and not self.state.running) else "disabled"))
             except Exception:
                 pass
+            try:
+                if hasattr(self, "btn_upload_books"):
+                    self.btn_upload_books.configure(state=("normal" if (ready and not self.state.running) else "disabled"))
+            except Exception:
+                pass
 
         def run_setup_wizard(self, *, force: bool = False) -> None:
             self._run_setup_wizard(force=force)
@@ -1603,6 +1651,99 @@ if TK_AVAILABLE:
             p = filedialog.askopenfilename(title="Select schedule CSV", filetypes=[("CSV", "*.csv"), ("All", "*")])
             if p:
                 self.var_csv_path.set(p)
+
+        def _select_epub_files(self) -> None:
+            picks = filedialog.askopenfilenames(
+                title="Select EPUB books",
+                filetypes=[("EPUB books", "*.epub"), ("All files", "*")],
+            )
+            if not picks:
+                return
+
+            self._selected_epub_files = [Path(p) for p in picks]
+            count = len(self._selected_epub_files)
+            self.lbl_epub_selection.configure(text=f"{count} EPUB file(s) selected")
+
+            if count == 1:
+                meta = extract_epub_metadata(self._selected_epub_files[0])
+                if meta.get("title"):
+                    self.var_book_title.set(meta["title"])
+                if meta.get("author"):
+                    self.var_book_author.set(meta["author"])
+                if meta.get("year"):
+                    self.var_book_year.set(meta["year"])
+
+        def _book_destination_parts(self, meta: dict[str, str], source: Path) -> tuple[str, str, str]:
+            author = (meta.get("author") or "").strip() or (self.var_book_author.get() or "").strip()
+            title = (meta.get("title") or "").strip() or (self.var_book_title.get() or "").strip() or source.stem
+            year = (meta.get("year") or "").strip() or (self.var_book_year.get() or "").strip()
+
+            author = sanitize_title_for_dir(author) if author else "Unknown Author"
+            title = sanitize_title_for_dir(title) if title else sanitize_title_for_dir(source.stem)
+            year = year if re.fullmatch(r"\d{4}", year) else ""
+            return author, title, year
+
+        def upload_epub_books(self) -> None:
+            try:
+                cfg = self._validate()
+                self._validate_directories()
+                if not self._selected_epub_files:
+                    raise ValueError("Select one or more EPUB files first.")
+
+                self._persist_state()
+
+                root = self._remote_path_only(self.var_books_dir.get().strip())
+                if not root:
+                    raise ValueError("Books dir is required.")
+
+                uploaded = 0
+                for local_epub in self._selected_epub_files:
+                    if not local_epub.exists() or not local_epub.is_file():
+                        self._append_log(f"Skipping missing file: {local_epub}\n")
+                        continue
+                    if local_epub.suffix.lower() != ".epub":
+                        self._append_log(f"Skipping non-EPUB file: {local_epub}\n")
+                        continue
+
+                    meta = extract_epub_metadata(local_epub)
+                    author, title, year = self._book_destination_parts(meta, local_epub)
+                    folder_name = f"{title} ({year})" if year else title
+                    remote_dir = f"{root.rstrip('/')}/{author}/{folder_name}"
+                    remote_file = f"{remote_dir}/{title}.epub"
+
+                    self._ensure_remote_dir(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_dir)
+                    if cfg.password:
+                        client = self._connect_paramiko(cfg.target, cfg.port, cfg.keyfile, cfg.password)
+                        try:
+                            abs_remote_file = self._remote_abs_path_paramiko(client, remote_file)
+                            self.remote.sftp_put(client, str(local_epub), abs_remote_file)
+                        finally:
+                            try:
+                                client.close()
+                            except Exception:
+                                pass
+                    else:
+                        abs_remote_file = self._remote_abs_path_ssh(cfg.target, cfg.port, cfg.keyfile, remote_file)
+                        remote_spec = f"{cfg.target}:{shlex.quote(abs_remote_file)}"
+                        res = subprocess.run(
+                            self._scp_args(cfg.target, cfg.port, cfg.keyfile) + [str(local_epub), remote_spec],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            check=False,
+                        )
+                        if res.returncode != 0:
+                            raise ValueError(
+                                f"Failed to upload {local_epub.name}.\n\n"
+                                + ((res.stdout or "").strip() or "(No additional details.)")
+                            )
+                    uploaded += 1
+                    self._append_log(f"Uploaded EPUB: {local_epub.name} -> {remote_file}\n")
+
+                messagebox.showinfo("Books upload", f"Uploaded {uploaded} EPUB file(s).")
+            except Exception as e:
+                messagebox.showerror("Books upload failed", str(e))
+
         def _validate_csv_schedule_file(self, path: Path) -> int:
             """Validate the entire CSV schedule before starting a run.
 

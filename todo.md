@@ -7,6 +7,8 @@ Look into OMDB API Key
 
 I have a few Movie DVD's that contain 4 movies on a Single DVD. I would like to add a check box for Multiple Titles for DVD. If it's checked allow the User to enter up to 4 movie titles and years and the MKV's extracted in order will be labeled with those titles.
 
+Planning doc: see `disc_resilience_and_multi_title_strategies.md` for the multi-movie-per-disc implementation draft and TODO details.
+
 --------------------
 
 Add the ability to upload Books - Integrate Good Reads data to see if some of the Meta data can be pulled. I wonder how Calibre gets the Meta data for books?

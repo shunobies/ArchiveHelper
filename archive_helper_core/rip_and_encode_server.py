@@ -655,6 +655,9 @@ def debian_install_hint(cmd: str) -> str:
         "grep": "sudo apt-get update && sudo apt-get install -y grep",
         "HandBrakeCLI": "sudo apt-get update && sudo apt-get install -y handbrake-cli",
         "makemkvcon": "Install MakeMKV (makemkvcon) from MakeMKV upstream or a trusted third-party Debian repo; it is often not in Debian main.",
+        "ddrescue": "sudo apt-get update && sudo apt-get install -y gddrescue",
+        "dvdbackup": "sudo apt-get update && sudo apt-get install -y dvdbackup",
+        "vobcopy": "sudo apt-get update && sudo apt-get install -y vobcopy",
         "ssh": "sudo apt-get update && sudo apt-get install -y openssh-client",
         "scp": "sudo apt-get update && sudo apt-get install -y openssh-client",
         "sed": "sudo apt-get update && sudo apt-get install -y sed",
@@ -674,6 +677,32 @@ def which_required(cmd: str) -> str:
     if not path:
         raise RuntimeError(f"Missing required command: {cmd}\nDebian hint: {debian_install_hint(cmd)}")
     return path
+
+
+
+
+def log_fallback_dependency_status() -> None:
+    """Log availability of fallback tools used for optical recovery stages."""
+    fallback_tools = ["ddrescue", "dvdbackup", "vobcopy"]
+    missing: list[str] = []
+
+    print("Fallback dependency check:")
+    for cmd in fallback_tools:
+        path = shutil.which(cmd)
+        if path:
+            print(f"  - {cmd}: available ({path})")
+        else:
+            missing.append(cmd)
+            print(f"  - {cmd}: MISSING")
+            print(f"    Debian hint: {debian_install_hint(cmd)}")
+
+    if missing:
+        print(
+            "Fallback note: missing tools above will be skipped when fallback stages run; "
+            "install them to enable full recovery attempts."
+        )
+    else:
+        print("Fallback note: all fallback tools are installed.")
 
 
 def check_deps(movies_dir: str, series_dir: str) -> int:
@@ -709,7 +738,8 @@ def check_deps(movies_dir: str, series_dir: str) -> int:
     if missing:
         return 2
 
-    print("All dependencies are present.")
+    print("All required dependencies are present.")
+    log_fallback_dependency_status()
     return 0
 
 
@@ -1122,7 +1152,7 @@ class MakeMKVError(RuntimeError):
         self.code = int(code)
 
 
-def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> None:
+def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128, source: str = "disc:0") -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -1141,7 +1171,7 @@ def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> N
         "--decrypt",
         f"--cache={cache_mb}",
         "--minlength=300",
-        "disc:0",
+        str(source),
         "all",
         str(out_dir),
     ]
@@ -1168,6 +1198,100 @@ def run_makemkv_with_progress_to_dir(out_dir: Path, *, cache_mb: int = 128) -> N
     print()
     if code != 0:
         raise MakeMKVError(int(code), f"MakeMKV failed with exit code {code}")
+
+
+def _run_ddrescue_iso_recovery(*, disc_dir: Path, disc_device: str = "/dev/sr0") -> Optional[Path]:
+    if not shutil.which("ddrescue"):
+        print("Fallback: ddrescue not available; skipping ddrescue stage.")
+        return None
+
+    fallback_dir = disc_dir / "_fallback"
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    iso_path = fallback_dir / "recovered_disc.iso"
+    map_path = fallback_dir / "recovered_disc.map"
+
+    print("Fallback: running ddrescue image recovery (pass 1/2, no retries).")
+    cp1 = run_cmd(
+        ["ddrescue", "-f", "-n", disc_device, str(iso_path), str(map_path)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    print((cp1.stdout or "").rstrip())
+
+    print("Fallback: running ddrescue image recovery (pass 2/2, retry bad sectors).")
+    cp2 = run_cmd(
+        ["ddrescue", "-f", "-d", "-r3", disc_device, str(iso_path), str(map_path)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    print((cp2.stdout or "").rstrip())
+
+    if iso_path.exists() and iso_path.stat().st_size > 0:
+        print(f"Fallback: ddrescue produced image: {iso_path}")
+        return iso_path
+
+    print("Fallback: ddrescue did not produce a usable image.")
+    return None
+
+
+def _run_dvdbackup_recovery(*, disc_dir: Path, disc_device: str = "/dev/sr0") -> Optional[Path]:
+    if not shutil.which("dvdbackup"):
+        print("Fallback: dvdbackup not available; skipping dvdbackup stage.")
+        return None
+
+    fallback_dir = disc_dir / "_fallback" / "dvdbackup"
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    print("Fallback: running dvdbackup full-disc copy.")
+    cp = run_cmd(
+        ["dvdbackup", "-i", disc_device, "-M", "-o", str(fallback_dir)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    print((cp.stdout or "").rstrip())
+
+    # dvdbackup typically creates <output>/<disc_label>/VIDEO_TS.
+    candidates = sorted(fallback_dir.rglob("VIDEO_TS"))
+    for cand in candidates:
+        if cand.is_dir():
+            print(f"Fallback: dvdbackup produced VIDEO_TS: {cand}")
+            return cand
+
+    print("Fallback: dvdbackup did not produce a usable VIDEO_TS folder.")
+    return None
+
+
+def _run_vobcopy_recovery(*, disc_dir: Path, disc_device: str = "/dev/sr0") -> Optional[Path]:
+    if not shutil.which("vobcopy"):
+        print("Fallback: vobcopy not available; skipping vobcopy stage.")
+        return None
+
+    fallback_dir = disc_dir / "_fallback" / "vobcopy"
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    print("Fallback: running vobcopy extraction.")
+    cp = run_cmd(
+        ["vobcopy", "-i", disc_device, "-m", "-o", str(fallback_dir)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    print((cp.stdout or "").rstrip())
+
+    candidates = sorted(fallback_dir.rglob("VIDEO_TS"))
+    for cand in candidates:
+        if cand.is_dir():
+            print(f"Fallback: vobcopy produced VIDEO_TS: {cand}")
+            return cand
+
+    # Some vobcopy runs produce .vob files directly in output folder.
+    if any(fallback_dir.rglob("*.VOB")) or any(fallback_dir.rglob("*.vob")):
+        print(f"Fallback: vobcopy produced VOB files in: {fallback_dir}")
+        return fallback_dir
+
+    print("Fallback: vobcopy did not produce usable VOB/VIDEO_TS output.")
+    return None
 
 
 def find_mkvs_in_dir(dir_: Path) -> list[Path]:
@@ -1674,9 +1798,11 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
         input()
 
     auto_retry_used = False
+    direct_error: Optional[Exception] = None
     while True:
         try:
             run_makemkv_with_progress_to_dir(disc_dir, cache_mb=makemkv_cache_mb)
+            direct_error = None
             break
         except MakeMKVError as e:
             # Exit code 11 commonly corresponds to a transient "Failed to open disc"
@@ -1696,7 +1822,61 @@ def rip_disc_if_needed(disc_dir: Path, prompt_msg: str, *, wait_for_enter: bool 
                 print("Check the disc/drive and press Enter to retry (or Ctrl-C / Stop to abort).")
                 input()
                 continue
-            raise
+            direct_error = e
+            break
+
+    if direct_error is not None:
+        print(f"Fallback: direct MakeMKV rip failed: {direct_error}")
+        print("Fallback: stage 1/3: ddrescue image recovery + MakeMKV from recovered image.")
+        recovered_iso = _run_ddrescue_iso_recovery(disc_dir=disc_dir)
+        if recovered_iso is not None:
+            try:
+                run_makemkv_with_progress_to_dir(
+                    disc_dir,
+                    cache_mb=makemkv_cache_mb,
+                    source=f"file:{recovered_iso}",
+                )
+            except Exception as e:
+                print(f"Fallback: MakeMKV from ddrescue image failed: {e}")
+            else:
+                print("Fallback: success from ddrescue image.")
+
+        mkvs_after_stage1 = find_mkvs_in_dir(disc_dir)
+        if not mkvs_after_stage1:
+            print("Fallback: stage 2/3: dvdbackup structure copy + MakeMKV from VIDEO_TS.")
+            dvdbackup_source = _run_dvdbackup_recovery(disc_dir=disc_dir)
+            if dvdbackup_source is not None:
+                try:
+                    run_makemkv_with_progress_to_dir(
+                        disc_dir,
+                        cache_mb=makemkv_cache_mb,
+                        source=f"file:{dvdbackup_source}",
+                    )
+                except Exception as e:
+                    print(f"Fallback: MakeMKV from dvdbackup output failed: {e}")
+                else:
+                    print("Fallback: success from dvdbackup output.")
+
+        mkvs_after_stage2 = find_mkvs_in_dir(disc_dir)
+        if not mkvs_after_stage2:
+            print("Fallback: stage 3/3: vobcopy extraction + MakeMKV from fallback output.")
+            vobcopy_source = _run_vobcopy_recovery(disc_dir=disc_dir)
+            if vobcopy_source is not None:
+                try:
+                    run_makemkv_with_progress_to_dir(
+                        disc_dir,
+                        cache_mb=makemkv_cache_mb,
+                        source=f"file:{vobcopy_source}",
+                    )
+                except Exception as e:
+                    print(f"Fallback: MakeMKV from vobcopy output failed: {e}")
+                else:
+                    print("Fallback: success from vobcopy output.")
+
+        if not find_mkvs_in_dir(disc_dir):
+            raise RuntimeError(
+                "Fallback: all recovery stages failed (direct_makemkv, ddrescue, dvdbackup, vobcopy)."
+            )
     try:
         run_cmd(["eject", "/dev/sr0"], check=False)
     except Exception:
@@ -2681,6 +2861,10 @@ def main(argv: list[str]) -> int:
     except Exception:
         pass
 
+    # Fallback tools are optional per stage but we log availability up front so users
+    # understand which automatic recovery paths are active for this run.
+    log_fallback_dependency_status()
+
     # Simple mode: optional remote copy prompt (only if both dirs not overridden).
     keep_mkvs = bool(ns.keep_mkvs or ns.simple)
     if ns.simple and ns.movies_dir == "/storage/Movies" and ns.series_dir == "/storage/Series":
@@ -2894,15 +3078,23 @@ def main(argv: list[str]) -> int:
                         f"Resume: outputs already exist; skipping rip/encode: {ctx.title} ({ctx.year}) disc {row.disc}"
                     )
                 else:
-                    mkvs = rip_disc_if_needed(
-                        disc_dir,
-                        prompt_msg,
-                        wait_for_enter=not csv_next_confirmed,
-                        makemkv_cache_mb=makemkv_cache_mb,
-                    )
+                    disc_failed = False
+                    try:
+                        mkvs = rip_disc_if_needed(
+                            disc_dir,
+                            prompt_msg,
+                            wait_for_enter=not csv_next_confirmed,
+                            makemkv_cache_mb=makemkv_cache_mb,
+                        )
+                    except Exception as e:
+                        print(
+                            "ERROR: disc processing failed after fallback attempts; "
+                            f"continuing queue for {ctx.title} ({ctx.year}) disc {row.disc}: {e}"
+                        )
+                        disc_failed = True
                     csv_next_confirmed = False
 
-                    if ctx.is_series:
+                    if (not disc_failed) and ctx.is_series:
                         process_series_disc(
                             ctx=ctx,
                             disc_dir=disc_dir,
@@ -2912,7 +3104,7 @@ def main(argv: list[str]) -> int:
                             subtitle_mode=ns.subtitle_mode,
                             submit_encode=submit_encode,
                         )
-                    else:
+                    elif not disc_failed:
                         process_movie_disc(
                             ctx=ctx,
                             disc_index=row.disc,

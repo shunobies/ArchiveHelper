@@ -90,7 +90,7 @@ def open_directories_settings_dialog(
     ttk.Label(r4, text="Music dir:").pack(side=LEFT)
     ent_music = ttk.Entry(r4, textvariable=music_dir_var, width=40)
     ent_music.pack(side=LEFT, padx=5)
-    Tooltip(ent_music, "(Future) Output folder on the server for music (example: /storage/Music).")
+    Tooltip(ent_music, "Output folder on the server for music/CD rips (example: /storage/Music).")
 
     btns = ttk.Frame(frm)
     btns.pack(fill=X, pady=(10, 0))

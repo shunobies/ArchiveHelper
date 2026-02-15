@@ -11,6 +11,7 @@ def open_connection_settings_dialog(
     port_var,
     key_var,
     password_var,
+    tmdb_api_key_var,
     browse_key: Callable[[], None],
     validate: Callable[[], object],
     persist_state: Callable[[], None],
@@ -70,6 +71,13 @@ def open_connection_settings_dialog(
     ent_pw = ttk.Entry(row2b, textvariable=password_var, width=40, show="*")
     ent_pw.pack(side=LEFT, padx=5)
     Tooltip(ent_pw, "SSH password (required if you are not using a key file).")
+
+    row3 = ttk.Frame(conn)
+    row3.pack(fill=X, pady=(6, 0))
+    ttk.Label(row3, text="TMDB API key:").pack(side=LEFT)
+    ent_tmdb = ttk.Entry(row3, textvariable=tmdb_api_key_var, width=40, show="*")
+    ent_tmdb.pack(side=LEFT, padx=5)
+    Tooltip(ent_tmdb, "Optional but recommended: used for TMDB title matching from the GUI.")
 
     btns = ttk.Frame(frm)
     btns.pack(fill=X, pady=(10, 0))

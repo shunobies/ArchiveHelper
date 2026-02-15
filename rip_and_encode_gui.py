@@ -204,6 +204,8 @@ if TK_AVAILABLE:
             # Local staging destination for local rip modes.
             self.var_local_dest = StringVar(value="")
             self.var_preset = StringVar(value="HQ 1080p30 Surround")
+            self.var_output_container = StringVar(value="mp4")
+            self.var_subtitle_mode = StringVar(value="external")
             self.var_ensure_jellyfin = BooleanVar(value=False)
             self.var_disc_type = StringVar(value="dvd")
 
@@ -310,6 +312,17 @@ if TK_AVAILABLE:
             self.cbo_preset = ttk.Combobox(s2, textvariable=self.var_preset, width=33, state="normal")
             self.cbo_preset.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_preset, "HandBrake preset name on the server (loaded from HandBrakeCLI --preset-list).")
+
+            s3 = ttk.Frame(settings)
+            s3.pack(fill=X, pady=(6, 0))
+            ttk.Label(s3, text="Output:").pack(side=LEFT)
+            cbo_container = ttk.Combobox(s3, textvariable=self.var_output_container, values=["mp4", "mkv"], state="readonly", width=7)
+            cbo_container.pack(side=LEFT, padx=5)
+            Tooltip(cbo_container, "Encoded file container. mp4 keeps existing workflow; mkv can improve subtitle compatibility.")
+            ttk.Label(s3, text="Subtitles:").pack(side=LEFT, padx=(12, 0))
+            cbo_sub_mode = ttk.Combobox(s3, textvariable=self.var_subtitle_mode, values=["preset", "soft", "external", "none"], state="readonly", width=10)
+            cbo_sub_mode.pack(side=LEFT, padx=5)
+            Tooltip(cbo_sub_mode, "preset: use preset behavior; soft: keep selectable tracks in output; external: extract subtitles with ffmpeg sidecars; none: remove subtitle tracks.")
 
             note = ttk.Label(settings, text="Connection and output directories are set under Settings.")
             note.pack(anchor="w", pady=(6, 0))
@@ -601,6 +614,8 @@ if TK_AVAILABLE:
                 self.var_music_dir.set(str(data.get("music_dir", self.var_music_dir.get())))
                 self.var_local_dest.set(str(data.get("local_dest", self.var_local_dest.get())))
                 self.var_preset.set(str(data.get("preset", self.var_preset.get())))
+                self.var_output_container.set(str(data.get("output_container", self.var_output_container.get())))
+                self.var_subtitle_mode.set(str(data.get("subtitle_mode", self.var_subtitle_mode.get())))
                 self.var_ensure_jellyfin.set(bool(data.get("ensure_jellyfin", self.var_ensure_jellyfin.get())))
                 self.var_disc_type.set(str(data.get("disc_type", self.var_disc_type.get())))
                 if "exec_mode" in data:
@@ -645,6 +660,8 @@ if TK_AVAILABLE:
                 "music_dir": self.var_music_dir.get(),
                 "local_dest": self.var_local_dest.get(),
                 "preset": self.var_preset.get(),
+                "output_container": self.var_output_container.get(),
+                "subtitle_mode": self.var_subtitle_mode.get(),
                 "ensure_jellyfin": bool(self.var_ensure_jellyfin.get()),
                 "disc_type": self.var_disc_type.get(),
                 "mode": self.var_mode.get(),
@@ -1820,7 +1837,7 @@ if TK_AVAILABLE:
                     "Cleanup",
                     f"This will delete {candidates} work folder(s) from the remote host.\n\n"
                     "This deletes temporary MKVs and other per-title staging artifacts under the user's home directory.\n"
-                    "It does not delete your final MP4s in the configured Movies/Series directories.\n\n"
+                    "It does not delete your final videos in the configured Movies/Series directories.\n\n"
                     "Continue?",
                 )
                 if not confirm:
@@ -2297,6 +2314,10 @@ if TK_AVAILABLE:
                 (self.var_disc_type.get().strip() or "dvd"),
                 "--preset",
                 self.var_preset.get().strip(),
+                "--output-container",
+                (self.var_output_container.get().strip() or "mp4"),
+                "--subtitle-mode",
+                (self.var_subtitle_mode.get().strip() or "external"),
             ]
 
             if self.var_ensure_jellyfin.get():

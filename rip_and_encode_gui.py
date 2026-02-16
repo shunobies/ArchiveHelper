@@ -595,7 +595,17 @@ if TK_AVAILABLE:
             books_upload = ttk.LabelFrame(main, text="Books (EPUB upload)", padding=10)
             books_upload.pack(fill=X, pady=(10, 0))
 
-            b1 = ttk.Frame(books_upload)
+            books_toggle_row = ttk.Frame(books_upload)
+            books_toggle_row.pack(fill=X)
+            self._books_upload_expanded = True
+            self.btn_toggle_books = ttk.Button(books_toggle_row, text="▼", width=2, command=self._toggle_books_upload)
+            self.btn_toggle_books.pack(side=RIGHT)
+            Tooltip(self.btn_toggle_books, "Expand or collapse the EPUB upload area.")
+
+            self.books_upload_content = ttk.Frame(books_upload)
+            self.books_upload_content.pack(fill=X, pady=(4, 0))
+
+            b1 = ttk.Frame(self.books_upload_content)
             b1.pack(fill=X)
             self.lbl_epub_selection = ttk.Label(b1, text="No EPUB files selected.")
             self.lbl_epub_selection.pack(side=LEFT)
@@ -603,7 +613,7 @@ if TK_AVAILABLE:
             self.btn_select_epubs.pack(side=RIGHT)
             Tooltip(self.btn_select_epubs, "Choose one or more local .epub files to upload into Jellyfin Books layout.")
 
-            b2 = ttk.Frame(books_upload)
+            b2 = ttk.Frame(self.books_upload_content)
             b2.pack(fill=X, pady=(6, 0))
             ttk.Label(b2, text="Fallback Author:").pack(side=LEFT)
             ent_book_author = ttk.Entry(b2, textvariable=self.var_book_author, width=24)
@@ -618,7 +628,7 @@ if TK_AVAILABLE:
             Tooltip(ent_book_title, "Used when an EPUB is missing title metadata (especially helpful for single-file uploads).")
             Tooltip(ent_book_year, "Optional 4-digit year appended to the destination folder name.")
 
-            b3 = ttk.Frame(books_upload)
+            b3 = ttk.Frame(self.books_upload_content)
             b3.pack(fill=X, pady=(6, 0))
             self.btn_upload_books = ttk.Button(b3, text="Upload EPUBs", command=self.upload_epub_books)
             self.btn_upload_books.pack(side=LEFT)
@@ -1193,6 +1203,29 @@ if TK_AVAILABLE:
                 self.var_kind.set("series")
             elif media_type == "movie":
                 self.var_kind.set("movie")
+
+        def _reset_manual_match_fields(self) -> None:
+            """Clear TMDB suggestion state and the manual movie/series title fields."""
+            self._tmdb_matches = []
+            try:
+                self.cbo_tmdb_matches.configure(values=[])
+                self.cbo_tmdb_matches.set("")
+            except Exception:
+                pass
+            self.var_tmdb_match.set("")
+            self.var_title.set("")
+            self.var_year.set("")
+
+        def _toggle_books_upload(self) -> None:
+            if not hasattr(self, "books_upload_content") or not hasattr(self, "btn_toggle_books"):
+                return
+            self._books_upload_expanded = not bool(getattr(self, "_books_upload_expanded", True))
+            if self._books_upload_expanded:
+                self.books_upload_content.pack(fill=X, pady=(4, 0))
+                self.btn_toggle_books.configure(text="▼")
+            else:
+                self.books_upload_content.pack_forget()
+                self.btn_toggle_books.configure(text="▶")
 
         def _browse_key(self) -> None:
             p = filedialog.askopenfilename(title="Select SSH private key")
@@ -2371,6 +2404,7 @@ if TK_AVAILABLE:
                         candidates += 1
 
                 if candidates <= 0:
+                    self._reset_manual_match_fields()
                     messagebox.showinfo("Cleanup", "No managed MKVs were found to clean.")
                     return
 
@@ -2404,6 +2438,7 @@ if TK_AVAILABLE:
                 if code2 != 0:
                     raise ValueError("Cleanup failed.")
 
+                self._reset_manual_match_fields()
                 messagebox.showinfo("Cleanup", "Cleanup complete.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))

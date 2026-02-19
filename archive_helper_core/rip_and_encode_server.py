@@ -1262,23 +1262,51 @@ def _run_ddrescue_iso_recovery(*, disc_dir: Path, disc_device: str = "/dev/sr0")
     iso_path = fallback_dir / "recovered_disc.iso"
     map_path = fallback_dir / "recovered_disc.map"
 
+    def _fmt_bytes(size: int) -> str:
+        units = ["B", "KiB", "MiB", "GiB", "TiB"]
+        val = float(max(0, size))
+        for u in units:
+            if val < 1024.0 or u == units[-1]:
+                if u == "B":
+                    return f"{int(val)} {u}"
+                return f"{val:.1f} {u}"
+            val /= 1024.0
+        return "0 B"
+
+    def _run_ddrescue_pass(argv: list[str], *, pass_label: str) -> int:
+        proc = subprocess.Popen(argv)
+        started = time.monotonic()
+        while True:
+            try:
+                return proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                elapsed = int(time.monotonic() - started)
+                mins, secs = divmod(elapsed, 60)
+                try:
+                    iso_size = iso_path.stat().st_size
+                    size_msg = _fmt_bytes(iso_size)
+                except OSError:
+                    size_msg = "unknown"
+                print(
+                    f"Fallback: ddrescue {pass_label} still running "
+                    f"(elapsed {mins:02d}:{secs:02d}, recovered size {size_msg})."
+                )
+
     print("Fallback: running ddrescue image recovery (pass 1/2, no retries).")
-    cp1 = run_cmd(
+    pass1_code = _run_ddrescue_pass(
         ["ddrescue", "-f", "-n", disc_device, str(iso_path), str(map_path)],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        pass_label="pass 1/2",
     )
-    print((cp1.stdout or "").rstrip())
+    if pass1_code != 0:
+        print(f"Fallback: ddrescue pass 1/2 exited with code {pass1_code}.")
 
     print("Fallback: running ddrescue image recovery (pass 2/2, retry bad sectors).")
-    cp2 = run_cmd(
+    pass2_code = _run_ddrescue_pass(
         ["ddrescue", "-f", "-d", "-r3", disc_device, str(iso_path), str(map_path)],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        pass_label="pass 2/2",
     )
-    print((cp2.stdout or "").rstrip())
+    if pass2_code != 0:
+        print(f"Fallback: ddrescue pass 2/2 exited with code {pass2_code}.")
 
     if iso_path.exists() and iso_path.stat().st_size > 0:
         print(f"Fallback: ddrescue produced image: {iso_path}")

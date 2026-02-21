@@ -155,16 +155,48 @@ def tmdb_movie_runtime_minutes(*, api_key: str, title: str, year: str = "") -> O
     if not api_key_s or not title_s:
         return None
 
-    try:
-        matches = tmdb_search(api_key=api_key_s, query=title_s, year=year, media_type="movie", limit=6)
-    except Exception:
+    queries = _query_variants_from_hint(title_s)
+    if title_s not in queries:
+        queries.insert(0, title_s)
+
+    year_hints: list[str] = []
+    seen_years: set[str] = set()
+
+    def _add_year(y: str) -> None:
+        yy = (y or "").strip()
+        if not re.fullmatch(r"\d{4}", yy):
+            return
+        if yy in seen_years:
+            return
+        seen_years.add(yy)
+        year_hints.append(yy)
+
+    _add_year(year)
+    _add_year(_extract_year_hint(title_s))
+
+    ranked_candidates: dict[str, tuple[float, dict[str, str]]] = {}
+    for q in queries[:8]:
+        attempts = year_hints + [""] if year_hints else [""]
+        for y in attempts:
+            try:
+                matches = tmdb_search(api_key=api_key_s, query=q, year=y, media_type="movie", limit=8)
+            except Exception:
+                continue
+            for row in matches:
+                tmdb_id = str(row.get("id") or "").strip()
+                if not tmdb_id.isdigit():
+                    continue
+                score = _row_quality_score(query=q, row=row, year_hint=(year_hints[0] if year_hints else ""))
+                prev = ranked_candidates.get(tmdb_id)
+                if prev is None or score > prev[0]:
+                    ranked_candidates[tmdb_id] = (score, row)
+
+    if not ranked_candidates:
         return None
 
-    for match in matches:
-        tmdb_id = str(match.get("id") or "").strip()
-        if not tmdb_id.isdigit():
-            continue
+    ranked_ids = [tmdb_id for tmdb_id, _ in sorted(ranked_candidates.items(), key=lambda item: item[1][0], reverse=True)]
 
+    for tmdb_id in ranked_ids[:10]:
         url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?" + urllib.parse.urlencode({"api_key": api_key_s})
         req = urllib.request.Request(
             url,
@@ -190,6 +222,36 @@ def tmdb_movie_runtime_minutes(*, api_key: str, title: str, year: str = "") -> O
             return runtime_i
 
     return None
+
+
+def _is_benign_handbrake_scan_line(line: str) -> bool:
+    """Return True for HandBrake scan/probe lines that are expected for MKV input."""
+
+    s = (line or "").strip()
+    if not s:
+        return False
+
+    if s == "Cannot load libnvidia-encode.so.1":
+        return True
+
+    probe_prefixes = (
+        "udfread ERROR: ECMA 167 Volume Recognition failed",
+        "disc.c:333: failed opening UDF image ",
+        "disc.c:437: error opening file BDMV/index.bdmv",
+        "disc.c:437: error opening file BDMV/BACKUP/index.bdmv",
+        "bluray.c:",
+        "libdvdread: DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed",
+        "libdvdnav: vm: vm: failed to read VIDEO_TS.IFO",
+    )
+    if s.startswith(probe_prefixes):
+        return True
+
+    if re.search(r"\bbd: not a bd - trying as a stream/file instead$", s):
+        return True
+    if re.search(r"\bdvd: not a dvd - trying as a stream/file instead$", s):
+        return True
+
+    return False
 
 
 def _cmd_stdout(argv: list[str], *, timeout_s: int = 8) -> str:
@@ -3730,6 +3792,7 @@ def main(argv: list[str]) -> int:
             buf = ""
             last_pct_int: Optional[int] = None
             last_emit = 0.0
+            suppressed_probe_noise = False
 
             def should_emit(line: str) -> bool:
                 nonlocal last_pct_int, last_emit
@@ -3756,13 +3819,22 @@ def main(argv: list[str]) -> int:
                     line = buf.strip()
                     buf = ""
                     if line and should_emit(line):
-                        print(line)
+                        if _is_benign_handbrake_scan_line(line):
+                            suppressed_probe_noise = True
+                        else:
+                            print(line)
                     continue
                 buf += ch
 
             tail = buf.strip()
             if tail and should_emit(tail):
-                print(tail)
+                if _is_benign_handbrake_scan_line(tail):
+                    suppressed_probe_noise = True
+                else:
+                    print(tail)
+
+            if suppressed_probe_noise:
+                print("HandBrake note: suppressed known probe noise for non-disc input.")
 
             code = proc.wait()
             try:

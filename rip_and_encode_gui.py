@@ -1119,7 +1119,11 @@ if TK_AVAILABLE:
                     raise ValueError("TMDB lookup is for movies/series only.")
                 cfg = self._validate()
                 query = (self.var_title.get() or "").strip()
-                year = (self.var_year.get() or "").strip()
+                raw_year = (self.var_year.get() or "")
+                year_digits = re.sub(r"[^0-9]", "", raw_year)
+                year = year_digits if len(year_digits) == 4 else ""
+                if raw_year.strip() and not year:
+                    self._append_log("(Info) TMDB lookup ignored non-4-digit year hint from Year field.\n")
                 api_key = (self.var_tmdb_api_key.get() or "").strip()
                 if not api_key:
                     raise ValueError("TMDB API key is required (Settings → Connection).")

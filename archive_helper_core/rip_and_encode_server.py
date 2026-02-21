@@ -1615,8 +1615,127 @@ def extract_external_subtitles(input_: Path, video_output: Path) -> None:
     print(f"Subtitle extraction done: {input_.name} ({extracted_ok} succeeded, {extracted_failed} failed)")
 
 
+def _preset_target_height(preset: str) -> Optional[int]:
+    m = re.search(r"(?<!\d)(\d{3,4})p(?:\d{1,3})?(?!\d)", preset or "", flags=re.I)
+    if not m:
+        return None
+    try:
+        h = int(m.group(1))
+    except Exception:
+        return None
+    return h if 240 <= h <= 4320 else None
+
+
+def _ffprobe_video_dimensions(path: Path) -> tuple[Optional[int], Optional[int]]:
+    try:
+        cp = run_cmd(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=8,
+        )
+        data = json.loads((cp.stdout or "").strip() or "{}")
+    except Exception:
+        return None, None
+
+    streams = data.get("streams") if isinstance(data, dict) else None
+    if not isinstance(streams, list) or not streams or not isinstance(streams[0], dict):
+        return None, None
+
+    try:
+        w = int(streams[0].get("width") or 0)
+        h = int(streams[0].get("height") or 0)
+    except Exception:
+        return None, None
+    if w <= 0 or h <= 0:
+        return None, None
+    return w, h
+
+
+def _resolution_label_from_height(height: Optional[int]) -> str:
+    try:
+        h = int(height or 0)
+    except Exception:
+        h = 0
+    if h >= 2160:
+        return "2160p"
+    if h >= 1440:
+        return "1440p"
+    if h >= 1080:
+        return "1080p"
+    if h >= 720:
+        return "720p"
+    if h >= 576:
+        return "576p"
+    if h >= 480:
+        return "480p"
+    if h > 0:
+        return f"{h}p"
+    return ""
+
+
+def _refresh_mp4_quality_metadata(output: Path, preset: str) -> None:
+    if output.suffix.lower() not in {".mp4", ".m4v"}:
+        return
+    w, h = _ffprobe_video_dimensions(output)
+    quality = _resolution_label_from_height(h)
+    if not quality:
+        quality = _resolution_label_from_height(_preset_target_height(preset))
+    if not quality:
+        return
+
+    quality_note = f"Encoded {quality} via HandBrake preset '{preset}'"
+    tmp = output.with_suffix(output.suffix + ".meta_tmp")
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-nostdin",
+        "-i",
+        str(output),
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-movflags",
+        "use_metadata_tags",
+        "-metadata",
+        f"comment={quality_note}",
+        "-metadata",
+        f"description={quality_note}",
+        "-metadata",
+        f"encoding_tool=ArchiveHelper ({preset})",
+        "-metadata:s:v:0",
+        "title=",
+        "-metadata:s:v:0",
+        f"comment={quality_note}",
+        str(tmp),
+    ]
+    cp = run_cmd(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if cp.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        print(f"Warning: metadata refresh failed for {output.name}; keeping HandBrake output as-is")
+        return
+
+    tmp.replace(output)
+    print(f"Metadata refresh: {output.name} tagged as {quality} ({w or '?'}x{h or '?'})")
+
+
 def hb_encode(input_: Path, output: Path, preset: str, *, subtitle_mode: str = "preset") -> None:
     hb_encode_with_progress(input_, output, preset, subtitle_mode=subtitle_mode)
+    _refresh_mp4_quality_metadata(output, preset)
 
 
 def _ensure_log_dir(home: Path) -> Path:
@@ -3652,6 +3771,8 @@ def main(argv: list[str]) -> int:
                 pass
             if code != 0:
                 raise RuntimeError(f"HandBrakeCLI failed (exit {code}) for output: {output}")
+
+            _refresh_mp4_quality_metadata(output, preset)
 
             with encode_stats_lock:
                 encode_finished += 1

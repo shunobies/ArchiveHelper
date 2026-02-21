@@ -1,0 +1,2366 @@
+Log file: /home/shunobies/.archive_helper_for_jellyfin/logs/rip_and_encode_20260221_104451.log
+Fallback dependency check:
+  - ddrescue: available (/usr/bin/ddrescue)
+  - dvdbackup: available (/usr/bin/dvdbackup)
+  - vobcopy: available (/usr/bin/vobcopy)
+Fallback note: all fallback tools are installed.
+Continuous mode enabled: keep feeding discs; copy/cleanup runs after all encodes finish.
+CSV schedule loaded: 1 discs
+Insert: Movie 'Antz (1998)' Disc 1. Press Enter when ready.
+MakeMKV v1.18.2 linux(x64-release) started
+Current operation: Scanning CD-ROM devices
+Current action: Scanning CD-ROM devices
+Current progress - 0%  , Total progress - 0%
+Current progress - 0%  , Total progress - 0%
+Current progress - 100%  , Total progress - 0%
+Current progress - 100%  , Total progress - 100%
+The new version 1.18.3 is available for download at http://www.makemkv.com/download/
+Current progress - 0%  , Total progress - 100%
+Current progress - 0%  , Total progress - 0%
+Current operation: Opening DVD disc
+Using direct disc access mode
+Current action: Processing title sets
+Current progress - 0%  , Total progress - 0%
+Current progress - 0%  , Total progress - 0%
+Current progress - 33%  , Total progress - 0%
+Current progress - 66%  , Total progress - 0%
+Current progress - 66%  , Total progress - 1%
+Current action: Scanning contents
+Current progress - 0%  , Total progress - 1%
+Current progress - 0%  , Total progress - 2%
+Current progress - 3%  , Total progress - 2%
+Current progress - 3%  , Total progress - 5%
+Current progress - 5%  , Total progress - 5%
+Current progress - 5%  , Total progress - 6%
+Current progress - 7%  , Total progress - 6%
+Current progress - 7%  , Total progress - 8%
+Current progress - 10%  , Total progress - 8%
+Current progress - 10%  , Total progress - 10%
+Current progress - 12%  , Total progress - 10%
+Current progress - 12%  , Total progress - 12%
+Current progress - 14%  , Total progress - 12%
+Current progress - 14%  , Total progress - 14%
+Current progress - 16%  , Total progress - 14%
+Current progress - 16%  , Total progress - 15%
+Current progress - 28%  , Total progress - 15%
+Current progress - 28%  , Total progress - 26%
+Current progress - 45%  , Total progress - 26%
+Current progress - 45%  , Total progress - 40%
+Current progress - 46%  , Total progress - 40%
+Current progress - 46%  , Total progress - 41%
+Current progress - 47%  , Total progress - 41%
+Current progress - 47%  , Total progress - 42%
+Current progress - 48%  , Total progress - 42%
+Current progress - 50%  , Total progress - 42%
+Current progress - 50%  , Total progress - 43%
+Current progress - 50%  , Total progress - 44%
+Current progress - 51%  , Total progress - 44%
+Current progress - 51%  , Total progress - 45%
+Current progress - 53%  , Total progress - 45%
+Current progress - 53%  , Total progress - 47%
+Current progress - 55%  , Total progress - 47%
+Current progress - 55%  , Total progress - 48%
+Current progress - 56%  , Total progress - 48%
+Current progress - 56%  , Total progress - 49%
+Current progress - 57%  , Total progress - 49%
+Current progress - 57%  , Total progress - 50%
+Current progress - 58%  , Total progress - 50%
+Current progress - 58%  , Total progress - 51%
+Current progress - 59%  , Total progress - 51%
+Current progress - 59%  , Total progress - 52%
+Current progress - 60%  , Total progress - 52%
+Current progress - 64%  , Total progress - 52%
+Current progress - 64%  , Total progress - 56%
+Current progress - 65%  , Total progress - 56%
+Current progress - 65%  , Total progress - 57%
+Current progress - 71%  , Total progress - 57%
+Current progress - 71%  , Total progress - 62%
+Current action: Processing titles
+Current progress - 0%  , Total progress - 62%
+Title #1 was added (26 cell(s), 1:22:40)
+Title #2 has length of 113 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #3 has length of 147 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Current progress - 23%  , Total progress - 62%
+Current progress - 23%  , Total progress - 64%
+Title #4 has length of 1 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #5 has length of 1 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #6 has length of 4 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #7 has length of 264 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #8 was added (1 cell(s), 0:11:07)
+Current progress - 61%  , Total progress - 64%
+Current progress - 61%  , Total progress - 68%
+Title #9 has length of 68 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Title #10 was added (1 cell(s), 0:10:29)
+Title #11 has length of 53 seconds which is less than minimum title length of 300 seconds and was therefore skipped
+Current action: Decrypting data
+Current progress - 0%  , Total progress - 68%
+Current progress - 33%  , Total progress - 68%
+Current progress - 33%  , Total progress - 69%
+Current progress - 66%  , Total progress - 69%
+Current progress - 66%  , Total progress - 70%
+Current progress - 100%  , Total progress - 70%
+Current progress - 100%  , Total progress - 71%
+Operation successfully completed
+Current progress - 0%  , Total progress - 71%
+Current progress - 0%  , Total progress - 0%
+Current operation: Saving all titles to MKV files
+Saving 3 titles into directory file:///home/shunobies/Antz (1998)/MKVs/Disc01
+Current action: Analyzing seamless segments
+Current progress - 0%  , Total progress - 0%
+Current progress - 0%  , Total progress - 0%
+Current progress - 25%  , Total progress - 0%
+Current progress - 75%  , Total progress - 0%
+Current action: Saving to MKV file
+Current progress - 0%  , Total progress - 0%
+Current progress - 1%  , Total progress - 0%
+Current progress - 1%  , Total progress - 1%
+Current progress - 2%  , Total progress - 1%
+Current progress - 2%  , Total progress - 2%
+Current progress - 3%  , Total progress - 2%
+Current progress - 3%  , Total progress - 3%
+Current progress - 4%  , Total progress - 3%
+Current progress - 4%  , Total progress - 4%
+Current progress - 5%  , Total progress - 4%
+Current progress - 5%  , Total progress - 5%
+Current progress - 6%  , Total progress - 5%
+Current progress - 6%  , Total progress - 6%
+Current progress - 7%  , Total progress - 6%
+Current progress - 8%  , Total progress - 6%
+Current progress - 8%  , Total progress - 7%
+Current progress - 9%  , Total progress - 7%
+Current progress - 9%  , Total progress - 8%
+Current progress - 10%  , Total progress - 8%
+Current progress - 10%  , Total progress - 9%
+Current progress - 11%  , Total progress - 9%
+Current progress - 11%  , Total progress - 10%
+Current progress - 12%  , Total progress - 10%
+Current progress - 12%  , Total progress - 11%
+Current progress - 13%  , Total progress - 11%
+Current progress - 13%  , Total progress - 12%
+Current progress - 14%  , Total progress - 12%
+Current progress - 14%  , Total progress - 13%
+Current progress - 15%  , Total progress - 13%
+Current progress - 16%  , Total progress - 13%
+Current progress - 16%  , Total progress - 14%
+Current progress - 17%  , Total progress - 14%
+Current progress - 17%  , Total progress - 15%
+Current progress - 18%  , Total progress - 15%
+Current progress - 18%  , Total progress - 16%
+Current progress - 19%  , Total progress - 16%
+Current progress - 19%  , Total progress - 17%
+Current progress - 20%  , Total progress - 17%
+Current progress - 20%  , Total progress - 18%
+Current progress - 21%  , Total progress - 18%
+Current progress - 21%  , Total progress - 19%
+Current progress - 22%  , Total progress - 19%
+Current progress - 23%  , Total progress - 19%
+Current progress - 23%  , Total progress - 20%
+Current progress - 24%  , Total progress - 20%
+Current progress - 24%  , Total progress - 21%
+Current progress - 25%  , Total progress - 21%
+Current progress - 25%  , Total progress - 22%
+Current progress - 26%  , Total progress - 22%
+Current progress - 26%  , Total progress - 23%
+Current progress - 27%  , Total progress - 23%
+Current progress - 27%  , Total progress - 24%
+Current progress - 28%  , Total progress - 24%
+Current progress - 28%  , Total progress - 25%
+Current progress - 29%  , Total progress - 25%
+Current progress - 29%  , Total progress - 26%
+Current progress - 30%  , Total progress - 26%
+Current progress - 31%  , Total progress - 26%
+Current progress - 31%  , Total progress - 27%
+Current progress - 32%  , Total progress - 27%
+Current progress - 32%  , Total progress - 28%
+Current progress - 33%  , Total progress - 28%
+Current progress - 33%  , Total progress - 29%
+Current progress - 34%  , Total progress - 29%
+Current progress - 34%  , Total progress - 30%
+Current progress - 35%  , Total progress - 30%
+Current progress - 35%  , Total progress - 31%
+Current progress - 36%  , Total progress - 31%
+Current progress - 36%  , Total progress - 32%
+Current progress - 37%  , Total progress - 32%
+Current progress - 37%  , Total progress - 33%
+Current progress - 38%  , Total progress - 33%
+Current progress - 39%  , Total progress - 33%
+Current progress - 39%  , Total progress - 34%
+Current progress - 40%  , Total progress - 34%
+Current progress - 40%  , Total progress - 35%
+Current progress - 41%  , Total progress - 35%
+Current progress - 41%  , Total progress - 36%
+Current progress - 42%  , Total progress - 36%
+Current progress - 42%  , Total progress - 37%
+Current progress - 43%  , Total progress - 37%
+Current progress - 43%  , Total progress - 38%
+Current progress - 44%  , Total progress - 38%
+Current progress - 44%  , Total progress - 39%
+Current progress - 45%  , Total progress - 39%
+Current progress - 46%  , Total progress - 39%
+Current progress - 46%  , Total progress - 40%
+Current progress - 47%  , Total progress - 40%
+Current progress - 47%  , Total progress - 41%
+Current progress - 48%  , Total progress - 41%
+Current progress - 48%  , Total progress - 42%
+Current progress - 49%  , Total progress - 42%
+Current progress - 49%  , Total progress - 43%
+Current progress - 50%  , Total progress - 43%
+Current progress - 50%  , Total progress - 44%
+Current progress - 51%  , Total progress - 44%
+Current progress - 51%  , Total progress - 45%
+Current progress - 52%  , Total progress - 45%
+Current progress - 52%  , Total progress - 46%
+Current progress - 53%  , Total progress - 46%
+Current progress - 54%  , Total progress - 46%
+Current progress - 54%  , Total progress - 47%
+Current progress - 55%  , Total progress - 47%
+Current progress - 55%  , Total progress - 48%
+Current progress - 56%  , Total progress - 48%
+Current progress - 56%  , Total progress - 49%
+Current progress - 57%  , Total progress - 49%
+Current progress - 57%  , Total progress - 50%
+Current progress - 58%  , Total progress - 50%
+Current progress - 58%  , Total progress - 51%
+Current progress - 59%  , Total progress - 51%
+Current progress - 59%  , Total progress - 52%
+Current progress - 60%  , Total progress - 52%
+Current progress - 60%  , Total progress - 53%
+Current progress - 61%  , Total progress - 53%
+Current progress - 62%  , Total progress - 53%
+Current progress - 62%  , Total progress - 54%
+Current progress - 63%  , Total progress - 54%
+Current progress - 63%  , Total progress - 55%
+Current progress - 64%  , Total progress - 55%
+Current progress - 64%  , Total progress - 56%
+Current progress - 65%  , Total progress - 56%
+Current progress - 65%  , Total progress - 57%
+Current progress - 66%  , Total progress - 57%
+Current progress - 66%  , Total progress - 58%
+Current progress - 67%  , Total progress - 58%
+Current progress - 67%  , Total progress - 59%
+Current progress - 68%  , Total progress - 59%
+Current progress - 69%  , Total progress - 59%
+Current progress - 69%  , Total progress - 60%
+Current progress - 70%  , Total progress - 60%
+Current progress - 70%  , Total progress - 61%
+Current progress - 71%  , Total progress - 61%
+Current progress - 71%  , Total progress - 62%
+Current progress - 72%  , Total progress - 62%
+Current progress - 72%  , Total progress - 63%
+Current progress - 73%  , Total progress - 63%
+Current progress - 73%  , Total progress - 64%
+Current progress - 74%  , Total progress - 64%
+Current progress - 74%  , Total progress - 65%
+Current progress - 75%  , Total progress - 65%
+Current progress - 75%  , Total progress - 66%
+Current progress - 76%  , Total progress - 66%
+Current progress - 77%  , Total progress - 66%
+Current progress - 77%  , Total progress - 67%
+Current progress - 78%  , Total progress - 67%
+Current progress - 78%  , Total progress - 68%
+Current progress - 79%  , Total progress - 68%
+Current progress - 79%  , Total progress - 69%
+Current progress - 80%  , Total progress - 69%
+Current progress - 80%  , Total progress - 70%
+Current progress - 81%  , Total progress - 70%
+Current progress - 81%  , Total progress - 71%
+Current progress - 82%  , Total progress - 71%
+Current progress - 82%  , Total progress - 72%
+Current progress - 83%  , Total progress - 72%
+Current progress - 83%  , Total progress - 73%
+Current progress - 84%  , Total progress - 73%
+Current progress - 85%  , Total progress - 73%
+Current progress - 85%  , Total progress - 74%
+Current progress - 86%  , Total progress - 74%
+Current progress - 86%  , Total progress - 75%
+Current progress - 87%  , Total progress - 75%
+Current progress - 87%  , Total progress - 76%
+Current progress - 88%  , Total progress - 76%
+Current progress - 88%  , Total progress - 77%
+Current progress - 89%  , Total progress - 77%
+Current progress - 89%  , Total progress - 78%
+Current progress - 90%  , Total progress - 78%
+Current progress - 90%  , Total progress - 79%
+Current progress - 91%  , Total progress - 79%
+Current progress - 92%  , Total progress - 79%
+Current progress - 92%  , Total progress - 80%
+Current progress - 93%  , Total progress - 80%
+Current progress - 93%  , Total progress - 81%
+Current progress - 94%  , Total progress - 81%
+Current progress - 94%  , Total progress - 82%
+Current progress - 95%  , Total progress - 82%
+Current progress - 95%  , Total progress - 83%
+Current progress - 96%  , Total progress - 83%
+Current progress - 96%  , Total progress - 84%
+Current progress - 97%  , Total progress - 84%
+Current progress - 97%  , Total progress - 85%
+Current progress - 98%  , Total progress - 85%
+Current progress - 98%  , Total progress - 86%
+Current progress - 99%  , Total progress - 86%
+Current action: Analyzing seamless segments
+Current progress - 0%  , Total progress - 86%
+Current progress - 25%  , Total progress - 86%
+Current progress - 75%  , Total progress - 86%
+Current action: Saving to MKV file
+Current progress - 0%  , Total progress - 86%
+Current progress - 1%  , Total progress - 86%
+Current progress - 1%  , Total progress - 87%
+Current progress - 2%  , Total progress - 87%
+Current progress - 3%  , Total progress - 87%
+Current progress - 4%  , Total progress - 87%
+Current progress - 5%  , Total progress - 87%
+Current progress - 6%  , Total progress - 87%
+Current progress - 7%  , Total progress - 87%
+Current progress - 8%  , Total progress - 87%
+Current progress - 9%  , Total progress - 87%
+Current progress - 10%  , Total progress - 87%
+Current progress - 11%  , Total progress - 87%
+Current progress - 12%  , Total progress - 87%
+Current progress - 13%  , Total progress - 87%
+Current progress - 14%  , Total progress - 87%
+Current progress - 15%  , Total progress - 87%
+Current progress - 16%  , Total progress - 87%
+Current progress - 16%  , Total progress - 88%
+Current progress - 17%  , Total progress - 88%
+Current progress - 18%  , Total progress - 88%
+Current progress - 19%  , Total progress - 88%
+Current progress - 20%  , Total progress - 88%
+Current progress - 21%  , Total progress - 88%
+Current progress - 22%  , Total progress - 88%
+Current progress - 23%  , Total progress - 88%
+Current progress - 24%  , Total progress - 88%
+Current progress - 25%  , Total progress - 88%
+Current progress - 26%  , Total progress - 88%
+Current progress - 27%  , Total progress - 88%
+Current progress - 28%  , Total progress - 88%
+Current progress - 29%  , Total progress - 88%
+Current progress - 30%  , Total progress - 88%
+Current progress - 30%  , Total progress - 89%
+Current progress - 31%  , Total progress - 89%
+Current progress - 32%  , Total progress - 89%
+Current progress - 33%  , Total progress - 89%
+Current progress - 34%  , Total progress - 89%
+Current progress - 35%  , Total progress - 89%
+Current progress - 36%  , Total progress - 89%
+Current progress - 37%  , Total progress - 89%
+Current progress - 38%  , Total progress - 89%
+Current progress - 39%  , Total progress - 89%
+Current progress - 40%  , Total progress - 89%
+Current progress - 41%  , Total progress - 89%
+Current progress - 42%  , Total progress - 89%
+Current progress - 43%  , Total progress - 89%
+Current progress - 44%  , Total progress - 89%
+Current progress - 45%  , Total progress - 89%
+Current progress - 45%  , Total progress - 90%
+Current progress - 46%  , Total progress - 90%
+Current progress - 47%  , Total progress - 90%
+Current progress - 48%  , Total progress - 90%
+Current progress - 49%  , Total progress - 90%
+Current progress - 50%  , Total progress - 90%
+Current progress - 51%  , Total progress - 90%
+Current progress - 52%  , Total progress - 90%
+Current progress - 53%  , Total progress - 90%
+Current progress - 54%  , Total progress - 90%
+Current progress - 55%  , Total progress - 90%
+Current progress - 56%  , Total progress - 90%
+Current progress - 57%  , Total progress - 90%
+Current progress - 58%  , Total progress - 90%
+Current progress - 59%  , Total progress - 90%
+Current progress - 60%  , Total progress - 90%
+Current progress - 60%  , Total progress - 91%
+Current progress - 61%  , Total progress - 91%
+Current progress - 62%  , Total progress - 91%
+Current progress - 63%  , Total progress - 91%
+Current progress - 64%  , Total progress - 91%
+Current progress - 65%  , Total progress - 91%
+Current progress - 66%  , Total progress - 91%
+Current progress - 67%  , Total progress - 91%
+Current progress - 68%  , Total progress - 91%
+Current progress - 69%  , Total progress - 91%
+Current progress - 70%  , Total progress - 91%
+Current progress - 71%  , Total progress - 91%
+Current progress - 72%  , Total progress - 91%
+Current progress - 73%  , Total progress - 91%
+Current progress - 74%  , Total progress - 91%
+Current progress - 75%  , Total progress - 91%
+Current progress - 75%  , Total progress - 92%
+Current progress - 76%  , Total progress - 92%
+Current progress - 77%  , Total progress - 92%
+Current progress - 78%  , Total progress - 92%
+Current progress - 79%  , Total progress - 92%
+Current progress - 80%  , Total progress - 92%
+Current progress - 81%  , Total progress - 92%
+Current progress - 82%  , Total progress - 92%
+Current progress - 83%  , Total progress - 92%
+Current progress - 84%  , Total progress - 92%
+Current progress - 85%  , Total progress - 92%
+Current progress - 86%  , Total progress - 92%
+Current progress - 87%  , Total progress - 92%
+Current progress - 88%  , Total progress - 92%
+Current progress - 89%  , Total progress - 92%
+Current progress - 90%  , Total progress - 92%
+Current progress - 90%  , Total progress - 93%
+Current progress - 91%  , Total progress - 93%
+Current progress - 92%  , Total progress - 93%
+Current progress - 93%  , Total progress - 93%
+Current progress - 94%  , Total progress - 93%
+Current progress - 95%  , Total progress - 93%
+Current progress - 96%  , Total progress - 93%
+Current progress - 97%  , Total progress - 93%
+Current progress - 98%  , Total progress - 93%
+Current progress - 99%  , Total progress - 93%
+Current action: Analyzing seamless segments
+Current progress - 0%  , Total progress - 93%
+Current progress - 25%  , Total progress - 93%
+Current progress - 75%  , Total progress - 93%
+Current action: Saving to MKV file
+Current progress - 0%  , Total progress - 93%
+Current progress - 1%  , Total progress - 93%
+Current progress - 2%  , Total progress - 93%
+Current progress - 3%  , Total progress - 93%
+Current progress - 4%  , Total progress - 93%
+Current progress - 5%  , Total progress - 93%
+Current progress - 5%  , Total progress - 94%
+Current progress - 6%  , Total progress - 94%
+Current progress - 7%  , Total progress - 94%
+Current progress - 8%  , Total progress - 94%
+Current progress - 9%  , Total progress - 94%
+Current progress - 10%  , Total progress - 94%
+Current progress - 11%  , Total progress - 94%
+Current progress - 12%  , Total progress - 94%
+Current progress - 13%  , Total progress - 94%
+Current progress - 14%  , Total progress - 94%
+Current progress - 15%  , Total progress - 94%
+Current progress - 16%  , Total progress - 94%
+Current progress - 17%  , Total progress - 94%
+Current progress - 18%  , Total progress - 94%
+Current progress - 19%  , Total progress - 94%
+Current progress - 20%  , Total progress - 94%
+Current progress - 21%  , Total progress - 94%
+Current progress - 21%  , Total progress - 95%
+Current progress - 22%  , Total progress - 95%
+Current progress - 23%  , Total progress - 95%
+Current progress - 24%  , Total progress - 95%
+Current progress - 25%  , Total progress - 95%
+Current progress - 26%  , Total progress - 95%
+Current progress - 27%  , Total progress - 95%
+Current progress - 28%  , Total progress - 95%
+Current progress - 29%  , Total progress - 95%
+Current progress - 30%  , Total progress - 95%
+Current progress - 31%  , Total progress - 95%
+Current progress - 32%  , Total progress - 95%
+Current progress - 33%  , Total progress - 95%
+Current progress - 34%  , Total progress - 95%
+Current progress - 35%  , Total progress - 95%
+Current progress - 36%  , Total progress - 95%
+Current progress - 36%  , Total progress - 96%
+Current progress - 37%  , Total progress - 96%
+Current progress - 38%  , Total progress - 96%
+Current progress - 39%  , Total progress - 96%
+Current progress - 40%  , Total progress - 96%
+Current progress - 41%  , Total progress - 96%
+Current progress - 42%  , Total progress - 96%
+Current progress - 43%  , Total progress - 96%
+Current progress - 44%  , Total progress - 96%
+Current progress - 45%  , Total progress - 96%
+Current progress - 46%  , Total progress - 96%
+Current progress - 47%  , Total progress - 96%
+Current progress - 48%  , Total progress - 96%
+Current progress - 49%  , Total progress - 96%
+Current progress - 50%  , Total progress - 96%
+Current progress - 51%  , Total progress - 96%
+Current progress - 52%  , Total progress - 96%
+Current progress - 52%  , Total progress - 97%
+Current progress - 53%  , Total progress - 97%
+Current progress - 54%  , Total progress - 97%
+Current progress - 55%  , Total progress - 97%
+Current progress - 56%  , Total progress - 97%
+Current progress - 57%  , Total progress - 97%
+Current progress - 58%  , Total progress - 97%
+Current progress - 59%  , Total progress - 97%
+Current progress - 60%  , Total progress - 97%
+Current progress - 61%  , Total progress - 97%
+Current progress - 62%  , Total progress - 97%
+Current progress - 63%  , Total progress - 97%
+Current progress - 64%  , Total progress - 97%
+Current progress - 65%  , Total progress - 97%
+Current progress - 66%  , Total progress - 97%
+Current progress - 67%  , Total progress - 97%
+Current progress - 68%  , Total progress - 97%
+Current progress - 68%  , Total progress - 98%
+Current progress - 69%  , Total progress - 98%
+Current progress - 70%  , Total progress - 98%
+Current progress - 71%  , Total progress - 98%
+Current progress - 72%  , Total progress - 98%
+Current progress - 73%  , Total progress - 98%
+Current progress - 74%  , Total progress - 98%
+Current progress - 75%  , Total progress - 98%
+Current progress - 76%  , Total progress - 98%
+Current progress - 77%  , Total progress - 98%
+Current progress - 78%  , Total progress - 98%
+Current progress - 79%  , Total progress - 98%
+Current progress - 80%  , Total progress - 98%
+Current progress - 81%  , Total progress - 98%
+Current progress - 82%  , Total progress - 98%
+Current progress - 83%  , Total progress - 98%
+Current progress - 84%  , Total progress - 98%
+Current progress - 84%  , Total progress - 99%
+Current progress - 85%  , Total progress - 99%
+Current progress - 86%  , Total progress - 99%
+Current progress - 87%  , Total progress - 99%
+Current progress - 88%  , Total progress - 99%
+Current progress - 89%  , Total progress - 99%
+Current progress - 90%  , Total progress - 99%
+Current progress - 91%  , Total progress - 99%
+Current progress - 92%  , Total progress - 99%
+Current progress - 93%  , Total progress - 99%
+Current progress - 94%  , Total progress - 99%
+Current progress - 95%  , Total progress - 99%
+Current progress - 96%  , Total progress - 99%
+Current progress - 97%  , Total progress - 99%
+Current progress - 98%  , Total progress - 99%
+Current progress - 99%  , Total progress - 99%
+Current progress - 100%  , Total progress - 99%
+Current progress - 100%  , Total progress - 100%
+3 titles saved
+Copy complete. 3 titles saved.
+
+TMDB runtime check: no runtime found for 'Antz'; using local heuristic only.
+Subtitle extraction start: A1_t00.mkv (1 streams)
+Subtitle extraction progress: 1/1: A1_t00.mkv stream 3 -> Antz.en.idx
+Warning: subtitle extraction failed for stream 3 (dvd_subtitle)
+Subtitle extraction done: A1_t00.mkv (0 succeeded, 1 failed)
+HandBrake start: 1/1: Antz.mp4
+Queued encode: Antz.mp4
+[11:14:41] Compile-time hardening features are enabled
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+[11:14:41] hb_init: starting libhb thread
+[11:14:41] thread 73b11fd60640 started ("libhb")
+HandBrake 1.5.1 (2022030700) - Linux x86_64 - https://handbrake.fr
+12 CPUs detected
+Opening /home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv...
+[11:14:41] CPU: AMD Ryzen 5 5600G with Radeon Graphics
+[11:14:41]  - logical processor count: 12
+[11:14:41] hb_scan: path=/home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv, title_index=1
+udfread ERROR: ECMA 167 Volume Recognition failed
+disc.c:333: failed opening UDF image /home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv
+disc.c:437: error opening file BDMV/index.bdmv
+disc.c:437: error opening file BDMV/BACKUP/index.bdmv
+bluray.c:2652: nav_get_title_list(/home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv/) failed
+[11:14:41] bd: not a bd - trying as a stream/file instead
+libdvdread: DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed
+libdvdnav: vm: vm: failed to read VIDEO_TS.IFO
+[11:14:41] dvd: not a dvd - trying as a stream/file instead
+Input #0, matroska,webm, from '/home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv':
+Metadata:
+encoder         : libmakemkv v1.18.2 (1.3.10/1.5.2) x86_64-linux-gnu
+creation_time   : 2026-02-21T16:46:43.000000Z
+Duration: 01:22:55.04, start: 0.000000, bitrate: 9751 kb/s
+Chapters:
+Chapter #0:0: start 0.033367, end 381.998283
+Metadata:
+title           : Chapter 01
+Chapter #0:1: start 381.998283, end 525.641783
+Metadata:
+title           : Chapter 02
+Chapter #0:2: start 525.641783, end 653.019033
+Metadata:
+title           : Chapter 03
+Chapter #0:3: start 653.019033, end 833.199033
+Metadata:
+title           : Chapter 04
+Chapter #0:4: start 833.199033, end 1039.488450
+Metadata:
+title           : Chapter 05
+Chapter #0:5: start 1039.488450, end 1215.914700
+Metadata:
+title           : Chapter 06
+Chapter #0:6: start 1215.914700, end 1450.565783
+Metadata:
+title           : Chapter 07
+Chapter #0:7: start 1450.565783, end 1578.276700
+Metadata:
+title           : Chapter 08
+Chapter #0:8: start 1578.276700, end 1718.500117
+Metadata:
+title           : Chapter 09
+Chapter #0:9: start 1718.500117, end 1888.086200
+Metadata:
+title           : Chapter 10
+Chapter #0:10: start 1888.086200, end 2137.001533
+Metadata:
+title           : Chapter 11
+Chapter #0:11: start 2137.001533, end 2428.793033
+Metadata:
+title           : Chapter 12
+Chapter #0:12: start 2428.793033, end 2535.900033
+Metadata:
+title           : Chapter 13
+Chapter #0:13: start 2535.900033, end 2718.749367
+Metadata:
+title           : Chapter 14
+Chapter #0:14: start 2718.749367, end 2879.076200
+Metadata:
+title           : Chapter 15
+Chapter #0:15: start 2879.076200, end 3069.766700
+Metadata:
+title           : Chapter 16
+Chapter #0:16: start 3069.766700, end 3217.998117
+Metadata:
+title           : Chapter 17
+Chapter #0:17: start 3217.998117, end 3340.704033
+Metadata:
+title           : Chapter 18
+Chapter #0:18: start 3340.704033, end 3635.665367
+Metadata:
+title           : Chapter 19
+Chapter #0:19: start 3635.665367, end 3871.317450
+Metadata:
+title           : Chapter 20
+Chapter #0:20: start 3871.317450, end 4037.900533
+Metadata:
+title           : Chapter 21
+Chapter #0:21: start 4037.900533, end 4253.115533
+Metadata:
+title           : Chapter 22
+Chapter #0:22: start 4253.115533, end 4447.309533
+Metadata:
+title           : Chapter 23
+Chapter #0:23: start 4447.309533, end 4547.993450
+Metadata:
+title           : Chapter 24
+Chapter #0:24: start 4547.993450, end 4668.030033
+Metadata:
+title           : Chapter 25
+Chapter #0:25: start 4668.030033, end 4975.036733
+Metadata:
+title           : Chapter 26
+Stream #0:0(eng): Video: mpeg2video (Main), yuv420p(tv, top first), 720x480 [SAR 32:27 DAR 16:9], 9100 kb/s, SAR 853:720 DAR 853:480, 29.97 fps, 29.97 tbr, 1k tbn, 59.94 tbc
+Metadata:
+BPS-eng         : 9099726
+DURATION-eng    : 01:22:55.036733333
+NUMBER_OF_FRAMES-eng: 119282
+NUMBER_OF_BYTES-eng: 5658933396
+SOURCE_ID-eng   : 0100E0
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 16:46:43
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+Side data:
+cpb: bitrate max/min/avg: 9100000/0/0 buffer size: 1835008 vbv_delay: N/A
+Stream #0:1(eng): Audio: ac3, 48000 Hz, 5.1(side), fltp, 448 kb/s (default)
+Metadata:
+title           : Surround 5.1
+BPS-eng         : 448000
+DURATION-eng    : 01:22:55.008000000
+NUMBER_OF_FRAMES-eng: 155469
+NUMBER_OF_BYTES-eng: 278600448
+SOURCE_ID-eng   : 0180BD
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 16:46:43
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+Stream #0:2(eng): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s
+Metadata:
+title           : Stereo
+BPS-eng         : 192000
+DURATION-eng    : 01:22:55.008000000
+NUMBER_OF_FRAMES-eng: 155469
+NUMBER_OF_BYTES-eng: 119400192
+SOURCE_ID-eng   : 0181BD
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 16:46:43
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+Stream #0:3(eng): Subtitle: dvd_subtitle, 720x480 (default)
+Metadata:
+BPS-eng         : 6396
+DURATION-eng    : 01:18:59.266822222
+NUMBER_OF_FRAMES-eng: 1191
+NUMBER_OF_BYTES-eng: 3789584
+SOURCE_ID-eng   : 0120BD
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 16:46:43
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+[11:14:41] scan: decoding previews for title 1
+[11:14:41] scan: audio 0x1: ac3, rate=48000Hz, bitrate=448000 English (AC3) (5.1 ch) (448 kbps)
+[11:14:41] scan: audio 0x2: ac3, rate=48000Hz, bitrate=192000 English (AC3) (2.0 ch) (Dolby Surround) (192 kbps)
+[11:14:41] WARNING: Video PAR 32:27 != container PAR 853:720
+[11:14:41] scan: 10 previews, 720x480, 23.976 fps, autocrop = 0/0/0/2, aspect 16:9, PAR 32:27, color profile: 6-1-6, chroma location: left
+[11:14:41] libhb: scan thread found 1 valid title(s)
++ Using preset: HQ 1080p30 Surround
++ title 1:
++ stream: /home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv
++ duration: 01:22:55
++ size: 720x480, pixel aspect: 32/27, display aspect: 1.78, 23.976 fps
++ autocrop: 0/0/0/2
++ chapters:
++ 1: duration 00:06:22
++ 2: duration 00:02:24
++ 3: duration 00:02:07
++ 4: duration 00:03:00
++ 5: duration 00:03:26
++ 6: duration 00:02:56
++ 7: duration 00:03:55
++ 8: duration 00:02:08
++ 9: duration 00:02:20
++ 10: duration 00:02:50
++ 11: duration 00:04:09
++ 12: duration 00:04:52
++ 13: duration 00:01:47
++ 14: duration 00:03:03
++ 15: duration 00:02:40
++ 16: duration 00:03:11
++ 17: duration 00:02:28
++ 18: duration 00:02:03
++ 19: duration 00:04:55
++ 20: duration 00:03:56
++ 21: duration 00:02:47
++ 22: duration 00:03:35
++ 23: duration 00:03:14
++ 24: duration 00:01:41
++ 25: duration 00:02:00
++ 26: duration 00:05:07
++ audio tracks:
++ 1, English (AC3) (5.1 ch) (448 kbps) (iso639-2: eng), 48000Hz, 448000bps
++ 2, English (AC3) (2.0 ch) (Dolby Surround) (192 kbps) (iso639-2: eng), 48000Hz, 192000bps
++ subtitle tracks:
++ 1, English [VOBSUB]
+[11:14:41] Starting work at: Sat Feb 21 11:14:41 2026
+[11:14:41] 1 job(s) to process
+[11:14:41] json job:
+{
+"Audio": {
+"AudioList": [
+{
+"Bitrate": 160,
+"CompressionLevel": -1.0,
+"DRC": 0.0,
+"DitherMethod": "auto",
+"Encoder": "av_aac",
+"Gain": 0.0,
+"Mixdown": "stereo",
+"Name": "Surround 5.1",
+"NormalizeMixLevel": false,
+"PresetEncoder": "av_aac",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+},
+{
+"Bitrate": 0,
+"DRC": 0.0,
+"Encoder": "copy:ac3",
+"Mixdown": "none",
+"Name": "Surround 5.1",
+"PresetEncoder": "copy:ac3",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+}
+],
+"CopyMask": [
+"copy:aac",
+"copy:ac3"
+],
+"FallbackEncoder": "av_aac"
+},
+"Destination": {
+"AlignAVStart": true,
+"ChapterList": [
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 6,
+"Seconds": 22,
+"Ticks": 34379845
+},
+"Name": "Chapter 1"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 24,
+"Ticks": 12927915
+},
+"Name": "Chapter 2"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 7,
+"Ticks": 11463952
+},
+"Name": "Chapter 3"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 0,
+"Ticks": 16216200
+},
+"Name": "Chapter 4"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 26,
+"Ticks": 18566048
+},
+"Name": "Chapter 5"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 56,
+"Ticks": 15878363
+},
+"Name": "Chapter 6"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 55,
+"Ticks": 21118597
+},
+"Name": "Chapter 7"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 8,
+"Ticks": 11493983
+},
+"Name": "Chapter 8"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 20,
+"Ticks": 12620107
+},
+"Name": "Chapter 9"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 50,
+"Ticks": 15262748
+},
+"Name": "Chapter 10"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 4,
+"Seconds": 9,
+"Ticks": 22402379
+},
+"Name": "Chapter 11"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 4,
+"Seconds": 52,
+"Ticks": 26261235
+},
+"Name": "Chapter 12"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 1,
+"Seconds": 47,
+"Ticks": 9639630
+},
+"Name": "Chapter 13"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 3,
+"Ticks": 16456440
+},
+"Name": "Chapter 14"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 40,
+"Ticks": 14429416
+},
+"Name": "Chapter 15"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 11,
+"Ticks": 17162145
+},
+"Name": "Chapter 16"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 28,
+"Ticks": 13340827
+},
+"Name": "Chapter 17"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 3,
+"Ticks": 11043532
+},
+"Name": "Chapter 18"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 4,
+"Seconds": 55,
+"Ticks": 26546520
+},
+"Name": "Chapter 19"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 56,
+"Ticks": 21208688
+},
+"Name": "Chapter 20"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 47,
+"Ticks": 14992477
+},
+"Name": "Chapter 21"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 35,
+"Ticks": 19369350
+},
+"Name": "Chapter 22"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 3,
+"Seconds": 14,
+"Ticks": 17477460
+},
+"Name": "Chapter 23"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 1,
+"Seconds": 41,
+"Ticks": 9061553
+},
+"Name": "Chapter 24"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 2,
+"Seconds": 0,
+"Ticks": 10803292
+},
+"Name": "Chapter 25"
+},
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 5,
+"Seconds": 7,
+"Ticks": 27630538
+},
+"Name": "Chapter 26"
+}
+],
+"ChapterMarkers": true,
+"File": "/storage/Movies/Antz (1998)/Antz.mp4",
+"InlineParameterSets": false,
+"Mp4Options": {
+"IpodAtom": false,
+"Mp4Optimize": false
+},
+"Mux": "m4v"
+},
+"Filters": {
+"FilterList": [
+{
+"ID": 3,
+"Settings": {
+"block-height": "16",
+"block-thresh": "40",
+"block-width": "16",
+"filter-mode": "2",
+"mode": "3",
+"motion-thresh": "1",
+"spatial-metric": "2",
+"spatial-thresh": "1"
+}
+},
+{
+"ID": 4,
+"Settings": {
+"mode": "7"
+}
+},
+{
+"ID": 6,
+"Settings": {
+"mode": 2,
+"rate": "27000000/900000"
+}
+},
+{
+"ID": 13,
+"Settings": {
+"crop-bottom": 0,
+"crop-left": 0,
+"crop-right": 2,
+"crop-top": 0,
+"height": 480,
+"width": 718
+}
+}
+]
+},
+"Metadata": {},
+"PAR": {
+"Den": 27,
+"Num": 32
+},
+"SequenceID": 0,
+"Source": {
+"Angle": 0,
+"Path": "/home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv",
+"Range": {
+"End": 26,
+"Start": 1,
+"Type": "chapter"
+},
+"Title": 1
+},
+"Subtitle": {
+"Search": {
+"Burn": true,
+"Default": false,
+"Enable": true,
+"Forced": true
+},
+"SubtitleList": []
+},
+"Video": {
+"ChromaLocation": 1,
+"ColorInputFormat": 0,
+"ColorMatrix": 6,
+"ColorOutputFormat": 0,
+"ColorPrimaries": 6,
+"ColorRange": 1,
+"ColorTransfer": 1,
+"Encoder": "x264",
+"Level": "4.0",
+"Options": "",
+"Preset": "slow",
+"Profile": "high",
+"QSV": {
+"AdapterIndex": 0,
+"AsyncDepth": 0,
+"Decode": false
+},
+"Quality": 20.0,
+"Tune": "",
+"Turbo": false,
+"TwoPass": false
+}
+}
+[11:14:41] Starting Task: Subtitle Scan
+[11:14:41] job configuration:
+[11:14:41]  * source
+[11:14:41]    + /home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv
+[11:14:41]    + title 1, chapter(s) 1 to 26
+[11:14:41]    + container: matroska,webm
+[11:14:41]    + data rate: 9751 kbps
+[11:14:41]  * destination
+[11:14:41]    + /storage/Movies/Antz (1998)/Antz.mp4
+[11:14:41]    + container: MPEG-4 (libavformat)
+[11:14:41]      + align initial A/V stream timestamps
+[11:14:41]      + chapter markers
+[11:14:41]  * video track
+[11:14:41]    + decoder: mpeg2video 8-bit (yuv420p)
+[11:14:41]      + bitrate 9100 kbps
+[11:14:41]    + filters
+[11:14:41]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[11:14:41]      + Decomb (mode=39)
+[11:14:41]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[11:14:41]        + frame rate: 23.976 fps -> peak rate limited to 30.000 fps
+[11:14:41]      + Crop and Scale (width=718:height=480:crop-top=0:crop-bottom=0:crop-left=0:crop-right=2)
+[11:14:41]        + source: 720 * 480, crop (0/0/0/2): 718 * 480, scale: 718 * 480
+[11:14:41]    + Output geometry
+[11:14:41]      + storage dimensions: 718 x 480
+[11:14:41]      + pixel aspect ratio: 32 : 27
+[11:14:41]      + display dimensions: 850 x 480
+[11:14:41]  * Foreign Audio Search: Render/Burn-in, Forced Only
+[11:14:41]    + subtitle, English [VOBSUB] (track 0, id 0x3, Picture)
+[11:14:41] sync: expecting 119281 video frames
+Subtitle extraction done: B3_t01.mkv (no subtitle streams found)
+Queued encode: Extra.mp4
+Subtitle extraction done: B5_t02.mkv (no subtitle streams found)
+Queued encode: Extra.mp4
+libdvdread: Can't open file VIDEO_TS.IFO.
+Encoding: task 1 of 2, 8.76 % (0.00 fps, avg 0.00 fps, ETA 00h00m01s)
+Encoding: task 1 of 2, 17.99 % (0.00 fps, avg 0.00 fps, ETA 00h00m01s)
+Encoding: task 1 of 2, 27.15 % (0.00 fps, avg 0.00 fps, ETA 00h00m01s)
+Encoding: task 1 of 2, 36.53 % (0.00 fps, avg 0.00 fps, ETA 00h00m01s)
+Encoding: task 1 of 2, 46.36 % (0.00 fps, avg 0.00 fps, ETA 00h00m01s)
+Encoding: task 1 of 2, 56.66 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)
+Encoding: task 1 of 2, 66.40 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)
+Encoding: task 1 of 2, 76.07 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)
+Encoding: task 1 of 2, 85.72 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)
+Encoding: task 1 of 2, 95.80 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)[11:14:44] reader: done. 1 scr changes
+Encoding: task 1 of 2, 100.00 % (0.00 fps, avg 0.00 fps, ETA 00h00m00s)[11:14:44] work: average encoding speed for job is 0.000000 fps
+[11:14:44] comb detect: heavy 0 | light 0 | uncombed 0 | total 0
+[11:14:44] decomb: deinterlaced 0 | blended 0 | unfiltered 0 | total 0
+[11:14:44] vfr: 0 frames output, 0 dropped and 0 duped for CFR/PFR
+[11:14:44] vfr: lost time: 0 (0 frames)
+[11:14:44] vfr: gained time: 0 (0 frames) (0 not accounted for)
+[11:14:44] mpeg2video-decoder done: 0 frames, 0 decoder errors
+[11:14:44] sync: got 0 frames, 119281 expected
+[11:14:44] Subtitle track 0 (id 0x3) 'English [VOBSUB]': 1191 hits (0 forced)
+[11:14:44] No candidate detected during subtitle scan
+[11:14:44] Starting Task: Encoding Pass
+[11:14:44] job configuration:
+[11:14:44]  * source
+[11:14:44]    + /home/shunobies/Antz (1998)/MKVs/Disc01/A1_t00.mkv
+[11:14:44]    + title 1, chapter(s) 1 to 26
+[11:14:44]    + container: matroska,webm
+[11:14:44]    + data rate: 9751 kbps
+[11:14:44]  * destination
+[11:14:44]    + /storage/Movies/Antz (1998)/Antz.mp4
+[11:14:44]    + container: MPEG-4 (libavformat)
+[11:14:44]      + align initial A/V stream timestamps
+[11:14:44]      + chapter markers
+[11:14:44]  * video track
+[11:14:44]    + decoder: mpeg2video 8-bit (yuv420p)
+[11:14:44]      + bitrate 9100 kbps
+[11:14:44]    + filters
+[11:14:44]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[11:14:44]      + Decomb (mode=39)
+[11:14:44]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[11:14:44]        + frame rate: 23.976 fps -> peak rate limited to 30.000 fps
+[11:14:44]      + Crop and Scale (width=718:height=480:crop-top=0:crop-bottom=0:crop-left=0:crop-right=2)
+[11:14:44]        + source: 720 * 480, crop (0/0/0/2): 718 * 480, scale: 718 * 480
+[11:14:44]    + Output geometry
+[11:14:44]      + storage dimensions: 718 x 480
+[11:14:44]      + pixel aspect ratio: 32 : 27
+[11:14:44]      + display dimensions: 850 x 480
+[11:14:44]    + encoder: H.264 (libx264)
+[11:14:44]      + preset:  slow
+[11:14:44]      + profile: high
+[11:14:44]      + level:   4.0
+[11:14:44]      + quality: 20.00 (RF)
+[11:14:44]      + color profile: 6-1-6
+[11:14:44]      + chroma location: left
+[11:14:44]  * audio track 1
+[11:14:44]    + name: Surround 5.1
+[11:14:44]    + decoder: English (AC3) (5.1 ch) (448 kbps) (track 1, id 0x1)
+[11:14:44]      + bitrate: 448 kbps, samplerate: 48000 Hz
+[11:14:44]    + mixdown: Stereo
+[11:14:44]    + encoder: AAC (libavcodec)
+[11:14:44]      + bitrate: 160 kbps, samplerate: 48000 Hz
+[11:14:44]  * audio track 2
+[11:14:44]    + name: Surround 5.1
+[11:14:44]    + decoder: English (AC3) (5.1 ch) (448 kbps) (track 1, id 0x1)
+[11:14:44]      + bitrate: 448 kbps, samplerate: 48000 Hz
+[11:14:44]    + AC3 Passthru
+[11:14:44] sync: expecting 119281 video frames
+[11:14:44] encx264: min-keyint: 24, keyint: 240
+[11:14:44] encx264: encoding at constant RF 20.000000
+[11:14:44] encx264: unparsed options: level=4.0:ref=5:direct=auto:subme=8:trellis=2:vbv-bufsize=31250:vbv-maxrate=25000:rc-lookahead=50
+x264 [info]: using SAR=32/27
+x264 [info]: using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+x264 [info]: profile High, level 4.0, 4:2:0, 8-bit
+[11:14:44] sync: first pts video is 0
+[11:14:44] sync: first pts audio 0x1 is 0
+[11:14:44] sync: first pts audio 0x1 is 0
+[11:14:44] sync: "Chapter 1" (1) at frame 2 time 3753
+Encoding: task 2 of 2, 0.09 %
+Encoding: task 2 of 2, 0.40 %
+Encoding: task 2 of 2, 0.72 % (215.01 fps, avg 215.01 fps, ETA 00h09m11s)
+Encoding: task 2 of 2, 1.02 % (184.75 fps, avg 198.83 fps, ETA 00h09m54s)
+Encoding: task 2 of 2, 1.33 % (180.86 fps, avg 193.78 fps, ETA 00h10m07s)
+Encoding: task 2 of 2, 1.66 % (201.93 fps, avg 197.07 fps, ETA 00h09m55s)
+Encoding: task 2 of 2, 2.04 % (214.75 fps, avg 199.80 fps, ETA 00h09m46s)
+Encoding: task 2 of 2, 2.47 % (256.13 fps, avg 211.01 fps, ETA 00h09m12s)
+Encoding: task 2 of 2, 2.82 % (247.98 fps, avg 215.63 fps, ETA 00h08m58s)
+Encoding: task 2 of 2, 3.01 % (231.57 fps, avg 215.00 fps, ETA 00h08m58s)
+Encoding: task 2 of 2, 3.47 % (256.14 fps, avg 222.46 fps, ETA 00h08m38s)
+Encoding: task 2 of 2, 3.82 % (231.81 fps, avg 221.85 fps, ETA 00h08m37s)
+Encoding: task 2 of 2, 4.01 % (224.15 fps, avg 222.71 fps, ETA 00h08m34s)
+Encoding: task 2 of 2, 4.39 % (238.28 fps, avg 224.08 fps, ETA 00h08m29s)
+Encoding: task 2 of 2, 4.73 % (213.49 fps, avg 222.34 fps, ETA 00h08m31s)
+Encoding: task 2 of 2, 5.03 % (208.24 fps, avg 222.18 fps, ETA 00h08m30s)
+Encoding: task 2 of 2, 5.41 % (229.88 fps, avg 223.15 fps, ETA 00h08m26s)
+Encoding: task 2 of 2, 5.83 % (240.96 fps, avg 224.36 fps, ETA 00h08m21s)
+Encoding: task 2 of 2, 6.01 % (242.32 fps, avg 225.05 fps, ETA 00h08m18s)
+Encoding: task 2 of 2, 6.41 % (247.38 fps, avg 226.53 fps, ETA 00h08m13s)
+Encoding: task 2 of 2, 6.81 % (243.23 fps, avg 227.54 fps, ETA 00h08m08s)
+Encoding: task 2 of 2, 7.00 % (229.66 fps, avg 226.80 fps, ETA 00h08m09s)
+Encoding: task 2 of 2, 7.34 % (210.19 fps, avg 226.13 fps, ETA 00h08m09s)
+Encoding: task 2 of 2, 7.70 % (217.34 fps, avg 226.05 fps, ETA 00h08m07s)
+Encoding: task 2 of 2, 8.00 % (243.72 fps, avg 227.14 fps, ETA 00h08m03s)
+Encoding: task 2 of 2, 8.47 % (259.77 fps, avg 228.46 fps, ETA 00h07m59s)
+Encoding: task 2 of 2, 8.99 % (289.32 fps, avg 231.36 fps, ETA 00h07m50s)
+Encoding: task 2 of 2, 9.05 % (301.08 fps, avg 233.28 fps, ETA 00h07m45s)
+Encoding: task 2 of 2, 9.54 % (301.62 fps, avg 235.96 fps, ETA 00h07m37s)
+Encoding: task 2 of 2, 9.98 % (289.70 fps, avg 236.93 fps, ETA 00h07m34s)
+Encoding: task 2 of 2, 10.03 % (272.26 fps, avg 237.14 fps, ETA 00h07m32s)
+Encoding: task 2 of 2, 10.44 % (250.49 fps, avg 237.74 fps, ETA 00h07m29s)
+Encoding: task 2 of 2, 10.87 % (257.58 fps, avg 238.34 fps, ETA 00h07m27s)
+Encoding: task 2 of 2, 11.03 % (245.61 fps, avg 238.15 fps, ETA 00h07m26s)
+Encoding: task 2 of 2, 11.44 % (243.68 fps, avg 238.64 fps, ETA 00h07m23s)
+Encoding: task 2 of 2, 11.88 % (255.04 fps, avg 239.37 fps, ETA 00h07m19s)
+Encoding: task 2 of 2, 12.01 % (253.22 fps, avg 239.42 fps, ETA 00h07m18s)
+Encoding: task 2 of 2, 12.41 % (235.62 fps, avg 239.18 fps, ETA 00h07m16s)
+Encoding: task 2 of 2, 12.81 % (239.33 fps, avg 239.41 fps, ETA 00h07m15s)
+Encoding: task 2 of 2, 13.01 % (245.19 fps, avg 239.39 fps, ETA 00h07m14s)
+Encoding: task 2 of 2, 13.44 % (246.54 fps, avg 239.76 fps, ETA 00h07m11s)
+Encoding: task 2 of 2, 13.90 % (264.97 fps, avg 240.61 fps, ETA 00h07m07s)
+Encoding: task 2 of 2, 14.01 % (273.58 fps, avg 241.26 fps, ETA 00h07m05s)
+Encoding: task 2 of 2, 14.48 % (288.46 fps, avg 242.64 fps, ETA 00h07m00s)
+Encoding: task 2 of 2, 14.92 % (276.73 fps, avg 243.49 fps, ETA 00h06m56s)
+Encoding: task 2 of 2, 15.00 % (276.73 fps, avg 243.49 fps, ETA 00h06m56s)
+Encoding: task 2 of 2, 15.43 % (252.74 fps, avg 243.33 fps, ETA 00h06m55s)
+Encoding: task 2 of 2, 15.84 % (242.92 fps, avg 243.30 fps, ETA 00h06m53s)
+Encoding: task 2 of 2, 16.00 % (239.86 fps, avg 243.18 fps, ETA 00h06m52s)
+Encoding: task 2 of 2, 16.41 % (244.33 fps, avg 243.34 fps, ETA 00h06m50s)
+Encoding: task 2 of 2, 16.82 % (255.19 fps, avg 243.64 fps, ETA 00h06m48s)
+Encoding: task 2 of 2, 17.01 % (251.35 fps, avg 243.65 fps, ETA 00h06m47s)
+Encoding: task 2 of 2, 17.38 % (237.21 fps, avg 243.40 fps, ETA 00h06m45s)
+Encoding: task 2 of 2, 17.79 % (229.46 fps, avg 243.50 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 18.01 % (234.48 fps, avg 243.08 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 18.31 % (197.94 fps, avg 241.92 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 18.63 % (186.68 fps, avg 240.85 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 18.97 % (195.20 fps, avg 239.76 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 19.01 % (195.20 fps, avg 239.76 fps, ETA 00h06m43s)
+Encoding: task 2 of 2, 19.37 % (206.37 fps, avg 239.18 fps, ETA 00h06m42s)
+Encoding: task 2 of 2, 19.72 % (216.00 fps, avg 238.66 fps, ETA 00h06m41s)
+Encoding: task 2 of 2, 20.02 % (217.52 fps, avg 238.23 fps, ETA 00h06m40s)
+Encoding: task 2 of 2, 20.36 % (218.67 fps, avg 238.05 fps, ETA 00h06m39s)
+Encoding: task 2 of 2, 20.69 % (204.65 fps, avg 237.19 fps, ETA 00h06m39s)
+Encoding: task 2 of 2, 21.05 % (208.64 fps, avg 236.54 fps, ETA 00h06m38s)
+Encoding: task 2 of 2, 21.44 % (230.11 fps, avg 236.53 fps, ETA 00h06m36s)
+Encoding: task 2 of 2, 21.82 % (231.31 fps, avg 236.42 fps, ETA 00h06m34s)
+Encoding: task 2 of 2, 22.01 % (242.43 fps, avg 236.69 fps, ETA 00h06m33s)
+Encoding: task 2 of 2, 22.45 % (265.97 fps, avg 237.23 fps, ETA 00h06m30s)
+Encoding: task 2 of 2, 22.89 % (268.86 fps, avg 237.59 fps, ETA 00h06m28s)
+Encoding: task 2 of 2, 23.01 % (268.73 fps, avg 237.82 fps, ETA 00h06m26s)
+Encoding: task 2 of 2, 23.45 % (268.26 fps, avg 238.40 fps, ETA 00h06m23s)
+Encoding: task 2 of 2, 23.90 % (271.20 fps, avg 238.87 fps, ETA 00h06m20s)
+Encoding: task 2 of 2, 24.02 % (271.20 fps, avg 238.87 fps, ETA 00h06m20s)
+[11:16:45] sync: "Chapter 7" (7) at frame 29154 time 109433073
+[11:16:45] 1215.964722s: Video -> Film
+Encoding: task 2 of 2, 24.49 % (266.41 fps, avg 239.32 fps, ETA 00h06m17s)
+Encoding: task 2 of 2, 24.84 % (247.99 fps, avg 239.29 fps, ETA 00h06m15s)
+Encoding: task 2 of 2, 25.03 % (228.11 fps, avg 239.03 fps, ETA 00h06m14s)
+Encoding: task 2 of 2, 25.36 % (206.91 fps, avg 238.49 fps, ETA 00h06m13s)
+Encoding: task 2 of 2, 25.71 % (196.81 fps, avg 237.88 fps, ETA 00h06m12s)
+Encoding: task 2 of 2, 26.01 % (220.87 fps, avg 238.06 fps, ETA 00h06m11s)
+Encoding: task 2 of 2, 26.47 % (272.05 fps, avg 238.68 fps, ETA 00h06m08s)
+Encoding: task 2 of 2, 26.93 % (276.97 fps, avg 239.02 fps, ETA 00h06m05s)
+Encoding: task 2 of 2, 27.02 % (276.97 fps, avg 239.02 fps, ETA 00h06m05s)
+Encoding: task 2 of 2, 27.42 % (258.45 fps, avg 239.27 fps, ETA 00h06m02s)
+Encoding: task 2 of 2, 27.72 % (209.04 fps, avg 238.77 fps, ETA 00h06m01s)
+Encoding: task 2 of 2, 28.02 % (203.75 fps, avg 238.31 fps, ETA 00h06m00s)
+Encoding: task 2 of 2, 28.40 % (221.44 fps, avg 238.01 fps, ETA 00h05m59s)
+Encoding: task 2 of 2, 28.80 % (234.16 fps, avg 238.02 fps, ETA 00h05m56s)
+Encoding: task 2 of 2, 29.04 % (237.11 fps, avg 237.99 fps, ETA 00h05m56s)
+Encoding: task 2 of 2, 29.41 % (237.96 fps, avg 238.02 fps, ETA 00h05m53s)
+Encoding: task 2 of 2, 29.79 % (225.05 fps, avg 237.72 fps, ETA 00h05m52s)
+Encoding: task 2 of 2, 30.03 % (215.54 fps, avg 237.55 fps, ETA 00h05m51s)
+Encoding: task 2 of 2, 30.43 % (238.44 fps, avg 237.73 fps, ETA 00h05m49s)
+Encoding: task 2 of 2, 30.78 % (230.75 fps, avg 237.41 fps, ETA 00h05m48s)
+Encoding: task 2 of 2, 31.00 % (208.28 fps, avg 237.12 fps, ETA 00h05m47s)
+Encoding: task 2 of 2, 31.38 % (219.61 fps, avg 237.05 fps, ETA 00h05m46s)
+Encoding: task 2 of 2, 31.76 % (236.25 fps, avg 237.10 fps, ETA 00h05m44s)
+Encoding: task 2 of 2, 32.00 % (231.72 fps, avg 236.95 fps, ETA 00h05m43s)
+Encoding: task 2 of 2, 32.41 % (241.92 fps, avg 237.20 fps, ETA 00h05m40s)
+Encoding: task 2 of 2, 32.87 % (254.37 fps, avg 237.46 fps, ETA 00h05m38s)
+Encoding: task 2 of 2, 33.01 % (270.50 fps, avg 237.82 fps, ETA 00h05m36s)
+Encoding: task 2 of 2, 33.49 % (285.21 fps, avg 238.36 fps, ETA 00h05m33s)
+Encoding: task 2 of 2, 34.01 % (289.75 fps, avg 239.20 fps, ETA 00h05m29s)
+Encoding: task 2 of 2, 34.48 % (299.64 fps, avg 239.92 fps, ETA 00h05m25s)
+Encoding: task 2 of 2, 35.00 % (307.89 fps, avg 240.64 fps, ETA 00h05m22s)
+Encoding: task 2 of 2, 35.44 % (268.99 fps, avg 240.71 fps, ETA 00h05m20s)
+Encoding: task 2 of 2, 35.91 % (274.90 fps, avg 241.20 fps, ETA 00h05m17s)
+Encoding: task 2 of 2, 36.04 % (274.90 fps, avg 241.20 fps, ETA 00h05m17s)
+Encoding: task 2 of 2, 36.51 % (275.73 fps, avg 241.46 fps, ETA 00h05m14s)
+Encoding: task 2 of 2, 36.97 % (275.53 fps, avg 241.99 fps, ETA 00h05m11s)
+Encoding: task 2 of 2, 37.00 % (275.53 fps, avg 241.99 fps, ETA 00h05m11s)
+Encoding: task 2 of 2, 37.46 % (271.19 fps, avg 242.32 fps, ETA 00h05m08s)
+Encoding: task 2 of 2, 38.01 % (300.16 fps, avg 243.09 fps, ETA 00h05m04s)
+Encoding: task 2 of 2, 38.47 % (311.93 fps, avg 243.76 fps, ETA 00h05m01s)
+Encoding: task 2 of 2, 38.89 % (263.89 fps, avg 243.78 fps, ETA 00h04m59s)
+Encoding: task 2 of 2, 39.01 % (263.89 fps, avg 243.78 fps, ETA 00h04m59s)
+Encoding: task 2 of 2, 39.42 % (253.58 fps, avg 243.74 fps, ETA 00h04m57s)
+Encoding: task 2 of 2, 39.88 % (251.86 fps, avg 243.83 fps, ETA 00h04m55s)
+Encoding: task 2 of 2, 40.02 % (261.35 fps, avg 244.02 fps, ETA 00h04m53s)
+Encoding: task 2 of 2, 40.46 % (267.19 fps, avg 244.19 fps, ETA 00h04m51s)
+Encoding: task 2 of 2, 40.90 % (266.78 fps, avg 244.51 fps, ETA 00h04m48s)
+Encoding: task 2 of 2, 41.03 % (266.78 fps, avg 244.51 fps, ETA 00h04m48s)
+Encoding: task 2 of 2, 41.45 % (252.72 fps, avg 244.54 fps, ETA 00h04m46s)
+Encoding: task 2 of 2, 41.91 % (269.58 fps, avg 244.88 fps, ETA 00h04m43s)
+Encoding: task 2 of 2, 42.00 % (271.65 fps, avg 244.95 fps, ETA 00h04m42s)
+Encoding: task 2 of 2, 42.46 % (270.01 fps, avg 245.08 fps, ETA 00h04m41s)
+Encoding: task 2 of 2, 42.84 % (260.82 fps, avg 245.19 fps, ETA 00h04m38s)
+Encoding: task 2 of 2, 43.03 % (238.98 fps, avg 244.99 fps, ETA 00h04m38s)
+Encoding: task 2 of 2, 43.44 % (224.77 fps, avg 244.89 fps, ETA 00h04m36s)
+Encoding: task 2 of 2, 43.84 % (241.81 fps, avg 244.88 fps, ETA 00h04m34s)
+Encoding: task 2 of 2, 44.00 % (238.17 fps, avg 244.80 fps, ETA 00h04m33s)
+Encoding: task 2 of 2, 44.32 % (223.97 fps, avg 244.58 fps, ETA 00h04m31s)
+Encoding: task 2 of 2, 44.60 % (164.91 fps, avg 243.67 fps, ETA 00h04m31s)
+Encoding: task 2 of 2, 45.02 % (210.87 fps, avg 243.64 fps, ETA 00h04m29s)
+Encoding: task 2 of 2, 45.52 % (286.17 fps, avg 244.11 fps, ETA 00h04m26s)
+Encoding: task 2 of 2, 45.96 % (269.07 fps, avg 244.28 fps, ETA 00h04m24s)
+Encoding: task 2 of 2, 46.02 % (269.07 fps, avg 244.28 fps, ETA 00h04m24s)
+Encoding: task 2 of 2, 46.48 % (269.04 fps, avg 244.61 fps, ETA 00h04m21s)
+Encoding: task 2 of 2, 46.96 % (285.11 fps, avg 244.96 fps, ETA 00h04m18s)
+Encoding: task 2 of 2, 47.01 % (285.11 fps, avg 244.96 fps, ETA 00h04m18s)
+Encoding: task 2 of 2, 47.45 % (282.91 fps, avg 245.29 fps, ETA 00h04m15s)
+Encoding: task 2 of 2, 47.91 % (267.51 fps, avg 245.45 fps, ETA 00h04m13s)
+Encoding: task 2 of 2, 48.02 % (267.51 fps, avg 245.45 fps, ETA 00h04m13s)
+Encoding: task 2 of 2, 48.49 % (292.57 fps, avg 245.95 fps, ETA 00h04m10s)
+[11:18:40] 2418.332520s: Video -> Film
+Encoding: task 2 of 2, 48.87 % (237.60 fps, avg 245.67 fps, ETA 00h04m08s)
+Encoding: task 2 of 2, 49.00 % (237.60 fps, avg 245.67 fps, ETA 00h04m08s)
+Encoding: task 2 of 2, 49.47 % (272.20 fps, avg 246.13 fps, ETA 00h04m05s)
+Encoding: task 2 of 2, 49.92 % (272.52 fps, avg 246.17 fps, ETA 00h04m03s)
+Encoding: task 2 of 2, 50.01 % (252.92 fps, avg 246.22 fps, ETA 00h04m02s)
+Encoding: task 2 of 2, 50.45 % (263.54 fps, avg 246.39 fps, ETA 00h04m00s)
+Encoding: task 2 of 2, 50.88 % (267.24 fps, avg 246.53 fps, ETA 00h03m57s)
+Encoding: task 2 of 2, 51.03 % (267.24 fps, avg 246.53 fps, ETA 00h03m57s)
+Encoding: task 2 of 2, 51.46 % (273.65 fps, avg 246.74 fps, ETA 00h03m55s)
+Encoding: task 2 of 2, 51.87 % (260.13 fps, avg 246.82 fps, ETA 00h03m53s)
+Encoding: task 2 of 2, 52.01 % (245.35 fps, avg 246.72 fps, ETA 00h03m52s)
+Encoding: task 2 of 2, 52.44 % (245.47 fps, avg 246.81 fps, ETA 00h03m50s)
+Encoding: task 2 of 2, 52.82 % (234.04 fps, avg 246.61 fps, ETA 00h03m48s)
+Encoding: task 2 of 2, 53.01 % (212.83 fps, avg 246.39 fps, ETA 00h03m47s)
+Encoding: task 2 of 2, 53.38 % (224.17 fps, avg 246.35 fps, ETA 00h03m45s)
+Encoding: task 2 of 2, 53.85 % (257.16 fps, avg 246.42 fps, ETA 00h03m43s)
+Encoding: task 2 of 2, 54.04 % (257.16 fps, avg 246.42 fps, ETA 00h03m43s)
+Encoding: task 2 of 2, 54.53 % (286.26 fps, avg 246.78 fps, ETA 00h03m40s)
+Encoding: task 2 of 2, 54.94 % (274.09 fps, avg 246.90 fps, ETA 00h03m38s)
+Encoding: task 2 of 2, 55.02 % (253.64 fps, avg 246.86 fps, ETA 00h03m37s)
+Encoding: task 2 of 2, 55.49 % (264.40 fps, avg 247.11 fps, ETA 00h03m35s)
+Encoding: task 2 of 2, 55.95 % (274.06 fps, avg 247.19 fps, ETA 00h03m33s)
+Encoding: task 2 of 2, 56.00 % (296.95 fps, avg 247.43 fps, ETA 00h03m32s)
+Encoding: task 2 of 2, 56.50 % (296.73 fps, avg 247.75 fps, ETA 00h03m29s)
+Encoding: task 2 of 2, 57.02 % (307.97 fps, avg 248.16 fps, ETA 00h03m26s)
+Encoding: task 2 of 2, 57.48 % (299.54 fps, avg 248.33 fps, ETA 00h03m25s)
+[11:19:22] 2879.126221s: Video -> Film
+[11:19:22] sync: "Chapter 16" (16) at frame 69032 time 259125116
+Encoding: task 2 of 2, 57.92 % (281.37 fps, avg 248.54 fps, ETA 00h03m22s)
+Encoding: task 2 of 2, 58.00 % (258.93 fps, avg 248.45 fps, ETA 00h03m22s)
+Encoding: task 2 of 2, 58.46 % (265.42 fps, avg 248.72 fps, ETA 00h03m19s)
+Encoding: task 2 of 2, 58.86 % (250.48 fps, avg 248.58 fps, ETA 00h03m17s)
+Encoding: task 2 of 2, 59.03 % (250.48 fps, avg 248.58 fps, ETA 00h03m17s)
+Encoding: task 2 of 2, 59.42 % (254.39 fps, avg 248.61 fps, ETA 00h03m15s)
+Encoding: task 2 of 2, 59.82 % (237.27 fps, avg 248.44 fps, ETA 00h03m13s)
+Encoding: task 2 of 2, 60.02 % (226.36 fps, avg 248.37 fps, ETA 00h03m12s)
+Encoding: task 2 of 2, 60.40 % (234.50 fps, avg 248.29 fps, ETA 00h03m10s)
+Encoding: task 2 of 2, 60.80 % (230.17 fps, avg 248.18 fps, ETA 00h03m08s)
+Encoding: task 2 of 2, 61.02 % (239.62 fps, avg 248.20 fps, ETA 00h03m07s)
+Encoding: task 2 of 2, 61.42 % (246.49 fps, avg 248.17 fps, ETA 00h03m05s)
+Encoding: task 2 of 2, 61.83 % (247.44 fps, avg 248.14 fps, ETA 00h03m03s)
+Encoding: task 2 of 2, 62.04 % (241.63 fps, avg 248.10 fps, ETA 00h03m02s)
+Encoding: task 2 of 2, 62.41 % (230.40 fps, avg 247.96 fps, ETA 00h03m00s)
+Encoding: task 2 of 2, 62.77 % (212.91 fps, avg 247.70 fps, ETA 00h02m59s)
+Encoding: task 2 of 2, 63.01 % (221.32 fps, avg 247.69 fps, ETA 00h02m58s)
+Encoding: task 2 of 2, 63.36 % (220.03 fps, avg 247.42 fps, ETA 00h02m56s)
+Encoding: task 2 of 2, 63.72 % (219.25 fps, avg 247.21 fps, ETA 00h02m55s)
+Encoding: task 2 of 2, 64.05 % (215.42 fps, avg 247.09 fps, ETA 00h02m54s)
+Encoding: task 2 of 2, 64.43 % (233.38 fps, avg 247.06 fps, ETA 00h02m52s)
+Encoding: task 2 of 2, 64.88 % (242.95 fps, avg 246.92 fps, ETA 00h02m50s)
+Encoding: task 2 of 2, 65.03 % (246.25 fps, avg 247.06 fps, ETA 00h02m49s)
+Encoding: task 2 of 2, 65.53 % (292.34 fps, avg 247.35 fps, ETA 00h02m46s)
+Encoding: task 2 of 2, 65.97 % (280.40 fps, avg 247.53 fps, ETA 00h02m44s)
+Encoding: task 2 of 2, 66.00 % (280.40 fps, avg 247.53 fps, ETA 00h02m44s)
+Encoding: task 2 of 2, 66.52 % (282.10 fps, avg 247.81 fps, ETA 00h02m41s)
+Encoding: task 2 of 2, 66.99 % (295.12 fps, avg 248.10 fps, ETA 00h02m38s)
+Encoding: task 2 of 2, 67.06 % (295.12 fps, avg 248.10 fps, ETA 00h02m38s)
+Encoding: task 2 of 2, 67.55 % (294.47 fps, avg 248.42 fps, ETA 00h02m36s)
+Encoding: task 2 of 2, 67.99 % (283.34 fps, avg 248.63 fps, ETA 00h02m33s)
+Encoding: task 2 of 2, 68.05 % (283.34 fps, avg 248.63 fps, ETA 00h02m33s)
+Encoding: task 2 of 2, 68.45 % (258.70 fps, avg 248.52 fps, ETA 00h02m31s)
+Encoding: task 2 of 2, 68.83 % (228.81 fps, avg 248.44 fps, ETA 00h02m29s)
+Encoding: task 2 of 2, 69.04 % (238.11 fps, avg 248.42 fps, ETA 00h02m28s)
+Encoding: task 2 of 2, 69.47 % (245.62 fps, avg 248.48 fps, ETA 00h02m27s)
+Encoding: task 2 of 2, 69.94 % (267.50 fps, avg 248.59 fps, ETA 00h02m25s)
+Encoding: task 2 of 2, 70.02 % (268.70 fps, avg 248.66 fps, ETA 00h02m24s)
+Encoding: task 2 of 2, 70.42 % (254.51 fps, avg 248.65 fps, ETA 00h02m22s)
+Encoding: task 2 of 2, 70.90 % (268.82 fps, avg 248.83 fps, ETA 00h02m19s)
+Encoding: task 2 of 2, 71.01 % (268.82 fps, avg 248.83 fps, ETA 00h02m19s)
+Encoding: task 2 of 2, 71.52 % (298.37 fps, avg 249.12 fps, ETA 00h02m16s)
+Encoding: task 2 of 2, 72.03 % (322.58 fps, avg 249.64 fps, ETA 00h02m13s)
+Encoding: task 2 of 2, 72.55 % (310.22 fps, avg 249.97 fps, ETA 00h02m11s)
+Encoding: task 2 of 2, 73.00 % (314.84 fps, avg 250.21 fps, ETA 00h02m09s)
+[11:20:32] 3635.715576s: Video -> Film
+[11:20:32] sync: "Chapter 20" (20) at frame 87172 time 327218141
+Encoding: task 2 of 2, 73.48 % (297.37 fps, avg 250.39 fps, ETA 00h02m07s)
+Encoding: task 2 of 2, 73.95 % (287.77 fps, avg 250.64 fps, ETA 00h02m04s)
+Encoding: task 2 of 2, 74.00 % (287.77 fps, avg 250.64 fps, ETA 00h02m04s)
+Encoding: task 2 of 2, 74.49 % (285.58 fps, avg 250.82 fps, ETA 00h02m02s)
+Encoding: task 2 of 2, 75.01 % (309.68 fps, avg 251.18 fps, ETA 00h01m59s)
+Encoding: task 2 of 2, 75.56 % (313.68 fps, avg 251.55 fps, ETA 00h01m56s)
+Encoding: task 2 of 2, 76.01 % (296.69 fps, avg 251.69 fps, ETA 00h01m54s)
+Encoding: task 2 of 2, 76.45 % (271.70 fps, avg 251.79 fps, ETA 00h01m52s)
+Encoding: task 2 of 2, 76.93 % (266.15 fps, avg 251.93 fps, ETA 00h01m49s)
+Encoding: task 2 of 2, 77.02 % (266.15 fps, avg 251.93 fps, ETA 00h01m49s)
+Encoding: task 2 of 2, 77.49 % (284.42 fps, avg 252.11 fps, ETA 00h01m47s)
+Encoding: task 2 of 2, 77.96 % (283.93 fps, avg 252.28 fps, ETA 00h01m45s)
+Encoding: task 2 of 2, 78.01 % (283.93 fps, avg 252.28 fps, ETA 00h01m45s)
+Encoding: task 2 of 2, 78.43 % (248.07 fps, avg 252.22 fps, ETA 00h01m42s)
+Encoding: task 2 of 2, 78.90 % (253.68 fps, avg 252.25 fps, ETA 00h01m40s)
+Encoding: task 2 of 2, 79.04 % (273.10 fps, avg 252.40 fps, ETA 00h01m39s)
+Encoding: task 2 of 2, 79.51 % (286.74 fps, avg 252.53 fps, ETA 00h01m37s)
+Encoding: task 2 of 2, 79.97 % (281.13 fps, avg 252.66 fps, ETA 00h01m34s)
+Encoding: task 2 of 2, 80.02 % (281.13 fps, avg 252.66 fps, ETA 00h01m34s)
+Encoding: task 2 of 2, 80.50 % (279.09 fps, avg 252.80 fps, ETA 00h01m32s)
+Encoding: task 2 of 2, 80.94 % (275.17 fps, avg 252.91 fps, ETA 00h01m30s)
+Encoding: task 2 of 2, 81.00 % (275.17 fps, avg 252.91 fps, ETA 00h01m30s)
+Encoding: task 2 of 2, 81.48 % (274.13 fps, avg 253.09 fps, ETA 00h01m27s)
+Encoding: task 2 of 2, 82.01 % (305.49 fps, avg 253.40 fps, ETA 00h01m25s)
+Encoding: task 2 of 2, 82.49 % (301.17 fps, avg 253.64 fps, ETA 00h01m22s)
+Encoding: task 2 of 2, 82.98 % (287.87 fps, avg 253.77 fps, ETA 00h01m20s)
+Encoding: task 2 of 2, 83.01 % (287.87 fps, avg 253.77 fps, ETA 00h01m20s)
+Encoding: task 2 of 2, 83.44 % (283.39 fps, avg 253.85 fps, ETA 00h01m18s)
+Encoding: task 2 of 2, 83.91 % (253.77 fps, avg 253.92 fps, ETA 00h01m15s)
+Encoding: task 2 of 2, 84.02 % (253.77 fps, avg 253.92 fps, ETA 00h01m15s)
+Encoding: task 2 of 2, 84.48 % (281.90 fps, avg 254.03 fps, ETA 00h01m13s)
+Encoding: task 2 of 2, 84.85 % (245.36 fps, avg 253.95 fps, ETA 00h01m11s)
+Encoding: task 2 of 2, 85.03 % (240.16 fps, avg 253.92 fps, ETA 00h01m10s)
+Encoding: task 2 of 2, 85.53 % (264.62 fps, avg 254.03 fps, ETA 00h01m08s)
+Encoding: task 2 of 2, 85.90 % (250.49 fps, avg 253.94 fps, ETA 00h01m06s)
+Encoding: task 2 of 2, 86.00 % (250.49 fps, avg 253.94 fps, ETA 00h01m06s)
+Encoding: task 2 of 2, 86.36 % (230.19 fps, avg 253.86 fps, ETA 00h01m04s)
+Encoding: task 2 of 2, 86.67 % (194.10 fps, avg 253.48 fps, ETA 00h01m03s)
+Encoding: task 2 of 2, 87.00 % (197.83 fps, avg 253.27 fps, ETA 00h01m01s)
+Encoding: task 2 of 2, 87.41 % (239.51 fps, avg 253.21 fps, ETA 00h00m59s)
+Encoding: task 2 of 2, 87.82 % (246.98 fps, avg 253.22 fps, ETA 00h00m58s)
+Encoding: task 2 of 2, 88.04 % (230.47 fps, avg 253.04 fps, ETA 00h00m56s)
+Encoding: task 2 of 2, 88.45 % (226.24 fps, avg 253.01 fps, ETA 00h00m55s)
+Encoding: task 2 of 2, 88.83 % (249.36 fps, avg 253.01 fps, ETA 00h00m53s)
+Encoding: task 2 of 2, 89.03 % (221.25 fps, avg 252.78 fps, ETA 00h00m51s)
+Encoding: task 2 of 2, 89.42 % (217.94 fps, avg 252.65 fps, ETA 00h00m49s)
+Encoding: task 2 of 2, 89.80 % (226.03 fps, avg 252.59 fps, ETA 00h00m49s)
+Encoding: task 2 of 2, 90.02 % (220.11 fps, avg 252.41 fps, ETA 00h00m47s)
+Encoding: task 2 of 2, 90.41 % (215.53 fps, avg 252.31 fps, ETA 00h00m46s)
+Encoding: task 2 of 2, 90.76 % (225.63 fps, avg 252.21 fps, ETA 00h00m44s)
+Encoding: task 2 of 2, 91.00 % (209.48 fps, avg 251.99 fps, ETA 00h00m42s)
+Encoding: task 2 of 2, 91.39 % (215.89 fps, avg 251.84 fps, ETA 00h00m40s)
+Encoding: task 2 of 2, 91.70 % (207.27 fps, avg 251.67 fps, ETA 00h00m40s)
+Encoding: task 2 of 2, 92.01 % (204.06 fps, avg 251.50 fps, ETA 00h00m38s)
+Encoding: task 2 of 2, 92.42 % (234.71 fps, avg 251.46 fps, ETA 00h00m36s)
+Encoding: task 2 of 2, 92.75 % (213.87 fps, avg 251.29 fps, ETA 00h00m34s)
+Encoding: task 2 of 2, 93.01 % (181.03 fps, avg 250.88 fps, ETA 00h00m33s)
+Encoding: task 2 of 2, 93.31 % (172.14 fps, avg 250.70 fps, ETA 00h00m32s)
+Encoding: task 2 of 2, 93.67 % (195.25 fps, avg 250.49 fps, ETA 00h00m30s)
+Encoding: task 2 of 2, 94.04 % (251.13 fps, avg 250.62 fps, ETA 00h00m28s)
+[11:22:12] 4706.517578s: Video -> Film
+Encoding: task 2 of 2, 94.86 % (456.75 fps, avg 251.76 fps, ETA 00h00m24s)
+Encoding: task 2 of 2, 95.05 % (456.75 fps, avg 251.76 fps, ETA 00h00m24s)
+Encoding: task 2 of 2, 95.59 % (391.91 fps, avg 252.20 fps, ETA 00h00m21s)
+Encoding: task 2 of 2, 96.00 % (309.01 fps, avg 252.41 fps, ETA 00h00m19s)
+Encoding: task 2 of 2, 96.52 % (309.42 fps, avg 252.69 fps, ETA 00h00m16s)
+Encoding: task 2 of 2, 97.03 % (305.12 fps, avg 252.89 fps, ETA 00h00m14s)
+Encoding: task 2 of 2, 97.55 % (302.35 fps, avg 253.03 fps, ETA 00h00m12s)
+Encoding: task 2 of 2, 98.03 % (336.25 fps, avg 253.45 fps, ETA 00h00m09s)
+Encoding: task 2 of 2, 98.54 % (332.57 fps, avg 253.68 fps, ETA 00h00m07s)
+Encoding: task 2 of 2, 99.01 % (290.88 fps, avg 253.86 fps, ETA 00h00m05s)
+Encoding: task 2 of 2, 99.53 % (303.64 fps, avg 254.07 fps, ETA 00h00m02s)
+Encoding: task 2 of 2, 100.00 % (316.75 fps, avg 254.27 fps, ETA 00h00m01s)[11:22:33] work: average encoding speed for job is 254.270615 fps
+[11:22:33] comb detect: heavy 282 | light 999 | uncombed 118001 | total 119282
+[11:22:33] decomb: deinterlaced 282 | blended 999 | unfiltered 118001 | total 119282
+[11:22:33] vfr: lost time: 0 (0 frames)
+[11:22:33] vfr: gained time: 0 (0 frames) (0 not accounted for)
+[11:22:33] ac3-decoder done: 155469 frames, 0 decoder errors
+[11:22:33] ac3-decoder done: 155469 frames, 0 decoder errors
+[11:22:33] mpeg2video-decoder done: 119282 frames, 0 decoder errors
+[11:22:33] sync: got 119282 frames, 119281 expected
+[11:22:33] sync: framerate min 19.980 fps, max 30.303 fps, avg 23.976 fps
+x264 [info]: frame I:1407  Avg QP:16.81  size: 34839
+x264 [info]: frame P:32814 Avg QP:19.47  size:  9377
+x264 [info]: frame B:85061 Avg QP:22.38  size:  2331
+x264 [info]: consecutive B-frames:  3.2%  4.3%  2.4% 90.1%
+x264 [info]: mb I  I16..4:  5.4% 88.6%  5.9%
+x264 [info]: mb P  I16..4:  1.6%  9.3%  0.5%  P16..4: 43.7% 18.6% 10.5%  0.0%  0.0%    skip:15.9%
+x264 [info]: mb B  I16..4:  0.2%  1.0%  0.1%  B16..8: 39.0%  5.5%  1.2%  direct: 2.3%  skip:50.7%  L0:41.4% L1:50.3% BI: 8.3%
+x264 [info]: 8x8 transform intra:82.9% inter:74.3%
+x264 [info]: direct mvs  spatial:99.9% temporal:0.1%
+x264 [info]: coded y,uvDC,uvAC intra: 77.6% 83.5% 49.4% inter: 13.9% 20.3% 2.0%
+x264 [info]: i16 v,h,dc,p: 33% 17% 12% 37%
+x264 [info]: i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 13% 10% 13%  8% 11% 12% 11% 11% 12%
+x264 [info]: i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 10%  7%  4%  9% 17% 16% 14% 11% 11%
+x264 [info]: i8c dc,h,v,p: 40% 22% 21% 17%
+x264 [info]: Weighted P-Frames: Y:3.5% UV:1.8%
+x264 [info]: ref P L0: 54.6% 12.8% 18.6%  6.6%  7.1%  0.4%  0.0%
+x264 [info]: ref B L0: 82.1% 11.9%  4.5%  1.5%
+x264 [info]: ref B L1: 96.0%  4.0%
+x264 [info]: kb/s:892.40
+[11:22:33] mux: track 0, 119282 frames, 554902618 bytes, 892.30 kbps, fifo 2048
+[11:22:33] mux: track 1, 233204 frames, 99607611 bytes, 160.17 kbps, fifo 4096
+[11:22:33] mux: track 2, 155469 frames, 278600448 bytes, 448.00 kbps, fifo 4096
+[11:22:33] Finished work at: Sat Feb 21 11:22:33 2026
+[11:22:33] libhb: work result = 0
+Encode done!
+HandBrake has exited.
+HandBrake done: 1/3: Antz.mp4
+HandBrake start: 2/3: Extra.mp4
+[11:22:33] Compile-time hardening features are enabled
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+[11:22:33] hb_init: starting libhb thread
+[11:22:33] thread 7d9782205640 started ("libhb")
+HandBrake 1.5.1 (2022030700) - Linux x86_64 - https://handbrake.fr
+12 CPUs detected
+Opening /home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv...
+[11:22:33] CPU: AMD Ryzen 5 5600G with Radeon Graphics
+[11:22:33]  - logical processor count: 12
+[11:22:33] hb_scan: path=/home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv, title_index=1
+udfread ERROR: ECMA 167 Volume Recognition failed
+disc.c:333: failed opening UDF image /home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv
+disc.c:437: error opening file BDMV/index.bdmv
+disc.c:437: error opening file BDMV/BACKUP/index.bdmv
+bluray.c:2652: nav_get_title_list(/home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv/) failed
+[11:22:33] bd: not a bd - trying as a stream/file instead
+libdvdread: DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed
+libdvdnav: vm: vm: failed to read VIDEO_TS.IFO
+[11:22:33] dvd: not a dvd - trying as a stream/file instead
+Input #0, matroska,webm, from '/home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv':
+Metadata:
+encoder         : libmakemkv v1.18.2 (1.3.10/1.5.2) x86_64-linux-gnu
+creation_time   : 2026-02-21T17:09:49.000000Z
+Duration: 00:11:08.50, start: 0.000000, bitrate: 5611 kb/s
+Stream #0:0(eng): Video: mpeg2video (Main), yuv420p(tv, top first), 720x480 [SAR 8:9 DAR 4:3], 29.97 fps, 29.97 tbr, 1k tbn, 59.94 tbc
+Metadata:
+BPS-eng         : 5413489
+DURATION-eng    : 00:11:08.501166666
+NUMBER_OF_FRAMES-eng: 20035
+NUMBER_OF_BYTES-eng: 452365380
+SOURCE_ID-eng   : 0100E0
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 17:09:49
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+Side data:
+cpb: bitrate max/min/avg: 6800000/0/0 buffer size: 1835008 vbv_delay: N/A
+Stream #0:1(eng): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s (default)
+Metadata:
+title           : Stereo
+BPS-eng         : 192000
+DURATION-eng    : 00:11:08.480000000
+NUMBER_OF_FRAMES-eng: 20890
+NUMBER_OF_BYTES-eng: 16043520
+SOURCE_ID-eng   : 0180BD
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 17:09:49
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+[11:22:33] scan: decoding previews for title 1
+[11:22:33] scan: audio 0x1: ac3, rate=48000Hz, bitrate=192000 English (AC3) (2.0 ch) (192 kbps)
+[11:22:33] scan: 10 previews, 720x480, 29.970 fps, autocrop = 44/66/8/2, aspect 4:3, PAR 8:9, color profile: 6-1-6, chroma location: left
+[11:22:33] libhb: scan thread found 1 valid title(s)
++ Using preset: HQ 1080p30 Surround
++ title 1:
++ stream: /home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv
++ duration: 00:11:08
++ size: 720x480, pixel aspect: 8/9, display aspect: 1.33, 29.970 fps
++ autocrop: 44/66/8/2
++ chapters:
++ 1: duration 00:11:08
++ audio tracks:
++ 1, English (AC3) (2.0 ch) (192 kbps) (iso639-2: eng), 48000Hz, 192000bps
++ subtitle tracks:
+[11:22:33] Starting work at: Sat Feb 21 11:22:33 2026
+[11:22:33] 1 job(s) to process
+[11:22:33] json job:
+{
+"Audio": {
+"AudioList": [
+{
+"Bitrate": 160,
+"CompressionLevel": -1.0,
+"DRC": 0.0,
+"DitherMethod": "auto",
+"Encoder": "av_aac",
+"Gain": 0.0,
+"Mixdown": "stereo",
+"Name": "Stereo",
+"NormalizeMixLevel": false,
+"PresetEncoder": "av_aac",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+},
+{
+"Bitrate": 0,
+"DRC": 0.0,
+"Encoder": "copy:ac3",
+"Mixdown": "none",
+"Name": "Stereo",
+"PresetEncoder": "copy:ac3",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+}
+],
+"CopyMask": [
+"copy:aac",
+"copy:ac3"
+],
+"FallbackEncoder": "av_aac"
+},
+"Destination": {
+"AlignAVStart": true,
+"ChapterList": [
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 11,
+"Seconds": 8,
+"Ticks": 60165090
+},
+"Name": ""
+}
+],
+"ChapterMarkers": false,
+"File": "/storage/Movies/Antz (1998)/Extras/Extra.mp4",
+"InlineParameterSets": false,
+"Mp4Options": {
+"IpodAtom": false,
+"Mp4Optimize": false
+},
+"Mux": "m4v"
+},
+"Filters": {
+"FilterList": [
+{
+"ID": 3,
+"Settings": {
+"block-height": "16",
+"block-thresh": "40",
+"block-width": "16",
+"filter-mode": "2",
+"mode": "3",
+"motion-thresh": "1",
+"spatial-metric": "2",
+"spatial-thresh": "1"
+}
+},
+{
+"ID": 4,
+"Settings": {
+"mode": "7"
+}
+},
+{
+"ID": 6,
+"Settings": {
+"mode": 2,
+"rate": "27000000/900000"
+}
+},
+{
+"ID": 13,
+"Settings": {
+"crop-bottom": 66,
+"crop-left": 8,
+"crop-right": 2,
+"crop-top": 44,
+"height": 370,
+"width": 710
+}
+}
+]
+},
+"Metadata": {},
+"PAR": {
+"Den": 9,
+"Num": 8
+},
+"SequenceID": 0,
+"Source": {
+"Angle": 0,
+"Path": "/home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv",
+"Range": {
+"End": 1,
+"Start": 1,
+"Type": "chapter"
+},
+"Title": 1
+},
+"Subtitle": {
+"Search": {
+"Burn": true,
+"Default": false,
+"Enable": false,
+"Forced": false
+},
+"SubtitleList": []
+},
+"Video": {
+"ChromaLocation": 1,
+"ColorInputFormat": 0,
+"ColorMatrix": 6,
+"ColorOutputFormat": 0,
+"ColorPrimaries": 6,
+"ColorRange": 1,
+"ColorTransfer": 1,
+"Encoder": "x264",
+"Level": "4.0",
+"Options": "",
+"Preset": "slow",
+"Profile": "high",
+"QSV": {
+"AdapterIndex": 0,
+"AsyncDepth": 0,
+"Decode": false
+},
+"Quality": 20.0,
+"Tune": "",
+"Turbo": false,
+"TwoPass": false
+}
+}
+[11:22:33] Starting Task: Encoding Pass
+[11:22:33] job configuration:
+[11:22:33]  * source
+[11:22:33]    + /home/shunobies/Antz (1998)/MKVs/Disc01/B3_t01.mkv
+[11:22:33]    + title 1, chapter(s) 1 to 1
+[11:22:33]    + container: matroska,webm
+[11:22:33]    + data rate: 5611 kbps
+[11:22:33]  * destination
+[11:22:33]    + /storage/Movies/Antz (1998)/Extras/Extra.mp4
+[11:22:33]    + container: MPEG-4 (libavformat)
+[11:22:33]      + align initial A/V stream timestamps
+[11:22:33]  * video track
+[11:22:33]    + decoder: mpeg2video 8-bit (yuv420p)
+[11:22:33]    + filters
+[11:22:33]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[11:22:33]      + Decomb (mode=39)
+[11:22:33]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[11:22:33]        + frame rate: 29.970 fps -> peak rate limited to 30.000 fps
+[11:22:33]      + Crop and Scale (width=710:height=370:crop-top=44:crop-bottom=66:crop-left=8:crop-right=2)
+[11:22:33]        + source: 720 * 480, crop (44/66/8/2): 710 * 370, scale: 710 * 370
+[11:22:33]    + Output geometry
+[11:22:33]      + storage dimensions: 710 x 370
+[11:22:33]      + pixel aspect ratio: 8 : 9
+[11:22:33]      + display dimensions: 631 x 370
+[11:22:33]    + encoder: H.264 (libx264)
+[11:22:33]      + preset:  slow
+[11:22:33]      + profile: high
+[11:22:33]      + level:   4.0
+[11:22:33]      + quality: 20.00 (RF)
+[11:22:33]      + color profile: 6-1-6
+[11:22:33]      + chroma location: left
+[11:22:33]  * audio track 1
+[11:22:33]    + name: Stereo
+[11:22:33]    + decoder: English (AC3) (2.0 ch) (192 kbps) (track 1, id 0x1)
+[11:22:33]      + bitrate: 192 kbps, samplerate: 48000 Hz
+[11:22:33]    + mixdown: Stereo
+[11:22:33]    + encoder: AAC (libavcodec)
+[11:22:33]      + bitrate: 160 kbps, samplerate: 48000 Hz
+[11:22:33]  * audio track 2
+[11:22:33]    + name: Stereo
+[11:22:33]    + decoder: English (AC3) (2.0 ch) (192 kbps) (track 1, id 0x1)
+[11:22:33]      + bitrate: 192 kbps, samplerate: 48000 Hz
+[11:22:33]    + AC3 Passthru
+[11:22:33] sync: expecting 20034 video frames
+[11:22:33] encx264: min-keyint: 30, keyint: 300
+[11:22:33] encx264: encoding at constant RF 20.000000
+[11:22:33] encx264: unparsed options: level=4.0:ref=5:direct=auto:subme=8:trellis=2:vbv-bufsize=31250:vbv-maxrate=25000:rc-lookahead=50
+x264 [info]: using SAR=8/9
+x264 [info]: using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+x264 [info]: profile High, level 4.0, 4:2:0, 8-bit
+[11:22:33] sync: first pts video is 0
+[11:22:33] sync: first pts audio 0x1 is 0
+[11:22:33] sync: first pts audio 0x1 is 0
+[11:22:33] sync: Chapter 1 at frame 3 time 6006
+libdvdread: Can't open file VIDEO_TS.IFO.
+Encoding: task 1 of 1, 1.16 %
+Encoding: task 1 of 1, 2.25 %
+Encoding: task 1 of 1, 3.02 %
+Encoding: task 1 of 1, 4.12 %
+Encoding: task 1 of 1, 5.18 %
+Encoding: task 1 of 1, 6.03 % (228.09 fps, avg 275.96 fps, ETA 00h01m08s)
+Encoding: task 1 of 1, 7.11 % (233.96 fps, avg 265.17 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 8.11 % (233.96 fps, avg 265.17 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 9.06 % (233.21 fps, avg 259.38 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 10.02 % (225.83 fps, avg 255.13 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 11.12 % (222.70 fps, avg 249.61 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 12.22 % (217.82 fps, avg 245.76 fps, ETA 00h01m12s)
+Encoding: task 1 of 1, 13.02 % (210.73 fps, avg 241.75 fps, ETA 00h01m12s)
+Encoding: task 1 of 1, 14.27 % (217.16 fps, avg 240.57 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 15.08 % (217.16 fps, avg 240.57 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 16.03 % (222.02 fps, avg 239.56 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 17.19 % (224.72 fps, avg 237.69 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 18.26 % (231.54 fps, avg 238.60 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 19.10 % (245.49 fps, avg 240.74 fps, ETA 00h01m07s)
+Encoding: task 1 of 1, 20.25 % (257.20 fps, avg 241.33 fps, ETA 00h01m06s)
+Encoding: task 1 of 1, 21.22 % (237.68 fps, avg 238.44 fps, ETA 00h01m06s)
+Encoding: task 1 of 1, 22.02 % (237.68 fps, avg 238.44 fps, ETA 00h01m06s)
+Encoding: task 1 of 1, 23.11 % (213.53 fps, avg 236.36 fps, ETA 00h01m05s)
+Encoding: task 1 of 1, 24.10 % (198.90 fps, avg 234.73 fps, ETA 00h01m05s)
+Encoding: task 1 of 1, 25.07 % (204.27 fps, avg 233.39 fps, ETA 00h01m04s)
+Encoding: task 1 of 1, 26.02 % (198.70 fps, avg 231.05 fps, ETA 00h01m04s)
+Encoding: task 1 of 1, 27.29 % (198.58 fps, avg 229.85 fps, ETA 00h01m04s)
+Encoding: task 1 of 1, 28.09 % (196.56 fps, avg 228.49 fps, ETA 00h01m03s)
+Encoding: task 1 of 1, 29.05 % (203.35 fps, avg 227.44 fps, ETA 00h01m02s)
+Encoding: task 1 of 1, 30.00 % (208.20 fps, avg 227.19 fps, ETA 00h01m01s)
+Encoding: task 1 of 1, 31.10 % (213.97 fps, avg 226.82 fps, ETA 00h01m01s)
+Encoding: task 1 of 1, 32.08 % (214.77 fps, avg 226.04 fps, ETA 00h01m00s)
+Encoding: task 1 of 1, 33.03 % (214.77 fps, avg 226.04 fps, ETA 00h01m00s)
+Encoding: task 1 of 1, 34.00 % (207.43 fps, avg 225.02 fps, ETA 00h00m59s)
+Encoding: task 1 of 1, 35.13 % (176.81 fps, avg 220.74 fps, ETA 00h00m59s)
+Encoding: task 1 of 1, 36.04 % (164.50 fps, avg 218.64 fps, ETA 00h00m58s)
+Encoding: task 1 of 1, 37.09 % (165.92 fps, avg 217.23 fps, ETA 00h00m58s)
+Encoding: task 1 of 1, 38.22 % (167.91 fps, avg 215.70 fps, ETA 00h00m57s)
+Encoding: task 1 of 1, 39.03 % (172.66 fps, avg 214.47 fps, ETA 00h00m57s)
+Encoding: task 1 of 1, 40.12 % (173.66 fps, avg 213.40 fps, ETA 00h00m56s)
+Encoding: task 1 of 1, 41.12 % (163.25 fps, avg 211.22 fps, ETA 00h00m56s)
+Encoding: task 1 of 1, 42.12 % (156.31 fps, avg 209.63 fps, ETA 00h00m56s)
+Encoding: task 1 of 1, 43.01 % (154.01 fps, avg 208.55 fps, ETA 00h00m55s)
+Encoding: task 1 of 1, 44.16 % (185.60 fps, avg 209.24 fps, ETA 00h00m54s)
+Encoding: task 1 of 1, 45.26 % (225.60 fps, avg 210.80 fps, ETA 00h00m52s)
+Encoding: task 1 of 1, 46.06 % (225.60 fps, avg 210.80 fps, ETA 00h00m52s)
+Encoding: task 1 of 1, 47.01 % (256.92 fps, avg 212.07 fps, ETA 00h00m50s)
+Encoding: task 1 of 1, 48.16 % (258.31 fps, avg 212.74 fps, ETA 00h00m49s)
+Encoding: task 1 of 1, 49.11 % (237.42 fps, avg 212.68 fps, ETA 00h00m48s)
+Encoding: task 1 of 1, 50.06 % (223.77 fps, avg 212.86 fps, ETA 00h00m47s)
+Encoding: task 1 of 1, 51.01 % (224.60 fps, avg 213.50 fps, ETA 00h00m46s)
+Encoding: task 1 of 1, 52.29 % (220.94 fps, avg 213.19 fps, ETA 00h00m45s)
+Encoding: task 1 of 1, 53.07 % (220.94 fps, avg 213.19 fps, ETA 00h00m45s)
+Encoding: task 1 of 1, 54.18 % (217.00 fps, avg 213.12 fps, ETA 00h00m44s)
+Encoding: task 1 of 1, 55.13 % (209.47 fps, avg 213.26 fps, ETA 00h00m43s)
+Encoding: task 1 of 1, 56.29 % (226.61 fps, avg 213.99 fps, ETA 00h00m41s)
+Encoding: task 1 of 1, 57.04 % (226.61 fps, avg 213.99 fps, ETA 00h00m41s)
+Encoding: task 1 of 1, 58.18 % (270.68 fps, avg 216.44 fps, ETA 00h00m39s)
+Encoding: task 1 of 1, 59.30 % (288.28 fps, avg 217.59 fps, ETA 00h00m38s)
+Encoding: task 1 of 1, 60.08 % (288.28 fps, avg 217.59 fps, ETA 00h00m38s)
+Encoding: task 1 of 1, 61.19 % (293.51 fps, avg 218.57 fps, ETA 00h00m36s)
+Encoding: task 1 of 1, 62.15 % (268.73 fps, avg 219.43 fps, ETA 00h00m35s)
+Encoding: task 1 of 1, 63.28 % (262.15 fps, avg 220.05 fps, ETA 00h00m33s)
+Encoding: task 1 of 1, 64.08 % (262.15 fps, avg 220.05 fps, ETA 00h00m33s)
+Encoding: task 1 of 1, 65.05 % (261.61 fps, avg 220.92 fps, ETA 00h00m32s)
+Encoding: task 1 of 1, 66.01 % (256.60 fps, avg 221.40 fps, ETA 00h00m31s)
+Encoding: task 1 of 1, 67.15 % (261.78 fps, avg 222.26 fps, ETA 00h00m29s)
+Encoding: task 1 of 1, 68.24 % (261.78 fps, avg 222.26 fps, ETA 00h00m29s)
+Encoding: task 1 of 1, 69.02 % (260.92 fps, avg 222.99 fps, ETA 00h00m28s)
+Encoding: task 1 of 1, 70.13 % (275.53 fps, avg 224.12 fps, ETA 00h00m26s)
+Encoding: task 1 of 1, 71.26 % (258.36 fps, avg 224.01 fps, ETA 00h00m25s)
+Encoding: task 1 of 1, 72.20 % (258.36 fps, avg 224.01 fps, ETA 00h00m25s)
+Encoding: task 1 of 1, 73.03 % (247.33 fps, avg 224.16 fps, ETA 00h00m24s)
+Encoding: task 1 of 1, 74.11 % (227.16 fps, avg 224.27 fps, ETA 00h00m23s)
+Encoding: task 1 of 1, 75.09 % (228.04 fps, avg 224.21 fps, ETA 00h00m22s)
+Encoding: task 1 of 1, 76.01 % (228.04 fps, avg 224.21 fps, ETA 00h00m22s)
+Encoding: task 1 of 1, 77.18 % (241.20 fps, avg 224.96 fps, ETA 00h00m21s)
+Encoding: task 1 of 1, 78.14 % (244.62 fps, avg 225.20 fps, ETA 00h00m20s)
+Encoding: task 1 of 1, 79.10 % (253.58 fps, avg 225.53 fps, ETA 00h00m19s)
+Encoding: task 1 of 1, 80.25 % (233.26 fps, avg 225.34 fps, ETA 00h00m17s)
+Encoding: task 1 of 1, 81.05 % (233.26 fps, avg 225.34 fps, ETA 00h00m17s)
+Encoding: task 1 of 1, 82.03 % (237.70 fps, avg 225.75 fps, ETA 00h00m16s)
+Encoding: task 1 of 1, 83.04 % (250.32 fps, avg 226.60 fps, ETA 00h00m15s)
+Encoding: task 1 of 1, 84.13 % (257.78 fps, avg 226.71 fps, ETA 00h00m14s)
+Encoding: task 1 of 1, 85.20 % (232.67 fps, avg 226.04 fps, ETA 00h00m13s)
+Encoding: task 1 of 1, 86.18 % (204.62 fps, avg 225.65 fps, ETA 00h00m12s)
+Encoding: task 1 of 1, 87.00 % (187.73 fps, avg 225.09 fps, ETA 00h00m11s)
+Encoding: task 1 of 1, 88.28 % (201.45 fps, avg 225.05 fps, ETA 00h00m10s)
+Encoding: task 1 of 1, 89.22 % (201.45 fps, avg 225.05 fps, ETA 00h00m10s)
+Encoding: task 1 of 1, 90.18 % (232.45 fps, avg 225.92 fps, ETA 00h00m09s)
+Encoding: task 1 of 1, 91.11 % (250.00 fps, avg 226.08 fps, ETA 00h00m08s)
+Encoding: task 1 of 1, 92.21 % (256.35 fps, avg 226.26 fps, ETA 00h00m07s)
+Encoding: task 1 of 1, 93.16 % (256.35 fps, avg 226.26 fps, ETA 00h00m07s)
+Encoding: task 1 of 1, 94.14 % (228.35 fps, avg 226.01 fps, ETA 00h00m06s)
+Encoding: task 1 of 1, 95.20 % (233.89 fps, avg 226.37 fps, ETA 00h00m04s)
+Encoding: task 1 of 1, 96.24 % (267.54 fps, avg 227.79 fps, ETA 00h00m03s)
+Encoding: task 1 of 1, 97.04 % (267.54 fps, avg 227.79 fps, ETA 00h00m03s)
+Encoding: task 1 of 1, 98.01 % (292.82 fps, avg 228.43 fps, ETA 00h00m02s)
+Encoding: task 1 of 1, 99.30 % (292.82 fps, avg 228.43 fps, ETA 00h00m02s)
+Encoding: task 1 of 1, 100.00 % (308.94 fps, avg 229.36 fps, ETA 00h00m00s)
+[11:24:01] comb detect: heavy 14845 | light 1729 | uncombed 3461 | total 20035
+[11:24:01] decomb: deinterlaced 14845 | blended 1729 | unfiltered 3461 | total 20035
+[11:24:01] vfr: 20035 frames output, 0 dropped and 0 duped for CFR/PFR
+[11:24:01] vfr: lost time: 0 (0 frames)
+[11:24:01] vfr: gained time: 0 (0 frames) (0 not accounted for)
+[11:24:01] ac3-decoder done: 20890 frames, 0 decoder errors
+[11:24:01] mpeg2video-decoder done: 20035 frames, 0 decoder errors
+[11:24:01] sync: got 20035 frames, 20034 expected
+[11:24:01] sync: framerate min 29.970 fps, max 29.970 fps, avg 29.970 fps
+x264 [info]: frame I:302   Avg QP:19.29  size: 30670
+x264 [info]: frame P:5252  Avg QP:22.06  size: 13740
+x264 [info]: frame B:14481 Avg QP:24.51  size:  4621
+x264 [info]: consecutive B-frames:  2.6%  2.0%  3.0% 92.4%
+x264 [info]: mb I  I16..4: 10.0% 71.3% 18.6%
+x264 [info]: mb P  I16..4:  2.3% 12.8%  2.8%  P16..4: 36.0% 19.6%  9.9%  0.0%  0.0%    skip:16.6%
+x264 [info]: mb B  I16..4:  0.2%  1.2%  0.4%  B16..8: 30.8%  9.5%  2.4%  direct: 8.3%  skip:47.2%  L0:43.8% L1:42.2% BI:14.0%
+x264 [info]: 8x8 transform intra:70.5% inter:65.9%
+x264 [info]: direct mvs  spatial:99.3% temporal:0.7%
+x264 [info]: coded y,uvDC,uvAC intra: 78.0% 81.1% 57.2% inter: 27.6% 31.0% 4.4%
+x264 [info]: i16 v,h,dc,p: 31% 36% 10% 23%
+x264 [info]: i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 16% 12%  9%  8% 10% 11% 11% 11% 13%
+x264 [info]: i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 16% 15%  6%  7% 11% 11% 12%  9% 13%
+x264 [info]: i8c dc,h,v,p: 40% 28% 17% 15%
+x264 [info]: Weighted P-Frames: Y:9.9% UV:5.4%
+x264 [info]: ref P L0: 46.8% 12.7% 21.9%  7.8%  9.9%  0.8%  0.0%
+x264 [info]: ref B L0: 75.7% 16.3%  5.8%  2.3%
+x264 [info]: ref B L1: 95.2%  4.8%
+x264 [info]: kb/s:1775.21
+[11:24:01] mux: track 0, 20035 frames, 148329702 bytes, 1774.98 kbps, fifo 2048
+[11:24:01] mux: track 1, 31336 frames, 13389314 bytes, 160.22 kbps, fifo 4096
+[11:24:01] mux: track 2, 20890 frames, 16043520 bytes, 191.98 kbps, fifo 2048
+[11:24:01] Finished work at: Sat Feb 21 11:24:01 2026
+[11:24:01] libhb: work result = 0
+Encode done!
+HandBrake has exited.
+HandBrake done: 2/3: Extra.mp4
+HandBrake start: 3/3: Extra.mp4
+[11:24:01] Compile-time hardening features are enabled
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+Cannot load libnvidia-encode.so.1
+[11:24:01] hb_init: starting libhb thread
+[11:24:01] thread 7a9ffb703640 started ("libhb")
+HandBrake 1.5.1 (2022030700) - Linux x86_64 - https://handbrake.fr
+12 CPUs detected
+Opening /home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv...
+[11:24:01] CPU: AMD Ryzen 5 5600G with Radeon Graphics
+[11:24:01]  - logical processor count: 12
+[11:24:01] hb_scan: path=/home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv, title_index=1
+udfread ERROR: ECMA 167 Volume Recognition failed
+disc.c:333: failed opening UDF image /home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv
+disc.c:437: error opening file BDMV/index.bdmv
+disc.c:437: error opening file BDMV/BACKUP/index.bdmv
+bluray.c:2652: nav_get_title_list(/home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv/) failed
+[11:24:01] bd: not a bd - trying as a stream/file instead
+libdvdread: DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed
+libdvdnav: vm: vm: failed to read VIDEO_TS.IFO
+[11:24:01] dvd: not a dvd - trying as a stream/file instead
+Input #0, matroska,webm, from '/home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv':
+Metadata:
+encoder         : libmakemkv v1.18.2 (1.3.10/1.5.2) x86_64-linux-gnu
+creation_time   : 2026-02-21T17:12:08.000000Z
+Duration: 00:10:30.03, start: 0.000000, bitrate: 5598 kb/s
+Stream #0:0(eng): Video: mpeg2video (Main), yuv420p(tv, top first), 720x480 [SAR 8:9 DAR 4:3], 29.97 fps, 29.97 tbr, 1k tbn, 59.94 tbc
+Metadata:
+BPS-eng         : 5401103
+DURATION-eng    : 00:10:30.029400000
+NUMBER_OF_FRAMES-eng: 18882
+NUMBER_OF_BYTES-eng: 425356484
+SOURCE_ID-eng   : 0100E0
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 17:12:08
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+Side data:
+cpb: bitrate max/min/avg: 6800000/0/0 buffer size: 1835008 vbv_delay: N/A
+Stream #0:1(eng): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s (default)
+Metadata:
+title           : Stereo
+BPS-eng         : 192000
+DURATION-eng    : 00:10:30.016000000
+NUMBER_OF_FRAMES-eng: 19688
+NUMBER_OF_BYTES-eng: 15120384
+SOURCE_ID-eng   : 0180BD
+_STATISTICS_WRITING_APP-eng: MakeMKV v1.18.2 linux(x64-release)
+_STATISTICS_WRITING_DATE_UTC-eng: 2026-02-21 17:12:08
+_STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES SOURCE_ID
+[11:24:01] scan: decoding previews for title 1
+[11:24:01] scan: audio 0x1: ac3, rate=48000Hz, bitrate=192000 English (AC3) (2.0 ch) (192 kbps)
+[11:24:01] scan: 10 previews, 720x480, 29.970 fps, autocrop = 0/0/4/2, aspect 4:3, PAR 8:9, color profile: 6-1-6, chroma location: left
+[11:24:01] libhb: scan thread found 1 valid title(s)
++ Using preset: HQ 1080p30 Surround
++ title 1:
++ stream: /home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv
++ duration: 00:10:30
++ size: 720x480, pixel aspect: 8/9, display aspect: 1.33, 29.970 fps
++ autocrop: 0/0/4/2
++ chapters:
++ 1: duration 00:10:30
++ audio tracks:
++ 1, English (AC3) (2.0 ch) (192 kbps) (iso639-2: eng), 48000Hz, 192000bps
++ subtitle tracks:
+[11:24:01] Starting work at: Sat Feb 21 11:24:01 2026
+[11:24:01] 1 job(s) to process
+[11:24:01] json job:
+{
+"Audio": {
+"AudioList": [
+{
+"Bitrate": 160,
+"CompressionLevel": -1.0,
+"DRC": 0.0,
+"DitherMethod": "auto",
+"Encoder": "av_aac",
+"Gain": 0.0,
+"Mixdown": "stereo",
+"Name": "Stereo",
+"NormalizeMixLevel": false,
+"PresetEncoder": "av_aac",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+},
+{
+"Bitrate": 0,
+"DRC": 0.0,
+"Encoder": "copy:ac3",
+"Mixdown": "none",
+"Name": "Stereo",
+"PresetEncoder": "copy:ac3",
+"Quality": -3.0,
+"Samplerate": 0,
+"Track": 0
+}
+],
+"CopyMask": [
+"copy:aac",
+"copy:ac3"
+],
+"FallbackEncoder": "av_aac"
+},
+"Destination": {
+"AlignAVStart": true,
+"ChapterList": [
+{
+"Duration": {
+"Hours": 0,
+"Minutes": 10,
+"Seconds": 30,
+"Ticks": 56702610
+},
+"Name": ""
+}
+],
+"ChapterMarkers": false,
+"File": "/storage/Movies/Antz (1998)/Extras/Extra.mp4",
+"InlineParameterSets": false,
+"Mp4Options": {
+"IpodAtom": false,
+"Mp4Optimize": false
+},
+"Mux": "m4v"
+},
+"Filters": {
+"FilterList": [
+{
+"ID": 3,
+"Settings": {
+"block-height": "16",
+"block-thresh": "40",
+"block-width": "16",
+"filter-mode": "2",
+"mode": "3",
+"motion-thresh": "1",
+"spatial-metric": "2",
+"spatial-thresh": "1"
+}
+},
+{
+"ID": 4,
+"Settings": {
+"mode": "7"
+}
+},
+{
+"ID": 6,
+"Settings": {
+"mode": 2,
+"rate": "27000000/900000"
+}
+},
+{
+"ID": 13,
+"Settings": {
+"crop-bottom": 0,
+"crop-left": 4,
+"crop-right": 2,
+"crop-top": 0,
+"height": 480,
+"width": 714
+}
+}
+]
+},
+"Metadata": {},
+"PAR": {
+"Den": 9,
+"Num": 8
+},
+"SequenceID": 0,
+"Source": {
+"Angle": 0,
+"Path": "/home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv",
+"Range": {
+"End": 1,
+"Start": 1,
+"Type": "chapter"
+},
+"Title": 1
+},
+"Subtitle": {
+"Search": {
+"Burn": true,
+"Default": false,
+"Enable": false,
+"Forced": false
+},
+"SubtitleList": []
+},
+"Video": {
+"ChromaLocation": 1,
+"ColorInputFormat": 0,
+"ColorMatrix": 6,
+"ColorOutputFormat": 0,
+"ColorPrimaries": 6,
+"ColorRange": 1,
+"ColorTransfer": 1,
+"Encoder": "x264",
+"Level": "4.0",
+"Options": "",
+"Preset": "slow",
+"Profile": "high",
+"QSV": {
+"AdapterIndex": 0,
+"AsyncDepth": 0,
+"Decode": false
+},
+"Quality": 20.0,
+"Tune": "",
+"Turbo": false,
+"TwoPass": false
+}
+}
+[11:24:01] Starting Task: Encoding Pass
+[11:24:01] job configuration:
+[11:24:01]  * source
+[11:24:01]    + /home/shunobies/Antz (1998)/MKVs/Disc01/B5_t02.mkv
+[11:24:01]    + title 1, chapter(s) 1 to 1
+[11:24:01]    + container: matroska,webm
+[11:24:01]    + data rate: 5598 kbps
+[11:24:01]  * destination
+[11:24:01]    + /storage/Movies/Antz (1998)/Extras/Extra.mp4
+[11:24:01]    + container: MPEG-4 (libavformat)
+[11:24:01]      + align initial A/V stream timestamps
+[11:24:01]  * video track
+[11:24:01]    + decoder: mpeg2video 8-bit (yuv420p)
+[11:24:01]    + filters
+[11:24:01]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[11:24:01]      + Decomb (mode=39)
+[11:24:01]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[11:24:01]        + frame rate: 29.970 fps -> peak rate limited to 30.000 fps
+[11:24:01]      + Crop and Scale (width=714:height=480:crop-top=0:crop-bottom=0:crop-left=4:crop-right=2)
+[11:24:01]        + source: 720 * 480, crop (0/0/4/2): 714 * 480, scale: 714 * 480
+[11:24:01]    + Output geometry
+[11:24:01]      + storage dimensions: 714 x 480
+[11:24:01]      + pixel aspect ratio: 8 : 9
+[11:24:01]      + display dimensions: 634 x 480
+[11:24:01]    + encoder: H.264 (libx264)
+[11:24:01]      + preset:  slow
+[11:24:01]      + profile: high
+[11:24:01]      + level:   4.0
+[11:24:01]      + quality: 20.00 (RF)
+[11:24:01]      + color profile: 6-1-6
+[11:24:01]      + chroma location: left
+[11:24:01]  * audio track 1
+[11:24:01]    + name: Stereo
+[11:24:01]    + decoder: English (AC3) (2.0 ch) (192 kbps) (track 1, id 0x1)
+[11:24:01]      + bitrate: 192 kbps, samplerate: 48000 Hz
+[11:24:01]    + mixdown: Stereo
+[11:24:01]    + encoder: AAC (libavcodec)
+[11:24:01]      + bitrate: 160 kbps, samplerate: 48000 Hz
+[11:24:01]  * audio track 2
+[11:24:01]    + name: Stereo
+[11:24:01]    + decoder: English (AC3) (2.0 ch) (192 kbps) (track 1, id 0x1)
+[11:24:01]      + bitrate: 192 kbps, samplerate: 48000 Hz
+[11:24:01]    + AC3 Passthru
+[11:24:01] sync: expecting 18881 video frames
+[11:24:01] encx264: min-keyint: 30, keyint: 300
+[11:24:01] encx264: encoding at constant RF 20.000000
+[11:24:01] encx264: unparsed options: level=4.0:ref=5:direct=auto:subme=8:trellis=2:vbv-bufsize=31250:vbv-maxrate=25000:rc-lookahead=50
+x264 [info]: using SAR=8/9
+x264 [info]: using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+x264 [info]: profile High, level 4.0, 4:2:0, 8-bit
+[11:24:01] sync: first pts video is 0
+[11:24:01] sync: first pts audio 0x1 is 0
+[11:24:01] sync: first pts audio 0x1 is 0
+[11:24:01] sync: Chapter 1 at frame 3 time 6006
+libdvdread: Can't open file VIDEO_TS.IFO.
+Encoding: task 1 of 1, 0.56 %
+Encoding: task 1 of 1, 1.07 %
+Encoding: task 1 of 1, 2.08 %
+Encoding: task 1 of 1, 3.10 %
+Encoding: task 1 of 1, 4.26 %
+Encoding: task 1 of 1, 5.17 %
+Encoding: task 1 of 1, 6.00 % (223.98 fps, avg 260.78 fps, ETA 00h01m08s)
+Encoding: task 1 of 1, 7.04 % (215.56 fps, avg 251.20 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 8.01 % (215.56 fps, avg 251.20 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 9.06 % (215.06 fps, avg 244.74 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 10.01 % (215.14 fps, avg 241.44 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 11.02 % (202.34 fps, avg 232.77 fps, ETA 00h01m12s)
+Encoding: task 1 of 1, 12.03 % (187.83 fps, avg 225.71 fps, ETA 00h01m14s)
+Encoding: task 1 of 1, 13.04 % (172.50 fps, avg 220.09 fps, ETA 00h01m15s)
+Encoding: task 1 of 1, 14.03 % (181.82 fps, avg 218.28 fps, ETA 00h01m14s)
+Encoding: task 1 of 1, 15.20 % (190.93 fps, avg 216.68 fps, ETA 00h01m14s)
+Encoding: task 1 of 1, 16.07 % (203.35 fps, avg 216.14 fps, ETA 00h01m13s)
+Encoding: task 1 of 1, 17.16 % (205.14 fps, avg 215.44 fps, ETA 00h01m12s)
+Encoding: task 1 of 1, 18.22 % (205.14 fps, avg 215.44 fps, ETA 00h01m12s)
+Encoding: task 1 of 1, 19.06 % (208.23 fps, avg 215.00 fps, ETA 00h01m11s)
+Encoding: task 1 of 1, 20.10 % (223.76 fps, avg 217.53 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 21.10 % (219.34 fps, avg 216.11 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 22.11 % (203.53 fps, avg 213.12 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 23.01 % (186.88 fps, avg 212.68 fps, ETA 00h01m08s)
+Encoding: task 1 of 1, 24.20 % (171.72 fps, avg 209.42 fps, ETA 00h01m08s)
+Encoding: task 1 of 1, 25.16 % (168.67 fps, avg 206.54 fps, ETA 00h01m08s)
+Encoding: task 1 of 1, 26.23 % (141.27 fps, avg 202.33 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 27.07 % (144.52 fps, avg 200.19 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 28.06 % (142.98 fps, avg 194.80 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 29.09 % (130.60 fps, avg 191.95 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 30.11 % (115.28 fps, avg 189.46 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 31.15 % (131.76 fps, avg 188.24 fps, ETA 00h01m10s)
+Encoding: task 1 of 1, 32.33 % (156.28 fps, avg 188.34 fps, ETA 00h01m09s)
+Encoding: task 1 of 1, 33.07 % (188.57 fps, avg 189.37 fps, ETA 00h01m07s)
+Encoding: task 1 of 1, 34.03 % (216.88 fps, avg 190.92 fps, ETA 00h01m05s)
+Encoding: task 1 of 1, 35.08 % (227.67 fps, avg 191.91 fps, ETA 00h01m04s)
+Encoding: task 1 of 1, 36.11 % (227.67 fps, avg 191.91 fps, ETA 00h01m04s)
+Encoding: task 1 of 1, 37.08 % (221.77 fps, avg 192.31 fps, ETA 00h01m02s)
+Encoding: task 1 of 1, 38.11 % (194.59 fps, avg 191.25 fps, ETA 00h01m02s)
+Encoding: task 1 of 1, 39.06 % (183.48 fps, avg 191.18 fps, ETA 00h01m01s)
+Encoding: task 1 of 1, 40.02 % (196.24 fps, avg 192.64 fps, ETA 00h00m59s)
+Encoding: task 1 of 1, 41.01 % (209.90 fps, avg 192.71 fps, ETA 00h00m58s)
+Encoding: task 1 of 1, 42.10 % (198.26 fps, avg 191.73 fps, ETA 00h00m57s)
+Encoding: task 1 of 1, 43.03 % (166.82 fps, avg 190.66 fps, ETA 00h00m57s)
+Encoding: task 1 of 1, 44.02 % (149.27 fps, avg 189.53 fps, ETA 00h00m56s)
+Encoding: task 1 of 1, 45.01 % (149.69 fps, avg 188.68 fps, ETA 00h00m56s)
+Encoding: task 1 of 1, 46.17 % (170.26 fps, avg 188.15 fps, ETA 00h00m54s)
+Encoding: task 1 of 1, 47.00 % (170.26 fps, avg 188.15 fps, ETA 00h00m54s)
+Encoding: task 1 of 1, 48.01 % (172.50 fps, avg 187.56 fps, ETA 00h00m53s)
+Encoding: task 1 of 1, 49.05 % (176.40 fps, avg 187.39 fps, ETA 00h00m51s)
+Encoding: task 1 of 1, 50.03 % (184.77 fps, avg 187.40 fps, ETA 00h00m50s)
+Encoding: task 1 of 1, 51.18 % (178.45 fps, avg 186.94 fps, ETA 00h00m49s)
+Encoding: task 1 of 1, 52.05 % (178.45 fps, avg 186.94 fps, ETA 00h00m49s)
+Encoding: task 1 of 1, 53.03 % (183.52 fps, avg 187.16 fps, ETA 00h00m48s)
+Encoding: task 1 of 1, 54.01 % (198.94 fps, avg 188.09 fps, ETA 00h00m46s)
+Encoding: task 1 of 1, 55.06 % (232.17 fps, avg 189.62 fps, ETA 00h00m44s)
+Encoding: task 1 of 1, 56.04 % (222.47 fps, avg 189.16 fps, ETA 00h00m44s)
+Encoding: task 1 of 1, 57.03 % (198.65 fps, avg 188.66 fps, ETA 00h00m43s)
+Encoding: task 1 of 1, 58.02 % (159.23 fps, avg 188.02 fps, ETA 00h00m42s)
+Encoding: task 1 of 1, 59.05 % (159.85 fps, avg 187.65 fps, ETA 00h00m41s)
+Encoding: task 1 of 1, 60.11 % (155.94 fps, avg 186.97 fps, ETA 00h00m41s)
+Encoding: task 1 of 1, 61.05 % (160.69 fps, avg 186.61 fps, ETA 00h00m40s)
+Encoding: task 1 of 1, 62.03 % (182.88 fps, avg 187.41 fps, ETA 00h00m38s)
+Encoding: task 1 of 1, 63.05 % (182.23 fps, avg 186.73 fps, ETA 00h00m38s)
+Encoding: task 1 of 1, 64.06 % (179.57 fps, avg 186.25 fps, ETA 00h00m37s)
+Encoding: task 1 of 1, 65.26 % (171.22 fps, avg 186.58 fps, ETA 00h00m36s)
+Encoding: task 1 of 1, 66.20 % (203.78 fps, avg 187.54 fps, ETA 00h00m34s)
+Encoding: task 1 of 1, 67.24 % (203.78 fps, avg 187.54 fps, ETA 00h00m34s)
+Encoding: task 1 of 1, 68.23 % (239.49 fps, avg 188.75 fps, ETA 00h00m32s)
+Encoding: task 1 of 1, 69.14 % (244.40 fps, avg 189.26 fps, ETA 00h00m31s)
+Encoding: task 1 of 1, 70.27 % (244.04 fps, avg 190.17 fps, ETA 00h00m29s)
+Encoding: task 1 of 1, 71.08 % (244.04 fps, avg 190.17 fps, ETA 00h00m29s)
+Encoding: task 1 of 1, 72.09 % (235.85 fps, avg 190.88 fps, ETA 00h00m28s)
+Encoding: task 1 of 1, 73.17 % (227.20 fps, avg 190.96 fps, ETA 00h00m27s)
+Encoding: task 1 of 1, 74.23 % (219.61 fps, avg 191.46 fps, ETA 00h00m25s)
+Encoding: task 1 of 1, 75.23 % (209.24 fps, avg 191.69 fps, ETA 00h00m24s)
+Encoding: task 1 of 1, 76.19 % (204.15 fps, avg 191.52 fps, ETA 00h00m23s)
+Encoding: task 1 of 1, 77.01 % (185.01 fps, avg 191.19 fps, ETA 00h00m22s)
+Encoding: task 1 of 1, 78.04 % (177.52 fps, avg 191.09 fps, ETA 00h00m21s)
+Encoding: task 1 of 1, 79.05 % (179.79 fps, avg 191.02 fps, ETA 00h00m20s)
+Encoding: task 1 of 1, 80.17 % (185.55 fps, avg 190.96 fps, ETA 00h00m19s)
+Encoding: task 1 of 1, 81.07 % (185.55 fps, avg 190.96 fps, ETA 00h00m19s)
+Encoding: task 1 of 1, 82.11 % (187.17 fps, avg 190.93 fps, ETA 00h00m18s)
+Encoding: task 1 of 1, 83.15 % (193.92 fps, avg 191.14 fps, ETA 00h00m17s)
+Encoding: task 1 of 1, 84.21 % (202.83 fps, avg 191.43 fps, ETA 00h00m16s)
+Encoding: task 1 of 1, 85.10 % (216.35 fps, avg 191.91 fps, ETA 00h00m14s)
+Encoding: task 1 of 1, 86.10 % (214.35 fps, avg 192.02 fps, ETA 00h00m13s)
+Encoding: task 1 of 1, 87.04 % (200.44 fps, avg 191.76 fps, ETA 00h00m12s)
+Encoding: task 1 of 1, 88.05 % (182.75 fps, avg 191.57 fps, ETA 00h00m11s)
+Encoding: task 1 of 1, 89.15 % (181.01 fps, avg 191.62 fps, ETA 00h00m10s)
+Encoding: task 1 of 1, 90.10 % (180.80 fps, avg 191.37 fps, ETA 00h00m09s)
+Encoding: task 1 of 1, 91.11 % (180.80 fps, avg 191.37 fps, ETA 00h00m09s)
+Encoding: task 1 of 1, 92.11 % (193.53 fps, avg 191.64 fps, ETA 00h00m08s)
+Encoding: task 1 of 1, 93.13 % (197.29 fps, avg 191.82 fps, ETA 00h00m07s)
+Encoding: task 1 of 1, 94.00 % (219.19 fps, avg 192.30 fps, ETA 00h00m06s)
+Encoding: task 1 of 1, 95.10 % (213.38 fps, avg 192.36 fps, ETA 00h00m05s)
+Encoding: task 1 of 1, 96.15 % (207.53 fps, avg 192.33 fps, ETA 00h00m04s)
+Encoding: task 1 of 1, 97.00 % (185.70 fps, avg 192.08 fps, ETA 00h00m03s)
+Encoding: task 1 of 1, 98.09 % (186.86 fps, avg 192.18 fps, ETA 00h00m02s)
+Encoding: task 1 of 1, 99.01 % (186.86 fps, avg 192.18 fps, ETA 00h00m02s)
+Encoding: task 1 of 1, 100.00 % (193.83 fps, avg 192.38 fps, ETA 00h00m00s)
+[11:25:40] decomb: deinterlaced 13159 | blended 2837 | unfiltered 2886 | total 18882
+[11:25:40] vfr: 18882 frames output, 0 dropped and 0 duped for CFR/PFR
+[11:25:40] vfr: lost time: 0 (0 frames)
+[11:25:40] vfr: gained time: 0 (0 frames) (0 not accounted for)
+[11:25:40] ac3-decoder done: 19688 frames, 0 decoder errors
+[11:25:40] ac3-decoder done: 19688 frames, 0 decoder errors
+[11:25:40] mpeg2video-decoder done: 18882 frames, 0 decoder errors
+[11:25:40] sync: got 18882 frames, 18881 expected
+[11:25:40] sync: framerate min 29.970 fps, max 29.970 fps, avg 29.970 fps
+x264 [info]: frame I:66    Avg QP:17.20  size: 62318
+x264 [info]: frame P:4899  Avg QP:20.63  size: 25787
+x264 [info]: frame B:13917 Avg QP:24.79  size:  5777
+x264 [info]: consecutive B-frames:  0.7%  1.9%  3.0% 94.3%
+x264 [info]: mb I  I16..4: 11.8% 60.5% 27.7%
+x264 [info]: mb P  I16..4:  1.2%  3.0%  0.6%  P16..4: 46.1% 25.6% 13.5%  0.0%  0.0%    skip:10.0%
+x264 [info]: mb B  I16..4:  0.1%  0.1%  0.0%  B16..8: 44.6%  6.1%  1.7%  direct: 9.7%  skip:37.7%  L0:43.1% L1:40.9% BI:16.0%
+x264 [info]: 8x8 transform intra:60.4% inter:42.7%
+x264 [info]: direct mvs  spatial:99.9% temporal:0.1%
+x264 [info]: coded y,uvDC,uvAC intra: 65.9% 56.7% 31.0% inter: 29.5% 19.2% 2.5%
+x264 [info]: i16 v,h,dc,p: 54% 21% 15% 10%
+x264 [info]: i8 v,h,dc,ddl,ddr,vr,hd,vl,hu:  9%  8% 18%  8% 11% 11% 11% 10% 13%
+x264 [info]: i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 11% 11%  9%  9% 12% 12% 11% 11% 14%
+x264 [info]: i8c dc,h,v,p: 46% 28% 20%  6%
+x264 [info]: Weighted P-Frames: Y:9.6% UV:5.4%
+x264 [info]: ref P L0: 43.1% 11.0% 27.1%  8.8%  9.6%  0.4%  0.0%
+x264 [info]: ref B L0: 64.1% 25.3%  8.6%  1.9%
+x264 [info]: ref B L1: 89.3% 10.7%
+x264 [info]: kb/s:2677.30
+[11:25:40] mux: track 0, 18882 frames, 210844429 bytes, 2677.12 kbps, fifo 2048
+[11:25:40] mux: track 1, 29533 frames, 12629583 bytes, 160.36 kbps, fifo 4096
+[11:25:40] mux: track 2, 19688 frames, 15120384 bytes, 191.99 kbps, fifo 2048
+[11:25:40] Finished work at: Sat Feb 21 11:25:40 2026
+Muxing: this may take awhile...[11:25:40] libhb: work result = 0
+Encode done!
+HandBrake has exited.
+HandBrake done: 3/3: Extra.mp4
+Finalizing: Antz (1998)
+--keep-mkvs: leaving MKVs intact: /home/shunobies/Antz (1998)/MKVs
+--keep-mkvs: leaving WORK_DIR intact: /home/shunobies/Antz (1998)
+Processing complete.

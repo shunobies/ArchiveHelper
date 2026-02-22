@@ -100,6 +100,8 @@ class RemoteExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             if existing.returncode == 0 and (existing.stdout or "").strip():
                 fps = subprocess.run(
@@ -107,6 +109,8 @@ class RemoteExecutor:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
                 out = (fps.stdout or "").strip()
                 if out:
@@ -123,6 +127,8 @@ class RemoteExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             scan_out = (scan.stdout or "").strip()
             if not scan_out:
@@ -145,6 +151,8 @@ class RemoteExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             fp_out = (fps.stdout or "").strip()
             if fp_out:
@@ -282,6 +290,8 @@ class RemoteExecutor:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         return res.returncode, res.stdout or ""
 

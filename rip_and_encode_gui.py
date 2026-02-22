@@ -2536,6 +2536,8 @@ if TK_AVAILABLE:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
                 if res.returncode != 0:
                     raise ValueError("Remote host is missing python3. Install Python 3 on the remote host and try again.")
@@ -2560,6 +2562,8 @@ if TK_AVAILABLE:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
                 if res.returncode != 0:
                     raise ValueError("Failed to create remote directory: " + (res.stdout or "").strip())
@@ -2582,6 +2586,8 @@ if TK_AVAILABLE:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             if res.returncode != 0:
                 raise ValueError("Unable to determine remote home directory: " + ((res.stdout or "").strip()))
@@ -2707,6 +2713,8 @@ if TK_AVAILABLE:
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=True,
                     )
                     if res.stdout:
@@ -2720,6 +2728,8 @@ if TK_AVAILABLE:
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=False,
                     )
                     res2 = subprocess.run(
@@ -2727,6 +2737,8 @@ if TK_AVAILABLE:
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=True,
                     )
                     if res2.stdout:

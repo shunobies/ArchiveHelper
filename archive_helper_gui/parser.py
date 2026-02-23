@@ -20,7 +20,9 @@ from archive_helper_gui.log_patterns import (
     MAKEMKV_TOTAL_PROGRESS_RE,
     MAKE_MKV_PROGRESS_RE,
     FALLBACK_STATUS_RE,
+    MULTI_DISC_PROGRESS_RE,
     MULTI_DISC_SUMMARY_RE,
+    DISC_TITLE_PROGRESS_TEXT_RE,
     PROMPT_INSERT_RE,
     PROMPT_LOW_DISK_RE,
     PROMPT_NEXT_DISC_RE,
@@ -42,6 +44,23 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             gui.var_prompt.set("")
             gui.btn_continue.configure(state="disabled")
             gui.state.next_disc_prompt = ""
+
+    def _set_disc_title_status() -> bool:
+        total = int(getattr(gui.state, "disc_total_selected_titles", 0) or 0)
+        completed = int(getattr(gui.state, "disc_completed_titles", 0) or 0)
+        failed = int(getattr(gui.state, "disc_failed_titles", 0) or 0)
+        disc_id = str(getattr(gui.state, "current_disc_id", "") or "").strip()
+
+        if total <= 0:
+            return False
+
+        disc_display = "?"
+        m_disc = re.search(r"disc\s*[-_ ]?(\d+)", disc_id, flags=re.IGNORECASE)
+        if m_disc:
+            disc_display = m_disc.group(1)
+
+        gui.var_step.set(f"Disc {disc_display}: {completed}/{total} titles complete ({failed} failed)")
+        return True
 
     def _format_disc_prompt(raw: str) -> str:
         shown = (raw or "").strip()
@@ -156,6 +175,50 @@ def parse_for_progress(gui, text_chunk: str) -> None:
         gui.progress.start(10)
         return
 
+    m = MULTI_DISC_PROGRESS_RE.match(line)
+    if m:
+        payload_raw = m.group(1)
+        try:
+            payload = json.loads(payload_raw)
+        except Exception:
+            payload = {}
+
+        disc_id = payload.get("disc_id")
+        if disc_id is not None:
+            gui.state.current_disc_id = str(disc_id)
+
+        total_selected = payload.get("selected_titles", payload.get("total_selected_titles", gui.state.disc_total_selected_titles))
+        completed = payload.get("completed_titles", gui.state.disc_completed_titles)
+        failed = payload.get("failed_titles", payload.get("failed_title_count", gui.state.disc_failed_titles))
+
+        try:
+            gui.state.disc_total_selected_titles = max(0, int(total_selected))
+        except Exception:
+            pass
+        try:
+            gui.state.disc_completed_titles = max(0, int(completed))
+        except Exception:
+            pass
+        try:
+            if isinstance(failed, list):
+                gui.state.disc_failed_titles = max(0, len(failed))
+            else:
+                gui.state.disc_failed_titles = max(0, int(failed))
+        except Exception:
+            pass
+
+        _set_disc_title_status()
+        return
+
+    m = DISC_TITLE_PROGRESS_TEXT_RE.match(line)
+    if m:
+        gui.state.current_disc_id = (m.group(2) or f"disc-{m.group(1)}").strip()
+        gui.state.disc_completed_titles = max(0, int(m.group(3)))
+        gui.state.disc_total_selected_titles = max(0, int(m.group(4)))
+        gui.state.disc_failed_titles = max(0, int(m.group(5) or 0))
+        _set_disc_title_status()
+        return
+
     m = MULTI_DISC_SUMMARY_RE.match(line)
     if m:
         payload_raw = m.group(1)
@@ -163,16 +226,32 @@ def parse_for_progress(gui, text_chunk: str) -> None:
             payload = json.loads(payload_raw)
         except Exception:
             payload = {}
-        status = str(payload.get("status") or "")
+
         disc_num = payload.get("disc_number")
-        if status == "full_success":
-            gui.var_step.set(f"Disc {disc_num} complete")
-        elif status == "partial_success":
-            gui.var_step.set(f"Disc {disc_num} partial success (retry failed titles)")
-        elif status == "full_failure":
-            gui.var_step.set(f"Disc {disc_num} failed (retry failed titles)")
-            gui.progress.configure(mode="indeterminate")
-            gui.progress.stop()
+        disc_id = payload.get("disc_id")
+        if disc_id is not None:
+            gui.state.current_disc_id = str(disc_id)
+        elif disc_num is not None:
+            gui.state.current_disc_id = f"disc-{disc_num}"
+
+        total_selected = payload.get("selected_titles", gui.state.disc_total_selected_titles)
+        failed = payload.get("failed_titles", [])
+        failed_count = len(failed) if isinstance(failed, list) else int(failed or 0)
+
+        gui.state.disc_total_selected_titles = max(0, int(total_selected or 0))
+        gui.state.disc_failed_titles = max(0, failed_count)
+        gui.state.disc_completed_titles = max(0, gui.state.disc_total_selected_titles - gui.state.disc_failed_titles)
+
+        if not _set_disc_title_status():
+            status = str(payload.get("status") or "")
+            if status == "full_success":
+                gui.var_step.set(f"Disc {disc_num} complete")
+            elif status == "partial_success":
+                gui.var_step.set(f"Disc {disc_num} partial success (retry failed titles)")
+            elif status == "full_failure":
+                gui.var_step.set(f"Disc {disc_num} failed (retry failed titles)")
+                gui.progress.configure(mode="indeterminate")
+                gui.progress.stop()
         return
 
     # HandBrake task markers

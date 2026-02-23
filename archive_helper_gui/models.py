@@ -19,6 +19,10 @@ class UiState:
     # Most recent disc prompt (used so CSV mode can show which disc is next even
     # when the script prints a generic "next disc" message afterward).
     next_disc_prompt: str = ""
+    current_disc_id: str = ""
+    disc_total_selected_titles: int = 0
+    disc_completed_titles: int = 0
+    disc_failed_titles: int = 0
 
     eta_phase: str = ""  # e.g., "makemkv" | "handbrake" | ""
     # Baseline used for average-rate ETA smoothing within a phase.

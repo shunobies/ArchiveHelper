@@ -2471,16 +2471,120 @@ def process_multi_movie_disc(
     if missing:
         raise RuntimeError(f"Selected source title index(es) not found in rip output: {missing}")
 
-    results: dict[int, bool] = {}
+    manifest = _load_disc_manifest(disc_dir)
+    manifest_items: dict[int, dict] = {}
+    if manifest and manifest.get("kind") == "movie_multi":
+        raw_items = manifest.get("items")
+        if isinstance(raw_items, list):
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                source_idx = item.get("source_title_index")
+                if isinstance(source_idx, int):
+                    manifest_items[source_idx] = item
+
+    reserved_outputs: set[str] = set()
+
+    def _is_unavailable(path: Path) -> tuple[bool, str]:
+        p = str(path)
+        if p in reserved_outputs:
+            return True, "already reserved for another selected title"
+        lock = encode_lock_path(path)
+        lock_is_stale_or_clear(lock)
+        if path.exists():
+            return True, "file already exists"
+        if lock.exists():
+            return True, "encode lock exists"
+        return False, ""
+
+    def _resolve_output_path(*, row: ScheduleV2Row, ctx: TitleContext, input_path: Path) -> Path:
+        assert ctx.output_movie_dir is not None
+        stem_base = f"{ctx.title} ({ctx.year})"
+        planned = manifest_items.get(row.source_title_index)
+        if isinstance(planned, dict):
+            out_s = planned.get("output")
+            if isinstance(out_s, str) and out_s:
+                out = Path(out_s)
+                reserved_outputs.add(str(out))
+                print(
+                    "Multi-title output plan (manifest): "
+                    f"disc={row.disc_id} source_title_index={row.source_title_index} "
+                    f"-> {input_path.name} -> {out}"
+                )
+                return out
+
+        candidates: list[Path] = [ctx.output_movie_dir / f"{stem_base}.{output_ext}"]
+        safe_index = f"t{row.source_title_index:02d}"
+        candidates.append(ctx.output_movie_dir / f"{stem_base}-{safe_index}.{output_ext}")
+        for i in range(2, 100):
+            candidates.append(ctx.output_movie_dir / f"{stem_base}-{safe_index}-{i:02d}.{output_ext}")
+
+        reasons: list[str] = []
+        chosen: Optional[Path] = None
+        for cand in candidates:
+            unavailable, reason = _is_unavailable(cand)
+            if unavailable:
+                reasons.append(f"{cand.name} ({reason})")
+                continue
+            chosen = cand
+            break
+
+        if chosen is None:
+            raise RuntimeError(f"Could not resolve output path for selected title index {row.source_title_index} in {ctx.output_movie_dir}")
+
+        reserved_outputs.add(str(chosen))
+        if reasons:
+            print(
+                "Output collision resolution: "
+                f"disc={row.disc_id} source_title_index={row.source_title_index} "
+                f"input={input_path.name}; tried {', '.join(reasons)}; selected {chosen.name}"
+            )
+        else:
+            print(
+                "Output selection: "
+                f"disc={row.disc_id} source_title_index={row.source_title_index} "
+                f"input={input_path.name}; selected {chosen.name}"
+            )
+        return chosen
+
+    plan: list[tuple[ScheduleV2Row, TitleContext, Path, Path]] = []
+    manifest_plan_items: list[dict] = []
     for row, ctx in selections:
         input_path = mapped.get(row.source_title_index)
         if input_path is None:
-            results[row.source_title_index] = False
             continue
-
-        assert ctx.output_movie_main is not None
-        out = ctx.output_movie_main
+        out = _resolve_output_path(row=row, ctx=ctx, input_path=input_path)
         out.parent.mkdir(parents=True, exist_ok=True)
+        input_rel = str(input_path.relative_to(disc_dir))
+        plan.append((row, ctx, input_path, out))
+        manifest_plan_items.append(
+            {
+                "disc_id": row.disc_id,
+                "movie_title": row.movie_title,
+                "output": str(out),
+                "source_title_index": row.source_title_index,
+                "title": ctx.title,
+                "type": "main",
+                "year": row.year,
+                "input_rel": input_rel,
+            }
+        )
+
+    if plan:
+        manifest_to_write = {
+            "version": DISC_MANIFEST_VERSION,
+            "kind": "movie_multi",
+            "disc_dir": str(disc_dir),
+            "items": manifest_plan_items,
+            "created_at": int(time.time()),
+        }
+        try:
+            _write_disc_manifest(disc_dir, manifest_to_write)
+        except Exception:
+            pass
+
+    results: dict[int, bool] = {}
+    for row, _ctx, input_path, out in plan:
 
         print(
             "Selected-title mapping: "

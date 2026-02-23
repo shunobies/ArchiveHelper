@@ -27,3 +27,8 @@ ERROR_RE = re.compile(r"^ERROR:")
 MAKEMKV_ACCESS_ERROR_RE = re.compile(r"Failed to get full access to drive")
 FALLBACK_STATUS_RE = re.compile(r"^Fallback:\s*(.+)$")
 MULTI_DISC_SUMMARY_RE = re.compile(r"^MULTI_DISC_SUMMARY:\s*(\{.+\})$")
+MULTI_DISC_PROGRESS_RE = re.compile(r"^MULTI_DISC_PROGRESS:\s*(\{.+\})$")
+DISC_TITLE_PROGRESS_TEXT_RE = re.compile(
+    r"^Disc\s+(\d+)(?:\s*\(([^)]+)\))?:\s*(\d+)\s*/\s*(\d+)\s*titles?\s*complete(?:\s*\((\d+)\s*failed\))?$",
+    re.IGNORECASE,
+)

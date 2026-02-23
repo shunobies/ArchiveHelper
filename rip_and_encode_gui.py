@@ -45,7 +45,7 @@ try:
 except Exception:
     tkfont = None
 
-from archive_helper_core.schedule_csv import csv_disc_prompt_for_row, load_csv_schedule
+from archive_helper_core.schedule_csv import csv_disc_prompt_for_row, load_csv_schedule, load_schedule
 from rip_and_encode import sanitize_title_for_dir
 
 from archive_helper_gui.log_patterns import (
@@ -1782,53 +1782,20 @@ if TK_AVAILABLE:
                 messagebox.showerror("Books upload failed", str(e))
 
         def _validate_csv_schedule_file(self, path: Path) -> int:
-            """Validate the entire CSV schedule before starting a run.
+            """Validate the entire schedule before starting a run.
 
-            Mirrors the server-side rules (4 columns, no embedded commas, strict year/disc/season).
-            Returns the number of parsed rows.
+            Supports both legacy 4-column CSV (v1) and v2 schedule JSON/CSV.
+            Returns the number of parsed schedule rows/items.
             """
 
-            text = path.read_text(errors="ignore")
-            rows = 0
-            for n, raw in enumerate(text.splitlines(), start=1):
-                line = raw.rstrip("\r")
-                if not line.strip():
-                    continue
-                if line.lstrip().startswith("#"):
-                    continue
-                if re.match(r"^\s*(movie|series)?\s*name\s*,\s*year\s*,", line, flags=re.I):
-                    continue
+            try:
+                parsed = load_schedule(path)
+            except RuntimeError as e:
+                raise ValueError(str(e)) from e
 
-                parts = [p.strip() for p in line.split(",")]
-                if len(parts) != 4 or any(p == "" for p in parts[:4]):
-                    raise ValueError(
-                        f"CSV parse error at line {n}: expected exactly 4 comma-separated columns (no embedded commas)\n"
-                        f"Line: {line}"
-                    )
-
-                _name, year, third, disc_s = parts
-
-                if not re.fullmatch(r"\d{4}", year):
-                    raise ValueError(f"CSV validation error at line {n}: year must be 4 digits\nLine: {line}")
-                if not disc_s.isdigit() or int(disc_s) < 1:
-                    raise ValueError(f"CSV validation error at line {n}: disc must be an integer >= 1\nLine: {line}")
-
-                v = third.strip().lower()
-                is_bool = v in {"y", "n", "yes", "no", "true", "false"}
-                if is_bool:
-                    if v not in {"y", "n", "yes", "no", "true", "false"}:
-                        raise ValueError(f"CSV validation error at line {n}: MultiDisc must be y/n\nLine: {line}")
-                else:
-                    if not third.isdigit() or int(third) < 1:
-                        raise ValueError(
-                            f"CSV validation error at line {n}: season must be an integer >= 1\nLine: {line}"
-                        )
-
-                rows += 1
-
-            if rows < 1:
-                raise ValueError(f"CSV schedule is empty: {path}")
-            return rows
+            if parsed.version == 1:
+                return len(parsed.rows_v1)
+            return len(parsed.rows_v2)
 
         def toggle_log(self) -> None:
             self._set_log_visible(not self.log_visible)

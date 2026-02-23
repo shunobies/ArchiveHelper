@@ -46,10 +46,10 @@ from threading import Lock
 from typing import IO, Callable, Iterable, Optional
 
 from archive_helper_core.schedule_csv import (
-    ScheduleRow,
+    ScheduleV2Row,
     csv_disc_prompt_for_row,
     csv_next_up_note,
-    load_csv_schedule,
+    load_schedule,
 )
 
 
@@ -1440,6 +1440,59 @@ def find_mkvs_in_dir(dir_: Path) -> list[Path]:
     return sorted([p for p in dir_.rglob("*.mkv") if p.is_file()])
 
 
+def _source_title_order_hint_from_name(path: Path) -> Optional[int]:
+    name = (path.name or "").lower()
+    m = re.search(r"(?:^|[^a-z0-9])title[_\- ]*t?(\d{1,4})(?:[^a-z0-9]|$)", name)
+    if not m:
+        m = re.search(r"(?:^|[^a-z0-9])t(\d{1,4})(?:[^a-z0-9]|$)", name)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def _source_title_order_hint_from_meta(path: Path) -> Optional[int]:
+    meta = ffprobe_meta_title(path)
+    m = re.search(r"\btitle\s*(\d{1,4})\b", meta or "", flags=re.I)
+    if not m:
+        m = re.search(r"\bt(\d{1,4})\b", meta or "", flags=re.I)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def map_selected_title_indexes_to_mkvs(*, mkvs: list[Path], selected_indexes: Iterable[int]) -> tuple[dict[int, Path], list[int]]:
+    selected = sorted({int(i) for i in selected_indexes if int(i) >= 0})
+    if not selected:
+        return {}, []
+
+    ordered_mkvs = sorted(mkvs, key=lambda p: (_natural_key(p.name), str(p)))
+    hints: dict[Path, tuple[Optional[int], Optional[int]]] = {
+        p: (_source_title_order_hint_from_name(p), _source_title_order_hint_from_meta(p)) for p in ordered_mkvs
+    }
+
+    unassigned = set(ordered_mkvs)
+    out: dict[int, Path] = {}
+    for idx in selected:
+        exact = [
+            p
+            for p in ordered_mkvs
+            if p in unassigned and (hints[p][0] == idx or hints[p][1] == idx)
+        ]
+        if exact:
+            chosen = sorted(exact, key=lambda p: (0 if hints[p][0] == idx else 1, _natural_key(p.name), str(p)))[0]
+            out[idx] = chosen
+            unassigned.discard(chosen)
+
+    missing = [idx for idx in selected if idx not in out]
+    return out, missing
+
+
 # ----------------------------
 # Classification heuristics
 # ----------------------------
@@ -2395,6 +2448,60 @@ def process_movie_disc(
             )
 
     close_extras_nfo(ctx.output_extras_nfo)
+
+
+def process_multi_movie_disc(
+    *,
+    selections: list[tuple[ScheduleV2Row, TitleContext]],
+    disc_dir: Path,
+    overlap: bool,
+    preset: str,
+    output_ext: str,
+    subtitle_mode: str,
+    submit_encode,
+) -> dict[int, bool]:
+    """Encode only explicitly selected source titles for a v2 schedule disc."""
+
+    mkvs = find_mkvs_in_dir(disc_dir)
+    if not mkvs:
+        raise RuntimeError("No MKVs found for selected-title movie disc.")
+
+    selected_indexes = [row.source_title_index for row, _ in selections]
+    mapped, missing = map_selected_title_indexes_to_mkvs(mkvs=mkvs, selected_indexes=selected_indexes)
+    if missing:
+        raise RuntimeError(f"Selected source title index(es) not found in rip output: {missing}")
+
+    results: dict[int, bool] = {}
+    for row, ctx in selections:
+        input_path = mapped.get(row.source_title_index)
+        if input_path is None:
+            results[row.source_title_index] = False
+            continue
+
+        assert ctx.output_movie_main is not None
+        out = ctx.output_movie_main
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        print(
+            "Selected-title mapping: "
+            f"disc={row.disc_id} source_title_index={row.source_title_index} "
+            f"-> {input_path.name} -> {out}"
+        )
+
+        if subtitle_mode == "external":
+            extract_external_subtitles(input_path, out)
+
+        if overlap:
+            submit_encode(input_path, out, preset, subtitle_mode)
+        else:
+            if out.exists():
+                print(f"Skipping encode (exists): {out}")
+            else:
+                hb_encode(input_path, out, preset, subtitle_mode=subtitle_mode)
+        results[row.source_title_index] = True
+
+    close_extras_nfo(selections[0][1].output_extras_nfo)
+    return results
 
 
 def movie_disc_has_main_feature(
@@ -3903,108 +4010,207 @@ def main(argv: list[str]) -> int:
 
     try:
         if csv_path:
-            schedule = load_csv_schedule(csv_path)
-            print(f"CSV schedule loaded: {len(schedule)} discs")
+            parsed = load_schedule(csv_path)
+            if parsed.version == 2:
+                schedule_v2 = parsed.rows_v2
+                print(f"Schedule v2 loaded: {len(schedule_v2)} title selections")
 
-            csv_next_confirmed = bool(ns.no_disc_prompts)
-            for idx, row in enumerate(schedule):
-                # Apply row to globals.
-                if row.kind == "movie":
-                    is_series = False
-                    season = None
-                    movie_multi = (row.third == "y")
-                else:
-                    is_series = True
-                    season = int(row.third)
-                    movie_multi = False
+                by_disc: dict[tuple[str, int], list[ScheduleV2Row]] = {}
+                disc_order: list[tuple[str, int]] = []
+                for row in schedule_v2:
+                    key = (row.disc_id, row.disc_number)
+                    if key not in by_disc:
+                        by_disc[key] = []
+                        disc_order.append(key)
+                    by_disc[key].append(row)
 
-                ctx = setup_title_context(
-                    home=home,
-                    home_base=home_base,
-                    title_raw=row.name,
-                    year=row.year,
-                    is_series=is_series,
-                    season=season,
-                    movie_multi_disc=movie_multi,
-                    movies_dir=ns.movies_dir,
-                    series_dir=ns.series_dir,
-                    output_ext=ns.output_container,
-                )
-                batch_add_once(ctx)
+                csv_next_confirmed = bool(ns.no_disc_prompts)
+                for idx, key in enumerate(disc_order):
+                    disc_id, disc_number = key
+                    disc_rows = sorted(by_disc.get(key, []), key=lambda r: r.source_title_index)
+                    if not disc_rows:
+                        continue
 
-                disc_dir = ctx.mkv_root / f"Disc{row.disc:02d}"
-                prompt_msg = csv_disc_prompt_for_row(row)
-
-                # CSV restart support: if the work directory was cleaned but output files
-                # already exist, skip re-ripping movie discs to avoid starting over.
-                # (Series discs are not safely attributable without the per-disc manifest.)
-                if (
-                    row.kind == "movie"
-                    and not find_mkvs_in_dir(disc_dir)
-                    and _movie_disc_outputs_exist(ctx, row.disc, ns.output_container)
-                    and not csv_next_confirmed
-                ):
-                    print(
-                        f"Resume: outputs already exist; skipping rip/encode: {ctx.title} ({ctx.year}) disc {row.disc}"
-                    )
-                else:
-                    disc_failed = False
-                    try:
-                        mkvs = rip_disc_if_needed(
-                            disc_dir,
-                            prompt_msg,
-                            wait_for_enter=not csv_next_confirmed,
-                            makemkv_cache_mb=makemkv_cache_mb,
-                            validate_rip=_movie_disc_validator_for_ctx(ctx, row.disc),
-                        )
-                    except Exception as e:
-                        print(
-                            "ERROR: disc processing failed after fallback attempts; "
-                            f"continuing queue for {ctx.title} ({ctx.year}) disc {row.disc}: {e}"
-                        )
-                        disc_failed = True
-                    csv_next_confirmed = False
-
-                    if (not disc_failed) and ctx.is_series:
-                        process_series_disc(
-                            ctx=ctx,
-                            disc_dir=disc_dir,
-                            overlap=ns.overlap,
-                            preset=ns.preset,
-                            output_ext=ns.output_container,
-                            subtitle_mode=ns.subtitle_mode,
-                            submit_encode=submit_encode,
-                        )
-                    elif not disc_failed:
-                        process_movie_disc(
-                            ctx=ctx,
-                            disc_index=row.disc,
-                            disc_dir=disc_dir,
-                            overlap=ns.overlap,
-                            preset=ns.preset,
-                            output_ext=ns.output_container,
-                            subtitle_mode=ns.subtitle_mode,
-                            submit_encode=submit_encode,
-                        )
-
-                if idx + 1 < len(schedule):
-                    # Before prompting for the next disc, ensure we have enough free space
-                    # on the filesystem(s) where we are storing MKVs and writing encoded outputs.
-                    pause_if_low_disk_space(
-                        paths=_disk_targets_for_run(
+                    selections: list[tuple[ScheduleV2Row, TitleContext]] = []
+                    for row in disc_rows:
+                        ctx = setup_title_context(
+                            home=home,
                             home_base=home_base,
+                            title_raw=row.movie_title,
+                            year=row.year,
+                            is_series=False,
+                            season=None,
+                            movie_multi_disc=False,
                             movies_dir=ns.movies_dir,
                             series_dir=ns.series_dir,
-                        ),
-                        min_free_gb=20,
-                    )
-                    if not ns.no_disc_prompts:
-                        csv_next_up_note(schedule[idx + 1])
-                        print("When the next disc is inserted, press Enter to start ripping... ")
-                        input()
-                        csv_next_confirmed = True
+                            output_ext=ns.output_container,
+                        )
+                        batch_add_once(ctx)
+                        selections.append((row, ctx))
+
+                    disc_dir = selections[0][1].mkv_root / f"Disc{disc_number:02d}"
+                    prompt_msg = f"Insert disc {disc_number} ({disc_id}) now (then press Enter)"
+
+                    per_title_success: dict[int, bool] = {}
+                    for row, _ctx in selections:
+                        def _selected_validator(mkvs: list[Path], *, _row=row) -> tuple[bool, str]:
+                            _mapped, missing = map_selected_title_indexes_to_mkvs(
+                                mkvs=mkvs,
+                                selected_indexes=[_row.source_title_index],
+                            )
+                            if missing:
+                                return False, f"Selected source_title_index {_row.source_title_index} not found in ripped MKVs"
+                            return True, ""
+
+                        try:
+                            rip_disc_if_needed(
+                                disc_dir,
+                                prompt_msg,
+                                wait_for_enter=not csv_next_confirmed,
+                                makemkv_cache_mb=makemkv_cache_mb,
+                                validate_rip=_selected_validator,
+                            )
+                            per_title_success[row.source_title_index] = True
+                        except Exception as e:
+                            print(
+                                "ERROR: selected-title rip/validation failed after fallback attempts; "
+                                f"disc {disc_number} ({disc_id}) title_index {row.source_title_index}: {e}"
+                            )
+                            per_title_success[row.source_title_index] = False
+                        csv_next_confirmed = False
+
+                    successful = [(row, c) for row, c in selections if per_title_success.get(row.source_title_index, False)]
+                    if successful:
+                        process_multi_movie_disc(
+                            selections=successful,
+                            disc_dir=disc_dir,
+                            overlap=ns.overlap,
+                            preset=ns.preset,
+                            output_ext=ns.output_container,
+                            subtitle_mode=ns.subtitle_mode,
+                            submit_encode=submit_encode,
+                        )
+
+                    if idx + 1 < len(disc_order):
+                        pause_if_low_disk_space(
+                            paths=_disk_targets_for_run(
+                                home_base=home_base,
+                                movies_dir=ns.movies_dir,
+                                series_dir=ns.series_dir,
+                            ),
+                            min_free_gb=20,
+                        )
+                        if not ns.no_disc_prompts:
+                            next_disc_id, next_disc_num = disc_order[idx + 1]
+                            print(f"Next up: disc {next_disc_num} ({next_disc_id})")
+                            print("When the next disc is inserted, press Enter to start ripping... ")
+                            input()
+                            csv_next_confirmed = True
+                        else:
+                            csv_next_confirmed = True
+            else:
+                schedule = parsed.rows_v1
+                print(f"CSV schedule loaded: {len(schedule)} discs")
+
+                csv_next_confirmed = bool(ns.no_disc_prompts)
+                for idx, row in enumerate(schedule):
+                    # Apply row to globals.
+                    if row.kind == "movie":
+                        is_series = False
+                        season = None
+                        movie_multi = (row.third == "y")
                     else:
-                        csv_next_confirmed = True
+                        is_series = True
+                        season = int(row.third)
+                        movie_multi = False
+
+                    ctx = setup_title_context(
+                        home=home,
+                        home_base=home_base,
+                        title_raw=row.name,
+                        year=row.year,
+                        is_series=is_series,
+                        season=season,
+                        movie_multi_disc=movie_multi,
+                        movies_dir=ns.movies_dir,
+                        series_dir=ns.series_dir,
+                        output_ext=ns.output_container,
+                    )
+                    batch_add_once(ctx)
+
+                    disc_dir = ctx.mkv_root / f"Disc{row.disc:02d}"
+                    prompt_msg = csv_disc_prompt_for_row(row)
+
+                    # CSV restart support: if the work directory was cleaned but output files
+                    # already exist, skip re-ripping movie discs to avoid starting over.
+                    # (Series discs are not safely attributable without the per-disc manifest.)
+                    if (
+                        row.kind == "movie"
+                        and not find_mkvs_in_dir(disc_dir)
+                        and _movie_disc_outputs_exist(ctx, row.disc, ns.output_container)
+                        and not csv_next_confirmed
+                    ):
+                        print(
+                            f"Resume: outputs already exist; skipping rip/encode: {ctx.title} ({ctx.year}) disc {row.disc}"
+                        )
+                    else:
+                        disc_failed = False
+                        try:
+                            rip_disc_if_needed(
+                                disc_dir,
+                                prompt_msg,
+                                wait_for_enter=not csv_next_confirmed,
+                                makemkv_cache_mb=makemkv_cache_mb,
+                                validate_rip=_movie_disc_validator_for_ctx(ctx, row.disc),
+                            )
+                        except Exception as e:
+                            print(
+                                "ERROR: disc processing failed after fallback attempts; "
+                                f"continuing queue for {ctx.title} ({ctx.year}) disc {row.disc}: {e}"
+                            )
+                            disc_failed = True
+                        csv_next_confirmed = False
+
+                        if (not disc_failed) and ctx.is_series:
+                            process_series_disc(
+                                ctx=ctx,
+                                disc_dir=disc_dir,
+                                overlap=ns.overlap,
+                                preset=ns.preset,
+                                output_ext=ns.output_container,
+                                subtitle_mode=ns.subtitle_mode,
+                                submit_encode=submit_encode,
+                            )
+                        elif not disc_failed:
+                            process_movie_disc(
+                                ctx=ctx,
+                                disc_index=row.disc,
+                                disc_dir=disc_dir,
+                                overlap=ns.overlap,
+                                preset=ns.preset,
+                                output_ext=ns.output_container,
+                                subtitle_mode=ns.subtitle_mode,
+                                submit_encode=submit_encode,
+                            )
+
+                    if idx + 1 < len(schedule):
+                        # Before prompting for the next disc, ensure we have enough free space
+                        # on the filesystem(s) where we are storing MKVs and writing encoded outputs.
+                        pause_if_low_disk_space(
+                            paths=_disk_targets_for_run(
+                                home_base=home_base,
+                                movies_dir=ns.movies_dir,
+                                series_dir=ns.series_dir,
+                            ),
+                            min_free_gb=20,
+                        )
+                        if not ns.no_disc_prompts:
+                            csv_next_up_note(schedule[idx + 1])
+                            print("When the next disc is inserted, press Enter to start ripping... ")
+                            input()
+                            csv_next_confirmed = True
+                        else:
+                            csv_next_confirmed = True
         else:
             # Interactive.
             title_raw = prompt_nonempty("Enter title (Movie or Series name): ")

@@ -2537,7 +2537,7 @@ def process_multi_movie_disc(
     output_ext: str,
     subtitle_mode: str,
     submit_encode,
-) -> dict[int, bool]:
+) -> dict[int, dict[str, object]]:
     """Encode only explicitly selected source titles for a v2 schedule disc."""
 
     mkvs = find_mkvs_in_dir(disc_dir)
@@ -2547,6 +2547,11 @@ def process_multi_movie_disc(
     selected_indexes = [row.source_title_index for row, _ in selections]
     mapped, missing = map_selected_title_indexes_to_mkvs(mkvs=mkvs, selected_indexes=selected_indexes)
     if missing:
+        print(
+            "Selected-title mapping is ambiguous or incomplete; "
+            f"missing source_title_index values: {missing}. "
+            "Guidance: re-scan disc when source mapping is ambiguous, then retry failed titles only."
+        )
         raise RuntimeError(f"Selected source title index(es) not found in rip output: {missing}")
 
     manifest = _load_disc_manifest(disc_dir)
@@ -2677,7 +2682,7 @@ def process_multi_movie_disc(
         except Exception:
             pass
 
-    results: dict[int, bool] = {}
+    results: dict[int, dict[str, object]] = {}
     for row, _ctx, input_path, out, item in plan:
 
         print(
@@ -2690,14 +2695,21 @@ def process_multi_movie_disc(
             state = item.get("state")
             if state == "encoded" and out.exists():
                 print(f"Skipping encode (already completed): {out}")
-                results[row.source_title_index] = True
+                results[row.source_title_index] = {
+                    "success": True,
+                    "failure_stage": "",
+                    "message": "already encoded",
+                }
                 continue
 
             if state == "failed" and input_path.exists():
                 print(f"Resume: retrying encode for failed item using existing MKV: {input_path.name}")
 
             if subtitle_mode == "external":
-                extract_external_subtitles(input_path, out)
+                try:
+                    extract_external_subtitles(input_path, out)
+                except Exception as e:
+                    raise RuntimeError(f"subtitle extraction failed: {e}") from e
 
             if overlap:
                 submit_encode(input_path, out, preset, subtitle_mode)
@@ -2710,11 +2722,38 @@ def process_multi_movie_disc(
                     hb_encode(input_path, out, preset, subtitle_mode=subtitle_mode)
                     item["state"] = "encoded"
             item["last_error"] = ""
-            results[row.source_title_index] = True
+            results[row.source_title_index] = {
+                "success": True,
+                "failure_stage": "",
+                "message": "",
+            }
         except Exception as e:
             item["state"] = "failed"
             item["last_error"] = str(e)
-            results[row.source_title_index] = False
+            msg = str(e)
+            stage = "encode_failure"
+            lowered = msg.lower()
+            if "subtitle extraction failed" in lowered:
+                stage = "subtitle_extraction_failure"
+            elif any(x in lowered for x in ("copy", "move", "remote", "scp", "rsync")):
+                stage = "output_move_copy_failure"
+            elif any(x in lowered for x in ("makemkv", "rip", "selected source_title_index")):
+                stage = "rip_failure"
+
+            print(
+                "Selected-title failure: "
+                f"disc={row.disc_id} source_title_index={row.source_title_index} "
+                f"classification={stage}; error={msg}"
+            )
+            print(
+                "Retry guidance: retry failed titles only. "
+                "If this failure repeats with read errors, run again with fallback mode enabled/check drive health."
+            )
+            results[row.source_title_index] = {
+                "success": False,
+                "failure_stage": stage,
+                "message": msg,
+            }
             try:
                 manifest_to_write = {
                     "version": DISC_MANIFEST_VERSION,
@@ -2728,7 +2767,7 @@ def process_multi_movie_disc(
                 _write_disc_manifest(disc_dir, manifest_to_write)
             except Exception:
                 pass
-            raise
+            continue
 
     try:
         manifest_to_write = {
@@ -4295,7 +4334,7 @@ def main(argv: list[str]) -> int:
                     disc_dir = selections[0][1].mkv_root / f"Disc{disc_number:02d}"
                     prompt_msg = f"Insert disc {disc_number} ({disc_id}) now (then press Enter)"
 
-                    per_title_success: dict[int, bool] = {}
+                    per_title_rip: dict[int, bool] = {}
                     existing_manifest = _load_disc_manifest(disc_dir)
                     completed_indexes: set[int] = set()
                     if isinstance(existing_manifest, dict) and existing_manifest.get("kind") == "movie_multi":
@@ -4314,7 +4353,7 @@ def main(argv: list[str]) -> int:
                                 "Resume: selected title already completed in manifest; skipping rip step: "
                                 f"disc {disc_number} ({disc_id}) title_index {row.source_title_index}"
                             )
-                            per_title_success[row.source_title_index] = True
+                            per_title_rip[row.source_title_index] = True
                             continue
 
                         def _selected_validator(mkvs: list[Path], *, _row=row) -> tuple[bool, str]:
@@ -4334,25 +4373,105 @@ def main(argv: list[str]) -> int:
                                 makemkv_cache_mb=makemkv_cache_mb,
                                 validate_rip=_selected_validator,
                             )
-                            per_title_success[row.source_title_index] = True
+                            per_title_rip[row.source_title_index] = True
                         except Exception as e:
                             print(
                                 "ERROR: selected-title rip/validation failed after fallback attempts; "
                                 f"disc {disc_number} ({disc_id}) title_index {row.source_title_index}: {e}"
                             )
-                            per_title_success[row.source_title_index] = False
+                            print(
+                                "Retry guidance: retry failed titles only. If source mapping is ambiguous, re-scan disc. "
+                                "If read errors repeat, use fallback mode again and check disc/drive condition."
+                            )
+                            per_title_rip[row.source_title_index] = False
                         csv_next_confirmed = False
 
-                    successful = [(row, c) for row, c in selections if per_title_success.get(row.source_title_index, False)]
+                    successful = [(row, c) for row, c in selections if per_title_rip.get(row.source_title_index, False)]
+                    disc_title_results: dict[int, dict[str, object]] = {}
+                    for row, _ctx in selections:
+                        if not per_title_rip.get(row.source_title_index, False):
+                            disc_title_results[row.source_title_index] = {
+                                "success": False,
+                                "failure_stage": "rip_failure",
+                                "message": "rip/validation failed",
+                            }
+
                     if successful:
-                        process_multi_movie_disc(
-                            selections=successful,
-                            disc_dir=disc_dir,
-                            overlap=ns.overlap,
-                            preset=ns.preset,
-                            output_ext=ns.output_container,
-                            subtitle_mode=ns.subtitle_mode,
-                            submit_encode=submit_encode,
+                        try:
+                            encoded_results = process_multi_movie_disc(
+                                selections=successful,
+                                disc_dir=disc_dir,
+                                overlap=ns.overlap,
+                                preset=ns.preset,
+                                output_ext=ns.output_container,
+                                subtitle_mode=ns.subtitle_mode,
+                                submit_encode=submit_encode,
+                            )
+                            disc_title_results.update(encoded_results)
+                        except Exception as e:
+                            err_msg = str(e)
+                            print(
+                                "ERROR: selected-title encode orchestration failed; "
+                                f"disc {disc_number} ({disc_id}): {err_msg}"
+                            )
+                            for row, _ctx in successful:
+                                disc_title_results.setdefault(
+                                    row.source_title_index,
+                                    {
+                                        "success": False,
+                                        "failure_stage": "encode_failure",
+                                        "message": err_msg,
+                                    },
+                                )
+
+                    total_selected = len(selections)
+                    failed_entries: list[dict[str, object]] = []
+                    for row, _ctx in selections:
+                        result = disc_title_results.get(
+                            row.source_title_index,
+                            {
+                                "success": False,
+                                "failure_stage": "encode_failure",
+                                "message": "missing per-title result",
+                            },
+                        )
+                        if not bool(result.get("success")):
+                            failed_entries.append(
+                                {
+                                    "source_title_index": row.source_title_index,
+                                    "movie_title": row.movie_title,
+                                    "year": row.year,
+                                    "failure_stage": str(result.get("failure_stage") or "encode_failure"),
+                                    "message": str(result.get("message") or ""),
+                                }
+                            )
+
+                    failed_count = len(failed_entries)
+                    if failed_count == 0:
+                        disc_status = "full_success"
+                    elif failed_count == total_selected:
+                        disc_status = "full_failure"
+                    else:
+                        disc_status = "partial_success"
+
+                    summary_payload = {
+                        "disc_id": disc_id,
+                        "disc_number": disc_number,
+                        "selected_titles": total_selected,
+                        "failed_titles": failed_entries,
+                        "status": disc_status,
+                    }
+                    print("MULTI_DISC_SUMMARY: " + json.dumps(summary_payload, sort_keys=True))
+
+                    if failed_entries:
+                        print(
+                            "Retry guidance: retry failed titles only (source_title_index values from MULTI_DISC_SUMMARY)."
+                        )
+                        print(
+                            "Retry guidance: if source title mapping keeps changing, re-scan disc when source mapping is ambiguous."
+                        )
+                        print(
+                            "Retry guidance: if read errors repeat, use fallback recovery mode and inspect disc/drive health."
                         )
 
                     if idx + 1 < len(disc_order):

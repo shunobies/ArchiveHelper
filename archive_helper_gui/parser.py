@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from archive_helper_gui.log_patterns import (
@@ -19,6 +20,7 @@ from archive_helper_gui.log_patterns import (
     MAKEMKV_TOTAL_PROGRESS_RE,
     MAKE_MKV_PROGRESS_RE,
     FALLBACK_STATUS_RE,
+    MULTI_DISC_SUMMARY_RE,
     PROMPT_INSERT_RE,
     PROMPT_LOW_DISK_RE,
     PROMPT_NEXT_DISC_RE,
@@ -152,6 +154,25 @@ def parse_for_progress(gui, text_chunk: str) -> None:
         gui.var_step.set("Fallback: " + stage)
         gui.progress.configure(mode="indeterminate")
         gui.progress.start(10)
+        return
+
+    m = MULTI_DISC_SUMMARY_RE.match(line)
+    if m:
+        payload_raw = m.group(1)
+        try:
+            payload = json.loads(payload_raw)
+        except Exception:
+            payload = {}
+        status = str(payload.get("status") or "")
+        disc_num = payload.get("disc_number")
+        if status == "full_success":
+            gui.var_step.set(f"Disc {disc_num} complete")
+        elif status == "partial_success":
+            gui.var_step.set(f"Disc {disc_num} partial success (retry failed titles)")
+        elif status == "full_failure":
+            gui.var_step.set(f"Disc {disc_num} failed (retry failed titles)")
+            gui.progress.configure(mode="indeterminate")
+            gui.progress.stop()
         return
 
     # HandBrake task markers

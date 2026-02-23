@@ -1985,6 +1985,7 @@ WORKDIR_MARKER_NAMES = (WORKDIR_MARKER_NAME, ".rip_and_encode_v2_workdir")
 DISC_MANIFEST_NAME = ".rip_and_encode_disc_manifest.json"
 DISC_MANIFEST_NAMES = (DISC_MANIFEST_NAME, ".rip_and_encode_v2_disc_manifest.json")
 DISC_MANIFEST_VERSION = 1
+DISC_ITEM_STATES = {"pending", "ripped", "encoded", "failed"}
 
 
 # ----------------------------
@@ -2247,10 +2248,12 @@ def _load_disc_manifest(disc_dir: Path) -> Optional[dict]:
     p = _disc_manifest_path(disc_dir)
     if not p.exists():
         return None
+    raw_text = p.read_text(encoding="utf-8", errors="ignore")
     try:
-        data = json.loads(p.read_text(encoding="utf-8", errors="ignore") or "{}")
+        data = json.loads(raw_text or "{}")
     except Exception:
-        return None
+        salvaged = _salvage_disc_manifest_from_text(raw_text)
+        return salvaged if salvaged else None
 
     if not isinstance(data, dict):
         return None
@@ -2259,7 +2262,82 @@ def _load_disc_manifest(disc_dir: Path) -> Optional[dict]:
     items = data.get("items")
     if not isinstance(items, list):
         return None
+    normalized_items: list[dict] = []
+    salvage_count = 0
+    for it in items:
+        normalized = _normalize_manifest_item(it)
+        if normalized is None:
+            salvage_count += 1
+            continue
+        normalized_items.append(normalized)
+    data["items"] = normalized_items
+    if salvage_count > 0:
+        data["needs_revalidation"] = True
     return data
+
+
+def _salvage_disc_manifest_from_text(raw_text: str) -> Optional[dict]:
+    # Best-effort recovery for partially corrupt manifest files.
+    text = raw_text or ""
+    if not text.strip():
+        return None
+
+    items: list[dict] = []
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while True:
+        idx = text.find("{", cursor)
+        if idx < 0:
+            break
+        try:
+            obj, end = decoder.raw_decode(text, idx)
+        except Exception:
+            cursor = idx + 1
+            continue
+        cursor = end
+        norm = _normalize_manifest_item(obj)
+        if norm is not None:
+            items.append(norm)
+
+    if not items:
+        return None
+
+    return {
+        "version": DISC_MANIFEST_VERSION,
+        "kind": "movie_multi",
+        "disc_dir": "",
+        "items": items,
+        "created_at": int(time.time()),
+        "needs_revalidation": True,
+    }
+
+
+def _normalize_manifest_item(item: object) -> Optional[dict]:
+    if not isinstance(item, dict):
+        return None
+    source_idx = item.get("source_title_index")
+    output = item.get("output")
+    if not isinstance(source_idx, int) or source_idx < 0:
+        return None
+    if not isinstance(output, str) or not output:
+        return None
+
+    state = item.get("state")
+    if not isinstance(state, str) or state not in DISC_ITEM_STATES:
+        if Path(output).exists():
+            state = "encoded"
+        elif item.get("input_rel"):
+            state = "ripped"
+        else:
+            state = "pending"
+
+    normalized = dict(item)
+    normalized["source_title_index"] = source_idx
+    normalized["output"] = output
+    normalized["state"] = state
+    last_error = item.get("last_error")
+    normalized["last_error"] = last_error if isinstance(last_error, str) and last_error else ""
+    return normalized
 
 
 def _write_disc_manifest(disc_dir: Path, manifest: dict) -> None:
@@ -2473,15 +2551,16 @@ def process_multi_movie_disc(
 
     manifest = _load_disc_manifest(disc_dir)
     manifest_items: dict[int, dict] = {}
+    manifest_needs_revalidation = bool(manifest.get("needs_revalidation")) if isinstance(manifest, dict) else False
     if manifest and manifest.get("kind") == "movie_multi":
         raw_items = manifest.get("items")
         if isinstance(raw_items, list):
             for item in raw_items:
-                if not isinstance(item, dict):
+                normalized = _normalize_manifest_item(item)
+                if not normalized:
+                    manifest_needs_revalidation = True
                     continue
-                source_idx = item.get("source_title_index")
-                if isinstance(source_idx, int):
-                    manifest_items[source_idx] = item
+                manifest_items[normalized["source_title_index"]] = normalized
 
     reserved_outputs: set[str] = set()
 
@@ -2547,7 +2626,7 @@ def process_multi_movie_disc(
             )
         return chosen
 
-    plan: list[tuple[ScheduleV2Row, TitleContext, Path, Path]] = []
+    plan: list[tuple[ScheduleV2Row, TitleContext, Path, Path, dict]] = []
     manifest_plan_items: list[dict] = []
     for row, ctx in selections:
         input_path = mapped.get(row.source_title_index)
@@ -2556,19 +2635,32 @@ def process_multi_movie_disc(
         out = _resolve_output_path(row=row, ctx=ctx, input_path=input_path)
         out.parent.mkdir(parents=True, exist_ok=True)
         input_rel = str(input_path.relative_to(disc_dir))
-        plan.append((row, ctx, input_path, out))
-        manifest_plan_items.append(
-            {
-                "disc_id": row.disc_id,
-                "movie_title": row.movie_title,
-                "output": str(out),
-                "source_title_index": row.source_title_index,
-                "title": ctx.title,
-                "type": "main",
-                "year": row.year,
-                "input_rel": input_rel,
-            }
-        )
+        existing_item = manifest_items.get(row.source_title_index, {})
+        item = {
+            "disc_id": row.disc_id,
+            "movie_title": row.movie_title,
+            "output": str(out),
+            "source_title_index": row.source_title_index,
+            "title": ctx.title,
+            "type": "main",
+            "year": row.year,
+            "input_rel": input_rel,
+            "state": "pending",
+            "last_error": "",
+        }
+        if isinstance(existing_item, dict):
+            item["state"] = existing_item.get("state") if existing_item.get("state") in DISC_ITEM_STATES else "pending"
+            if isinstance(existing_item.get("last_error"), str):
+                item["last_error"] = existing_item.get("last_error") or ""
+        if out.exists():
+            item["state"] = "encoded"
+            item["last_error"] = ""
+        elif input_path.exists() and item["state"] == "pending":
+            item["state"] = "ripped"
+        if row.source_title_index not in manifest_items:
+            manifest_needs_revalidation = True
+        plan.append((row, ctx, input_path, out, item))
+        manifest_plan_items.append(item)
 
     if plan:
         manifest_to_write = {
@@ -2578,13 +2670,15 @@ def process_multi_movie_disc(
             "items": manifest_plan_items,
             "created_at": int(time.time()),
         }
+        if manifest_needs_revalidation:
+            manifest_to_write["needs_revalidation"] = True
         try:
             _write_disc_manifest(disc_dir, manifest_to_write)
         except Exception:
             pass
 
     results: dict[int, bool] = {}
-    for row, _ctx, input_path, out in plan:
+    for row, _ctx, input_path, out, item in plan:
 
         print(
             "Selected-title mapping: "
@@ -2592,17 +2686,63 @@ def process_multi_movie_disc(
             f"-> {input_path.name} -> {out}"
         )
 
-        if subtitle_mode == "external":
-            extract_external_subtitles(input_path, out)
+        try:
+            state = item.get("state")
+            if state == "encoded" and out.exists():
+                print(f"Skipping encode (already completed): {out}")
+                results[row.source_title_index] = True
+                continue
 
-        if overlap:
-            submit_encode(input_path, out, preset, subtitle_mode)
-        else:
-            if out.exists():
-                print(f"Skipping encode (exists): {out}")
+            if state == "failed" and input_path.exists():
+                print(f"Resume: retrying encode for failed item using existing MKV: {input_path.name}")
+
+            if subtitle_mode == "external":
+                extract_external_subtitles(input_path, out)
+
+            if overlap:
+                submit_encode(input_path, out, preset, subtitle_mode)
+                item["state"] = "ripped"
             else:
-                hb_encode(input_path, out, preset, subtitle_mode=subtitle_mode)
-        results[row.source_title_index] = True
+                if out.exists():
+                    print(f"Skipping encode (exists): {out}")
+                    item["state"] = "encoded"
+                else:
+                    hb_encode(input_path, out, preset, subtitle_mode=subtitle_mode)
+                    item["state"] = "encoded"
+            item["last_error"] = ""
+            results[row.source_title_index] = True
+        except Exception as e:
+            item["state"] = "failed"
+            item["last_error"] = str(e)
+            results[row.source_title_index] = False
+            try:
+                manifest_to_write = {
+                    "version": DISC_MANIFEST_VERSION,
+                    "kind": "movie_multi",
+                    "disc_dir": str(disc_dir),
+                    "items": manifest_plan_items,
+                    "created_at": int(time.time()),
+                }
+                if manifest_needs_revalidation:
+                    manifest_to_write["needs_revalidation"] = True
+                _write_disc_manifest(disc_dir, manifest_to_write)
+            except Exception:
+                pass
+            raise
+
+    try:
+        manifest_to_write = {
+            "version": DISC_MANIFEST_VERSION,
+            "kind": "movie_multi",
+            "disc_dir": str(disc_dir),
+            "items": manifest_plan_items,
+            "created_at": int(time.time()),
+        }
+        if manifest_needs_revalidation:
+            manifest_to_write["needs_revalidation"] = True
+        _write_disc_manifest(disc_dir, manifest_to_write)
+    except Exception:
+        pass
 
     close_extras_nfo(selections[0][1].output_extras_nfo)
     return results
@@ -4156,7 +4296,27 @@ def main(argv: list[str]) -> int:
                     prompt_msg = f"Insert disc {disc_number} ({disc_id}) now (then press Enter)"
 
                     per_title_success: dict[int, bool] = {}
+                    existing_manifest = _load_disc_manifest(disc_dir)
+                    completed_indexes: set[int] = set()
+                    if isinstance(existing_manifest, dict) and existing_manifest.get("kind") == "movie_multi":
+                        raw_items = existing_manifest.get("items")
+                        if isinstance(raw_items, list):
+                            for item in raw_items:
+                                normalized = _normalize_manifest_item(item)
+                                if not normalized:
+                                    continue
+                                if normalized.get("state") == "encoded" and Path(str(normalized.get("output") or "")).exists():
+                                    completed_indexes.add(int(normalized["source_title_index"]))
+
                     for row, _ctx in selections:
+                        if row.source_title_index in completed_indexes:
+                            print(
+                                "Resume: selected title already completed in manifest; skipping rip step: "
+                                f"disc {disc_number} ({disc_id}) title_index {row.source_title_index}"
+                            )
+                            per_title_success[row.source_title_index] = True
+                            continue
+
                         def _selected_validator(mkvs: list[Path], *, _row=row) -> tuple[bool, str]:
                             _mapped, missing = map_selected_title_indexes_to_mkvs(
                                 mkvs=mkvs,

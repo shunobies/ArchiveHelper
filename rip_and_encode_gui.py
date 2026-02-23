@@ -74,7 +74,7 @@ from archive_helper_gui.help_dialog import show_help_dialog
 from archive_helper_gui.epub_utils import extract_epub_metadata
 from archive_helper_gui.persistence import PersistenceStore
 from archive_helper_gui.remote_exec import RemoteExecutor
-from archive_helper_gui.schedule import csv_rows_from_manual, write_csv_rows
+from archive_helper_gui.schedule import ScheduleV2Selection, csv_rows_from_manual, write_csv_rows, write_schedule_v2
 from archive_helper_gui.tailer import reader_loop as tailer_reader_loop
 from archive_helper_gui.tailer import start_tail as tailer_start_tail
 from archive_helper_gui.tailer import stop_tail as tailer_stop_tail
@@ -192,6 +192,9 @@ if TK_AVAILABLE:
             self.var_tmdb_api_key = StringVar(value="")
             self.var_tmdb_match = StringVar(value="")
             self._tmdb_matches: list[dict[str, str]] = []
+            self.var_multi_movie_disc = BooleanVar(value=False)
+            self._multi_title_rows: list[dict[str, Any]] = []
+            self._multi_title_widgets: list[dict[str, Any]] = []
 
             # Remote executor (OpenSSH/Paramiko). Initialized after connection vars exist.
             self.remote = RemoteExecutor(
@@ -261,6 +264,7 @@ if TK_AVAILABLE:
             self._build_ui()
             self.var_kind.trace_add("write", lambda *_: self._refresh_kind())
             self._refresh_kind()
+            self._render_multi_title_rows()
             self._poll_ui_queue()
 
             # If the user hasn't picked an execution mode yet, prompt once on startup.
@@ -529,6 +533,35 @@ if TK_AVAILABLE:
             self.cbo_tmdb_matches.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_tmdb_matches, "Choose a suggestion to auto-fill type, title, and year. Use No match to keep manual entry.")
             self.cbo_tmdb_matches.bind("<<ComboboxSelected>>", self._apply_tmdb_match_selection)
+
+            self.multi_movie_toggle_row = ttk.Frame(self.manual_frame)
+            self.multi_movie_toggle_row.pack(fill=X, pady=(6, 0))
+            chk_multi = ttk.Checkbutton(
+                self.multi_movie_toggle_row,
+                text="Disc contains multiple movies",
+                variable=self.var_multi_movie_disc,
+                command=self._refresh_multi_title_panel,
+            )
+            chk_multi.pack(side=LEFT)
+            Tooltip(chk_multi, "Enable when a disc contains multiple standalone movies. Scan will populate source titles and create a v2 schedule.")
+
+            self.multi_title_frame = ttk.LabelFrame(self.manual_frame, text="Disc source titles", padding=8)
+            self.multi_title_header = ttk.Frame(self.multi_title_frame)
+            self.multi_title_header.pack(fill=X)
+            for w, label in [
+                (5, "Use"),
+                (8, "Idx"),
+                (10, "Duration"),
+                (10, "Chapters"),
+                (16, "Quality / confidence"),
+                (24, "Movie title"),
+                (8, "Year"),
+                (28, "TMDB match (optional)"),
+            ]:
+                ttk.Label(self.multi_title_header, text=label, width=w).pack(side=LEFT, padx=(0, 4))
+            self.multi_title_rows_wrap = ttk.Frame(self.multi_title_frame)
+            self.multi_title_rows_wrap.pack(fill=X, pady=(4, 0))
+            self._refresh_multi_title_panel()
 
             self.artist_row = ttk.Frame(self.manual_frame)
             self.artist_row.pack(fill=X, pady=(6, 0))
@@ -896,9 +929,30 @@ if TK_AVAILABLE:
                 self.var_book_year.set(str(data.get("book_year", self.var_book_year.get())))
                 self.var_title.set(str(data.get("title", self.var_title.get())))
                 self.var_year.set(str(data.get("year", self.var_year.get())))
+                self.var_multi_movie_disc.set(bool(data.get("multi_movie_disc", self.var_multi_movie_disc.get())))
                 self.var_season.set(str(data.get("season", self.var_season.get())))
                 self.var_start_disc.set(int(data.get("start_disc", int(self.var_start_disc.get()))))
                 self.var_disc_count.set(int(data.get("disc_count", int(self.var_disc_count.get()))))
+                loaded_rows = data.get("multi_title_rows", [])
+                if isinstance(loaded_rows, list):
+                    clean_rows: list[dict[str, Any]] = []
+                    for row in loaded_rows:
+                        if not isinstance(row, dict):
+                            continue
+                        clean_rows.append(
+                            {
+                                "source_title_index": int(row.get("source_title_index", 0) or 0),
+                                "duration": str(row.get("duration", "")),
+                                "chapters": str(row.get("chapters", "")),
+                                "quality": str(row.get("quality", "")),
+                                "selected": bool(row.get("selected", False)),
+                                "movie_title": str(row.get("movie_title", "")),
+                                "year": str(row.get("year", "")),
+                                "tmdb_id": str(row.get("tmdb_id", "")),
+                                "tmdb_label": str(row.get("tmdb_label", "")),
+                            }
+                        )
+                    self._multi_title_rows = clean_rows
 
                 # Last-run (reattach) metadata.
                 self.last_run_host = str(data.get("last_run_host", self.last_run_host))
@@ -948,9 +1002,11 @@ if TK_AVAILABLE:
                 "book_year": self.var_book_year.get(),
                 "title": self.var_title.get(),
                 "year": self.var_year.get(),
+                "multi_movie_disc": bool(self.var_multi_movie_disc.get()),
                 "season": self.var_season.get(),
                 "start_disc": int(self.var_start_disc.get()),
                 "disc_count": int(self.var_disc_count.get()),
+                "multi_title_rows": self._collect_multi_title_rows_for_persist(),
                 "exec_mode": self.var_exec_mode.get(),
 
                 # Last-run (reattach) metadata.
@@ -1028,6 +1084,8 @@ if TK_AVAILABLE:
                 self.artist_row.pack_forget()
                 self.audiobook_row.pack_forget()
                 self.audiobook_row2.pack_forget()
+                self.multi_movie_toggle_row.pack_forget()
+                self.multi_title_frame.pack_forget()
                 return
 
             kind = (self.var_kind.get() or "movie").strip().lower()
@@ -1063,6 +1121,8 @@ if TK_AVAILABLE:
                     self.btn_tmdb_lookup.configure(state="disabled")
                 except Exception:
                     pass
+                self.multi_movie_toggle_row.pack_forget()
+                self.multi_title_frame.pack_forget()
                 return
             elif kind == "audiobook":
                 self.season_row.pack_forget()
@@ -1076,6 +1136,8 @@ if TK_AVAILABLE:
                     self.btn_tmdb_lookup.configure(state="disabled")
                 except Exception:
                     pass
+                self.multi_movie_toggle_row.pack_forget()
+                self.multi_title_frame.pack_forget()
                 try:
                     self.audiobook_row.pack(fill=X, pady=(6, 0), before=self.disc_row)
                     self.audiobook_row2.pack(fill=X, pady=(6, 0), before=self.disc_row)
@@ -1101,6 +1163,171 @@ if TK_AVAILABLE:
                 self.tmdb_row.pack(fill=X, pady=(6, 0))
             except Exception:
                 pass
+            try:
+                self.multi_movie_toggle_row.pack(fill=X, pady=(6, 0))
+            except Exception:
+                pass
+            self._refresh_multi_title_panel()
+
+        def _refresh_multi_title_panel(self) -> None:
+            if not hasattr(self, "multi_title_frame"):
+                return
+            show = self.var_mode.get() == "manual" and (self.var_kind.get() or "").strip().lower() == "movie" and bool(self.var_multi_movie_disc.get())
+            if show:
+                try:
+                    self.multi_title_frame.pack(fill=X, pady=(6, 0), before=self.disc_row)
+                except Exception:
+                    self.multi_title_frame.pack(fill=X, pady=(6, 0))
+            else:
+                self.multi_title_frame.pack_forget()
+
+        def _estimate_source_quality(self, duration_s: int, chapters: int) -> tuple[str, bool]:
+            if duration_s >= 3000 and chapters >= 8:
+                return ("High (main-feature)", True)
+            if duration_s >= 2400 and chapters >= 4:
+                return ("Medium", True)
+            if duration_s >= 1200:
+                return ("Low", False)
+            return ("Very low (extra)", False)
+
+        def _scan_disc_source_titles(self, cfg: ConnectionInfo, remote_script: str) -> list[dict[str, Any]]:
+            _ = remote_script
+            py = r'''import json, re, subprocess
+cmd = ["makemkvcon", "-r", "--noscan", "info", "disc:0"]
+proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+out = proc.stdout or ""
+rows = []
+for line in out.splitlines():
+    if not line.startswith("TINFO:"):
+        continue
+    m = re.match(r"^TINFO:(\d+),(\d+),\d+,\"?(.*?)\"?$", line)
+    if not m:
+        continue
+    idx = int(m.group(1))
+    code = int(m.group(2))
+    val = m.group(3)
+    while len(rows) <= idx:
+        rows.append({"source_title_index": len(rows), "duration_s": 0, "chapters": 0})
+    if code == 9:
+        hh, mm, ss = 0, 0, 0
+        mmatch = re.match(r"(\d+):(\d+):(\d+)", val)
+        if mmatch:
+            hh = int(mmatch.group(1)); mm = int(mmatch.group(2)); ss = int(mmatch.group(3))
+        rows[idx]["duration_s"] = hh * 3600 + mm * 60 + ss
+    elif code == 8 and str(val).isdigit():
+        rows[idx]["chapters"] = int(val)
+rows = [r for r in rows if (r.get("duration_s", 0) > 0 or r.get("chapters", 0) > 0)]
+print(json.dumps(rows))'''
+            remote_cmd = "python3 - <<'PY'\n" + py + "\nPY"
+            code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_cmd)
+            if code != 0:
+                raise ValueError((out or "").strip() or "Disc source-title scan failed.")
+            payload = json.loads((out or "").splitlines()[-1])
+            if not isinstance(payload, list):
+                return []
+            return [r for r in payload if isinstance(r, dict)]
+
+        def _render_multi_title_rows(self) -> None:
+            for child in self.multi_title_rows_wrap.winfo_children():
+                child.destroy()
+            self._multi_title_widgets = []
+            tmdb_options = [""] + [self._build_tmdb_match_label(m) for m in self._tmdb_matches[1:]]
+            for idx, row in enumerate(self._multi_title_rows):
+                rf = ttk.Frame(self.multi_title_rows_wrap)
+                rf.pack(fill=X, pady=1)
+                var_selected = BooleanVar(value=bool(row.get("selected", False)))
+                var_title = StringVar(value=str(row.get("movie_title", "")))
+                var_year = StringVar(value=str(row.get("year", "")))
+                var_tmdb = StringVar(value=str(row.get("tmdb_label", "")))
+                ttk.Checkbutton(rf, variable=var_selected).pack(side=LEFT, padx=(0, 8))
+                ttk.Label(rf, text=str(row.get("source_title_index", "")), width=8).pack(side=LEFT, padx=(0, 4))
+                ttk.Label(rf, text=str(row.get("duration", "")), width=10).pack(side=LEFT, padx=(0, 4))
+                ttk.Label(rf, text=str(row.get("chapters", "")), width=10).pack(side=LEFT, padx=(0, 4))
+                ttk.Label(rf, text=str(row.get("quality", "")), width=16).pack(side=LEFT, padx=(0, 4))
+                ttk.Entry(rf, textvariable=var_title, width=24).pack(side=LEFT, padx=(0, 4))
+                ttk.Entry(rf, textvariable=var_year, width=8).pack(side=LEFT, padx=(0, 4))
+                cbo = ttk.Combobox(rf, textvariable=var_tmdb, width=28, values=tmdb_options, state="readonly")
+                cbo.pack(side=LEFT)
+
+                def _on_tmdb_pick(_evt: Any, sel: StringVar = var_tmdb, title_v: StringVar = var_title, year_v: StringVar = var_year) -> None:
+                    label = sel.get().strip()
+                    if not label:
+                        return
+                    for m in self._tmdb_matches[1:]:
+                        if self._build_tmdb_match_label(m) == label:
+                            if (m.get("title") or "").strip():
+                                title_v.set((m.get("title") or "").strip())
+                            y = (m.get("year") or "").strip()
+                            if re.fullmatch(r"\d{4}", y):
+                                year_v.set(y)
+                            break
+
+                cbo.bind("<<ComboboxSelected>>", _on_tmdb_pick)
+                self._multi_title_widgets.append(
+                    {
+                        "selected": var_selected,
+                        "title": var_title,
+                        "year": var_year,
+                        "tmdb": var_tmdb,
+                        "base": row,
+                    }
+                )
+
+        def _collect_multi_title_rows_for_persist(self) -> list[dict[str, Any]]:
+            if self._multi_title_widgets:
+                rows: list[dict[str, Any]] = []
+                for w in self._multi_title_widgets:
+                    base = dict(w.get("base") or {})
+                    base["selected"] = bool(w["selected"].get())
+                    base["movie_title"] = str(w["title"].get())
+                    base["year"] = str(w["year"].get())
+                    base["tmdb_label"] = str(w["tmdb"].get())
+                    base["tmdb_id"] = self._tmdb_id_for_label(base["tmdb_label"])
+                    rows.append(base)
+                return rows
+            return [dict(r) for r in self._multi_title_rows]
+
+        def _tmdb_id_for_label(self, label: str) -> str:
+            target = (label or "").strip()
+            if not target:
+                return ""
+            for m in self._tmdb_matches[1:]:
+                if self._build_tmdb_match_label(m) == target:
+                    return str(m.get("id") or "").strip()
+            return ""
+
+        def _build_v2_schedule_from_panel(self) -> list[ScheduleV2Selection]:
+            rows = self._collect_multi_title_rows_for_persist()
+            selected = [r for r in rows if bool(r.get("selected", False))]
+            if not selected:
+                raise ValueError("Select at least one source title row.")
+            seen_names: set[str] = set()
+            out: list[ScheduleV2Selection] = []
+            for r in selected:
+                title = str(r.get("movie_title", "")).strip()
+                year = str(r.get("year", "")).strip()
+                if not title:
+                    raise ValueError("Every selected row must have a movie title.")
+                if not re.fullmatch(r"\d{4}", year):
+                    raise ValueError("Every selected row must have a 4-digit year.")
+                final_name = f"{sanitize_title_for_dir(title).lower()} ({year})"
+                if final_name in seen_names:
+                    raise ValueError(f"Duplicate output name detected: {title} ({year})")
+                seen_names.add(final_name)
+                tmdb_id_raw = str(r.get("tmdb_id", "")).strip()
+                tmdb_id = int(tmdb_id_raw) if tmdb_id_raw.isdigit() else None
+                out.append(
+                    ScheduleV2Selection(
+                        disc_id="disc-1",
+                        disc_number=1,
+                        source_title_index=int(r.get("source_title_index", 0) or 0),
+                        movie_title=title,
+                        year=year,
+                        tmdb_id=tmdb_id,
+                        output_role="main",
+                    )
+                )
+            return out
 
         def _build_tmdb_match_label(self, match: dict[str, str]) -> str:
             if str(match.get("no_match") or "").strip().lower() in {"1", "true", "yes"}:
@@ -1181,6 +1408,31 @@ if TK_AVAILABLE:
                 else:
                     self._append_log("(Info) TMDB lookup returned no matches.\n")
                     messagebox.showinfo("TMDB", "No TMDB matches found from the inserted disc. Select 'No match' and enter details manually.")
+
+                if bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie":
+                    scanned = self._scan_disc_source_titles(cfg, remote_script)
+                    self._multi_title_rows = []
+                    for item in scanned:
+                        dur_s = int(item.get("duration_s", 0) or 0)
+                        chapters = int(item.get("chapters", 0) or 0)
+                        hh = dur_s // 3600
+                        mm = (dur_s % 3600) // 60
+                        ss = dur_s % 60
+                        quality, default_selected = self._estimate_source_quality(dur_s, chapters)
+                        self._multi_title_rows.append(
+                            {
+                                "source_title_index": int(item.get("source_title_index", 0) or 0),
+                                "duration": f"{hh:02d}:{mm:02d}:{ss:02d}",
+                                "chapters": str(chapters),
+                                "quality": quality,
+                                "selected": default_selected,
+                                "movie_title": self.var_title.get().strip(),
+                                "year": self.var_year.get().strip(),
+                                "tmdb_id": "",
+                                "tmdb_label": "",
+                            }
+                        )
+                    self._render_multi_title_rows()
             except Exception as e:
                 messagebox.showerror("TMDB", str(e))
 
@@ -1219,6 +1471,8 @@ if TK_AVAILABLE:
             self.var_tmdb_match.set("")
             self.var_title.set("")
             self.var_year.set("")
+            self._multi_title_rows = []
+            self._render_multi_title_rows()
 
         def _toggle_books_upload(self) -> None:
             if not hasattr(self, "books_upload_content") or not hasattr(self, "btn_toggle_books"):
@@ -2801,30 +3055,43 @@ if TK_AVAILABLE:
                             extra += ["--tagbooks-script", tag_script]
                         self._start_remote_job(cfg, remote_script, None, extra_args=extra)
                         return
+                    if kind == "movie" and bool(self.var_multi_movie_disc.get()):
+                        if exec_mode != EXEC_MODE_REMOTE:
+                            raise ValueError("Multi-title movie panel currently supports remote mode only.")
+                        selections = self._build_v2_schedule_from_panel()
+                        tmp_v2 = Path(tempfile.gettempdir()) / f"rip_and_encode_gui_v2_{int(time.time())}.json"
+                        write_schedule_v2(tmp_v2, selections)
+                        local_csv = tmp_v2
+                        self.state.total_titles = len(selections)
+                        self.state.finalized_titles = 0
+                    else:
+                        if not title:
+                            raise ValueError("Title is required.")
+                        if not re.fullmatch(r"\d{4}", year):
+                            raise ValueError("Year must be 4 digits.")
+                        total_discs = int(self.var_disc_count.get())
+                        start_disc = int(self.var_start_disc.get())
+                        if total_discs < 1:
+                            raise ValueError("Total discs must be >= 1.")
+                        if start_disc < 1 or start_disc > total_discs:
+                            raise ValueError("Current disc must be between 1 and Total discs.")
 
-                    total_discs = int(self.var_disc_count.get())
-                    start_disc = int(self.var_start_disc.get())
-                    if total_discs < 1:
-                        raise ValueError("Total discs must be >= 1.")
-                    if start_disc < 1 or start_disc > total_discs:
-                        raise ValueError("Current disc must be between 1 and Total discs.")
+                        rows = csv_rows_from_manual(
+                            kind=kind,
+                            name=title,
+                            year=year,
+                            season=self.var_season.get(),
+                            start_disc=start_disc,
+                            total_discs=total_discs,
+                        )
 
-                    rows = csv_rows_from_manual(
-                        kind=kind,
-                        name=title,
-                        year=year,
-                        season=self.var_season.get(),
-                        start_disc=start_disc,
-                        total_discs=total_discs,
-                    )
+                        tmp = Path(tempfile.gettempdir()) / f"rip_and_encode_gui_{int(time.time())}.csv"
+                        write_csv_rows(tmp, rows)
+                        local_csv = tmp
 
-                    tmp = Path(tempfile.gettempdir()) / f"rip_and_encode_gui_{int(time.time())}.csv"
-                    write_csv_rows(tmp, rows)
-                    local_csv = tmp
-
-                    # Best-effort title counting for finalize progress.
-                    self.state.total_titles = 1
-                    self.state.finalized_titles = 0
+                        # Best-effort title counting for finalize progress.
+                        self.state.total_titles = 1
+                        self.state.finalized_titles = 0
 
                 assert local_csv is not None
 

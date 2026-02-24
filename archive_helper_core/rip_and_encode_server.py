@@ -2583,7 +2583,10 @@ def process_multi_movie_disc(
 
     def _resolve_output_path(*, row: ScheduleV2Row, ctx: TitleContext, input_path: Path) -> Path:
         assert ctx.output_movie_dir is not None
-        stem_base = f"{ctx.title} ({ctx.year})"
+        # Keep movie filenames consistent with the single-movie flow and common
+        # media library expectations: year belongs in the folder name, not the
+        # primary video filename.
+        stem_base = ctx.title
         planned = manifest_items.get(row.source_title_index)
         if isinstance(planned, dict):
             out_s = planned.get("output")

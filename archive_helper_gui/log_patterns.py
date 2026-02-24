@@ -18,7 +18,7 @@ SUBTITLE_START_RE = re.compile(r"^Subtitle extraction start:\s*(.+?)\s*\((\d+)\s
 SUBTITLE_PROGRESS_RE = re.compile(r"^Subtitle extraction progress:\s*(\d+)\s*/\s*(\d+):\s*(.+)$")
 SUBTITLE_DONE_RE = re.compile(r"^Subtitle extraction done:\s*(.+?)\s*\((.+)\)$")
 
-PROMPT_INSERT_RE = re.compile(r"Insert: ")
+PROMPT_INSERT_RE = re.compile(r"^(?:Insert:\s|Insert\s+disc\b)", re.IGNORECASE)
 PROMPT_NEXT_DISC_RE = re.compile(r"When the next disc is inserted, press Enter to start ripping\.\.\.")
 PROMPT_LOW_DISK_RE = re.compile(r"^Low disk space:")
 FINALIZING_RE = re.compile(r"^Finalizing: ")

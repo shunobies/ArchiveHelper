@@ -3014,13 +3014,12 @@ print(json.dumps(rows))'''
                 else:
                     title = self.var_title.get().strip()
                     year = self.var_year.get().strip()
-                    if not title:
-                        raise ValueError("Title is required.")
-                    if not re.fullmatch(r"\d{4}", year):
-                        raise ValueError("Year must be 4 digits.")
-
                     kind = (self.var_kind.get() or "movie").strip().lower()
                     if kind == "music":
+                        if not title:
+                            raise ValueError("Title is required.")
+                        if not re.fullmatch(r"\d{4}", year):
+                            raise ValueError("Year must be 4 digits.")
                         if exec_mode != EXEC_MODE_REMOTE:
                             raise ValueError("Music/CD workflow currently supports remote mode only.")
                         if (self.var_disc_type.get() or "").strip().lower() != "cd":
@@ -3037,6 +3036,10 @@ print(json.dumps(rows))'''
                         return
 
                     if kind == "audiobook":
+                        if not title:
+                            raise ValueError("Title is required.")
+                        if not re.fullmatch(r"\d{4}", year):
+                            raise ValueError("Year must be 4 digits.")
                         if exec_mode != EXEC_MODE_REMOTE:
                             raise ValueError("Audiobook workflow currently supports remote mode only.")
                         extra = ["--audiobook-workflow", "--books-dir", self.var_books_dir.get().strip()]

@@ -4307,7 +4307,11 @@ def main(argv: list[str]) -> int:
                         disc_order.append(key)
                     by_disc[key].append(row)
 
-                csv_next_confirmed = bool(ns.no_disc_prompts)
+                # The v2 schedule is created from a live disc scan in the GUI,
+                # so disc 1 is already verified to be present when processing starts.
+                # Skip the initial "insert disc ... press Enter" gate for that first
+                # disc and only prompt before subsequent discs.
+                csv_next_confirmed = True
                 for idx, key in enumerate(disc_order):
                     disc_id, disc_number = key
                     disc_rows = sorted(by_disc.get(key, []), key=lambda r: r.source_title_index)

@@ -4336,7 +4336,7 @@ def main(argv: list[str]) -> int:
                         selections.append((row, ctx))
 
                     disc_dir = selections[0][1].mkv_root / f"Disc{disc_number:02d}"
-                    prompt_msg = f"Insert disc {disc_number} ({disc_id}) now (then press Enter)"
+                    prompt_msg = f"Insert: Disc {disc_number} ({disc_id}). Press Enter when ready."
 
                     per_title_rip: dict[int, bool] = {}
                     existing_manifest = _load_disc_manifest(disc_dir)

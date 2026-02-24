@@ -88,6 +88,18 @@ def test_disc_prompt_legacy_insert_format_enables_continue() -> None:
     assert "Click Continue (or press Enter)" in gui.var_prompt.value
 
 
+
+
+def test_disc_prompt_v2_canonical_insert_format_enables_continue() -> None:
+    gui = _Gui()
+
+    parse_for_progress(gui, "Insert: Disc 1 (disc-1). Press Enter when ready.")
+
+    assert gui.state.waiting_for_enter is True
+    assert gui.btn_continue.state == "normal"
+    assert "Please insert: Disc 1 (disc-1)." in gui.var_prompt.value
+    assert "Click Continue (or press Enter)" in gui.var_prompt.value
+
 def test_disc_prompt_v2_insert_disc_format_enables_continue() -> None:
     gui = _Gui()
 

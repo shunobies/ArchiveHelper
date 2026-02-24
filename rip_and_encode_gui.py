@@ -950,6 +950,7 @@ if TK_AVAILABLE:
                                 "year": str(row.get("year", "")),
                                 "tmdb_id": str(row.get("tmdb_id", "")),
                                 "tmdb_label": str(row.get("tmdb_label", "")),
+                                "tmdb_matches": [dict(m) for m in (row.get("tmdb_matches") or []) if isinstance(m, dict)],
                             }
                         )
                     self._multi_title_rows = clean_rows
@@ -1231,14 +1232,20 @@ print(json.dumps(rows))'''
             for child in self.multi_title_rows_wrap.winfo_children():
                 child.destroy()
             self._multi_title_widgets = []
-            tmdb_options = [""] + [self._build_tmdb_match_label(m) for m in self._tmdb_matches[1:]]
             for idx, row in enumerate(self._multi_title_rows):
+                row_tmdb_matches = row.get("tmdb_matches") if isinstance(row, dict) else None
+                if not isinstance(row_tmdb_matches, list):
+                    row_tmdb_matches = [{"no_match": "1", "title": "No match"}]
+                tmdb_options = [self._build_tmdb_match_label(m) for m in row_tmdb_matches]
+                current_label = str(row.get("tmdb_label", ""))
+                if current_label and current_label not in tmdb_options:
+                    tmdb_options.append(current_label)
                 rf = ttk.Frame(self.multi_title_rows_wrap)
                 rf.pack(fill=X, pady=1)
                 var_selected = BooleanVar(value=bool(row.get("selected", False)))
                 var_title = StringVar(value=str(row.get("movie_title", "")))
                 var_year = StringVar(value=str(row.get("year", "")))
-                var_tmdb = StringVar(value=str(row.get("tmdb_label", "")))
+                var_tmdb = StringVar(value=current_label)
                 ttk.Checkbutton(rf, variable=var_selected).pack(side=LEFT, padx=(0, 8))
                 ttk.Label(rf, text=str(row.get("source_title_index", "")), width=8).pack(side=LEFT, padx=(0, 4))
                 ttk.Label(rf, text=str(row.get("duration", "")), width=10).pack(side=LEFT, padx=(0, 4))
@@ -1253,7 +1260,7 @@ print(json.dumps(rows))'''
                     label = sel.get().strip()
                     if not label:
                         return
-                    for m in self._tmdb_matches[1:]:
+                    for m in row_tmdb_matches[1:]:
                         if self._build_tmdb_match_label(m) == label:
                             if (m.get("title") or "").strip():
                                 title_v.set((m.get("title") or "").strip())
@@ -1269,6 +1276,7 @@ print(json.dumps(rows))'''
                         "title": var_title,
                         "year": var_year,
                         "tmdb": var_tmdb,
+                        "tmdb_matches": row_tmdb_matches,
                         "base": row,
                     }
                 )
@@ -1282,19 +1290,59 @@ print(json.dumps(rows))'''
                     base["movie_title"] = str(w["title"].get())
                     base["year"] = str(w["year"].get())
                     base["tmdb_label"] = str(w["tmdb"].get())
-                    base["tmdb_id"] = self._tmdb_id_for_label(base["tmdb_label"])
+                    tmdb_matches = w.get("tmdb_matches")
+                    if isinstance(tmdb_matches, list):
+                        base["tmdb_matches"] = [dict(m) for m in tmdb_matches if isinstance(m, dict)]
+                    base["tmdb_id"] = self._tmdb_id_for_label(base["tmdb_label"], tmdb_matches)
                     rows.append(base)
                 return rows
             return [dict(r) for r in self._multi_title_rows]
 
-        def _tmdb_id_for_label(self, label: str) -> str:
+        def _tmdb_id_for_label(self, label: str, matches: Any | None = None) -> str:
             target = (label or "").strip()
             if not target:
                 return ""
-            for m in self._tmdb_matches[1:]:
+            use_matches = matches if isinstance(matches, list) else self._tmdb_matches
+            for m in use_matches[1:]:
                 if self._build_tmdb_match_label(m) == target:
                     return str(m.get("id") or "").strip()
             return ""
+
+        def _normalize_tmdb_results(self, results: Any) -> list[dict[str, str]]:
+            clean: list[dict[str, str]] = [{"no_match": "1", "title": "No match"}]
+            if isinstance(results, list):
+                for it in results:
+                    if isinstance(it, dict):
+                        clean.append({k: str(v or "") for k, v in it.items()})
+            return clean
+
+        def _run_tmdb_lookup(self, cfg: ConnectionInfo, remote_script: str, api_key: str, query: str, year: str, kind: str) -> dict[str, Any]:
+            cmd_parts = ["python3", remote_script, "--tmdb-api-key", api_key, "--tmdb-limit", "12"]
+            if query:
+                media_type = "tv" if kind == "series" else "movie"
+                cmd_parts += ["--tmdb-search", query, "--tmdb-media-type", media_type]
+                if re.fullmatch(r"\d{4}", year):
+                    cmd_parts += ["--tmdb-year", year]
+            else:
+                cmd_parts += ["--tmdb-suggest-from-disc", "--tmdb-disc-media-type", "auto"]
+
+            remote_cmd = " ".join(shlex.quote(x) for x in cmd_parts)
+            code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_cmd)
+            if code != 0:
+                detail = (out or "").strip() or "TMDB lookup failed."
+                raise ValueError(detail)
+
+            payload_line = ""
+            for line in reversed((out or "").splitlines()):
+                if line.strip().startswith("{"):
+                    payload_line = line.strip()
+                    break
+            if not payload_line:
+                raise ValueError("TMDB lookup returned no JSON payload.")
+            payload = json.loads(payload_line)
+            if not isinstance(payload, dict):
+                return {}
+            return payload
 
         def _build_v2_schedule_from_panel(self) -> list[ScheduleV2Selection]:
             rows = self._collect_multi_title_rows_for_persist()
@@ -1358,40 +1406,79 @@ print(json.dumps(rows))'''
                 self._persist_state()
                 remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
 
-                cmd_parts = ["python3", remote_script, "--tmdb-api-key", api_key, "--tmdb-limit", "12"]
-                if query:
-                    kind = (self.var_kind.get() or "movie").strip().lower()
-                    media_type = "tv" if kind == "series" else "movie"
-                    cmd_parts += ["--tmdb-search", query, "--tmdb-media-type", media_type]
-                    if re.fullmatch(r"\d{4}", year):
-                        cmd_parts += ["--tmdb-year", year]
-                else:
-                    cmd_parts += ["--tmdb-suggest-from-disc", "--tmdb-disc-media-type", "auto"]
+                is_multi_movie = bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie"
+                if is_multi_movie:
+                    current_rows = self._collect_multi_title_rows_for_persist()
+                    current_by_idx = {
+                        int(r.get("source_title_index", 0) or 0): r
+                        for r in current_rows
+                        if isinstance(r, dict)
+                    }
+                    scanned = self._scan_disc_source_titles(cfg, remote_script)
+                    self._multi_title_rows = []
+                    for item in scanned:
+                        source_idx = int(item.get("source_title_index", 0) or 0)
+                        existing = current_by_idx.get(source_idx, {})
+                        dur_s = int(item.get("duration_s", 0) or 0)
+                        chapters = int(item.get("chapters", 0) or 0)
+                        hh = dur_s // 3600
+                        mm = (dur_s % 3600) // 60
+                        ss = dur_s % 60
+                        quality, default_selected = self._estimate_source_quality(dur_s, chapters)
+                        self._multi_title_rows.append(
+                            {
+                                "source_title_index": source_idx,
+                                "duration": f"{hh:02d}:{mm:02d}:{ss:02d}",
+                                "chapters": str(chapters),
+                                "quality": quality,
+                                "selected": bool(existing.get("selected", default_selected)),
+                                "movie_title": str(existing.get("movie_title") or self.var_title.get().strip()),
+                                "year": str(existing.get("year") or self.var_year.get().strip()),
+                                "tmdb_id": str(existing.get("tmdb_id", "")),
+                                "tmdb_label": str(existing.get("tmdb_label", "")),
+                                "tmdb_matches": [dict(m) for m in (existing.get("tmdb_matches") or []) if isinstance(m, dict)],
+                            }
+                        )
 
-                remote_cmd = " ".join(shlex.quote(x) for x in cmd_parts)
-                code, out = self._remote_run(cfg.target, cfg.port, cfg.keyfile, cfg.password, remote_cmd)
-                if code != 0:
-                    detail = (out or "").strip() or "TMDB lookup failed."
-                    raise ValueError(detail)
+                    rows_to_lookup = [r for r in self._multi_title_rows if bool(r.get("selected", False))]
+                    if not rows_to_lookup:
+                        rows_to_lookup = [r for r in self._multi_title_rows if str(r.get("movie_title", "")).strip()]
 
-                payload_line = ""
-                for line in reversed((out or "").splitlines()):
-                    if line.strip().startswith("{"):
-                        payload_line = line.strip()
-                        break
-                if not payload_line:
-                    raise ValueError("TMDB lookup returned no JSON payload.")
+                    skipped_empty_selected = False
+                    for row in rows_to_lookup:
+                        row_title = str(row.get("movie_title", "")).strip()
+                        row_year_raw = str(row.get("year", ""))
+                        row_year_digits = re.sub(r"[^0-9]", "", row_year_raw)
+                        row_year = row_year_digits if len(row_year_digits) == 4 else ""
+                        if row_year_raw.strip() and not row_year:
+                            self._append_log(
+                                f"(Info) TMDB lookup ignored non-4-digit year hint for source title {row.get('source_title_index', '?')}.\n"
+                            )
+                        if not row_title:
+                            skipped_empty_selected = True
+                            continue
+                        payload = self._run_tmdb_lookup(cfg, remote_script, api_key, row_title, row_year, "movie")
+                        row["tmdb_matches"] = self._normalize_tmdb_results(payload.get("results"))
+                        labels = [self._build_tmdb_match_label(m) for m in row["tmdb_matches"]]
+                        current = str(row.get("tmdb_label", "")).strip()
+                        row["tmdb_label"] = current if current in labels else labels[0]
+                        row["tmdb_id"] = self._tmdb_id_for_label(row.get("tmdb_label", ""), row["tmdb_matches"])
 
-                payload = json.loads(payload_line)
-                results = payload.get("results") if isinstance(payload, dict) else None
-                if not isinstance(results, list):
-                    results = []
+                    if skipped_empty_selected:
+                        self._append_log("(Info) TMDB lookup skipped selected rows without a movie title. Enter a title in those rows to fetch row-level matches.\n")
 
-                clean: list[dict[str, str]] = [{"no_match": "1", "title": "No match"}]
-                for it in results:
-                    if isinstance(it, dict):
-                        clean.append({k: str(v or "") for k, v in it.items()})
-                self._tmdb_matches = clean
+                    self._render_multi_title_rows()
+                    return
+
+                payload = self._run_tmdb_lookup(
+                    cfg,
+                    remote_script,
+                    api_key,
+                    query,
+                    year,
+                    (self.var_kind.get() or "movie").strip().lower(),
+                )
+                self._tmdb_matches = self._normalize_tmdb_results(payload.get("results"))
 
                 labels = [self._build_tmdb_match_label(m) for m in self._tmdb_matches]
                 self.cbo_tmdb_matches.configure(values=labels)
@@ -1408,31 +1495,6 @@ print(json.dumps(rows))'''
                 else:
                     self._append_log("(Info) TMDB lookup returned no matches.\n")
                     messagebox.showinfo("TMDB", "No TMDB matches found from the inserted disc. Select 'No match' and enter details manually.")
-
-                if bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie":
-                    scanned = self._scan_disc_source_titles(cfg, remote_script)
-                    self._multi_title_rows = []
-                    for item in scanned:
-                        dur_s = int(item.get("duration_s", 0) or 0)
-                        chapters = int(item.get("chapters", 0) or 0)
-                        hh = dur_s // 3600
-                        mm = (dur_s % 3600) // 60
-                        ss = dur_s % 60
-                        quality, default_selected = self._estimate_source_quality(dur_s, chapters)
-                        self._multi_title_rows.append(
-                            {
-                                "source_title_index": int(item.get("source_title_index", 0) or 0),
-                                "duration": f"{hh:02d}:{mm:02d}:{ss:02d}",
-                                "chapters": str(chapters),
-                                "quality": quality,
-                                "selected": default_selected,
-                                "movie_title": self.var_title.get().strip(),
-                                "year": self.var_year.get().strip(),
-                                "tmdb_id": "",
-                                "tmdb_label": "",
-                            }
-                        )
-                    self._render_multi_title_rows()
             except Exception as e:
                 messagebox.showerror("TMDB", str(e))
 

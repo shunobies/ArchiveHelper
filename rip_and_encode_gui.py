@@ -453,29 +453,35 @@ if TK_AVAILABLE:
             main.pack(fill=BOTH, expand=True)
             self.main_frame = main
 
-            header = ttk.Frame(main)
-            header.pack(fill=X, pady=(0, 10))
-            self._build_logo(header)
-
             # Settings frame
             settings = ttk.LabelFrame(main, text="Run settings", padding=10)
-            settings.pack(fill=X, pady=(10, 0))
+            settings.pack(fill=X, pady=(0, 0))
 
-            s1 = ttk.Frame(settings)
+            settings_content = ttk.Frame(settings)
+            settings_content.pack(fill=X)
+
+            settings_form = ttk.Frame(settings_content)
+            settings_form.pack(side=LEFT, fill=X, expand=True)
+
+            settings_logo = ttk.Frame(settings_content)
+            settings_logo.pack(side=RIGHT, anchor="ne", padx=(16, 0))
+            self._build_logo(settings_logo, compact=True)
+
+            s1 = ttk.Frame(settings_form)
             s1.pack(fill=X)
             ttk.Label(s1, text="Disc type:").pack(side=LEFT)
             cbo_disc = ttk.Combobox(s1, textvariable=self.var_disc_type, values=["dvd", "bluray", "cd"], state="readonly", width=8)
             cbo_disc.pack(side=LEFT, padx=5)
             Tooltip(cbo_disc, "Select 'bluray' for Blu-ray discs (larger MakeMKV cache). Select 'cd' to use abcde + MusicBrainz metadata for audio CDs.")
 
-            s2 = ttk.Frame(settings)
+            s2 = ttk.Frame(settings_form)
             s2.pack(fill=X, pady=(6, 0))
             ttk.Label(s2, text="HandBrake preset:").pack(side=LEFT)
             self.cbo_preset = ttk.Combobox(s2, textvariable=self.var_preset, width=33, state="normal")
             self.cbo_preset.pack(side=LEFT, padx=5)
             Tooltip(self.cbo_preset, "HandBrake preset name on the server (loaded from HandBrakeCLI --preset-list).")
 
-            s3 = ttk.Frame(settings)
+            s3 = ttk.Frame(settings_form)
             s3.pack(fill=X, pady=(6, 0))
             ttk.Label(s3, text="Output:").pack(side=LEFT)
             cbo_container = ttk.Combobox(s3, textvariable=self.var_output_container, values=["mp4", "mkv"], state="readonly", width=7)
@@ -487,13 +493,13 @@ if TK_AVAILABLE:
             Tooltip(cbo_sub_mode, "preset: use preset behavior; soft: keep selectable tracks in output; external: extract subtitles with ffmpeg sidecars; none: remove subtitle tracks.")
 
             note = ttk.Label(
-                settings,
+                settings_form,
                 text="Connection and output directories are set under Settings.",
                 foreground=self._theme_colors.get("muted", "#444"),
             )
             note.pack(anchor="w", pady=(6, 0))
 
-            self.lbl_exec_mode = ttk.Label(settings, text=f"Rip mode: {exec_mode_label(self.var_exec_mode.get())}")
+            self.lbl_exec_mode = ttk.Label(settings_form, text=f"Rip mode: {exec_mode_label(self.var_exec_mode.get())}")
             self.lbl_exec_mode.pack(anchor="w", pady=(2, 0))
 
             # Mode frame
@@ -738,7 +744,7 @@ if TK_AVAILABLE:
         def show_help(self) -> None:
             show_help_dialog(self.root)
 
-        def _build_logo(self, parent: Any) -> None:
+        def _build_logo(self, parent: Any, *, compact: bool = False) -> None:
             """Draw a simple, original mark + title using a Canvas.
 
             This avoids external image dependencies (Pillow) and keeps the GUI
@@ -746,11 +752,16 @@ if TK_AVAILABLE:
             """
 
             c = ttk.Frame(parent)
-            c.pack(fill=X)
+            if compact:
+                c.pack(anchor="ne")
+            else:
+                c.pack(fill=X)
 
             canvas = None
             try:
-                canvas = __import__("tkinter").Canvas(c, width=360, height=54, highlightthickness=0)
+                canvas_width = 300 if compact else 360
+                canvas_height = 46 if compact else 54
+                canvas = __import__("tkinter").Canvas(c, width=canvas_width, height=canvas_height, highlightthickness=0)
             except Exception:
                 canvas = None
 
@@ -790,21 +801,25 @@ if TK_AVAILABLE:
                 canvas.create_line(x0 + 44, y0 + 6, x0 + 44, y0 + 14, fill=accent, width=2)
 
                 # Text
+                title_y = 16 if compact else 18
+                subtitle_y = 33 if compact else 38
+                title_size = 12 if compact else 14
+                subtitle_size = 9 if compact else 10
                 canvas.create_text(
                     70,
-                    18,
+                    title_y,
                     text="Archive Helper",
                     anchor="w",
                     fill=dark,
-                    font=("TkDefaultFont", 14, "bold"),
+                    font=("TkDefaultFont", title_size, "bold"),
                 )
                 canvas.create_text(
                     70,
-                    38,
+                    subtitle_y,
                     text="for Jellyfin",
                     anchor="w",
                     fill=dark,
-                    font=("TkDefaultFont", 10),
+                    font=("TkDefaultFont", subtitle_size),
                 )
             else:
                 ttk.Label(parent, text="Archive Helper for Jellyfin", font=("TkDefaultFont", 14, "bold")).pack(

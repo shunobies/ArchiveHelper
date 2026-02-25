@@ -191,6 +191,7 @@ if TK_AVAILABLE:
             self.var_password = StringVar(value="")
             self.var_tmdb_api_key = StringVar(value="")
             self.var_tmdb_match = StringVar(value="")
+            self.var_scan_status = StringVar(value="Not scanned")
             self._tmdb_matches: list[dict[str, str]] = []
             self._last_disc_scan_state: dict[str, Any] = {}
             self.var_multi_movie_disc = BooleanVar(value=False)
@@ -535,6 +536,12 @@ if TK_AVAILABLE:
             self.btn_tmdb_lookup = ttk.Button(r1, text="TMDB Lookup", command=self._lookup_tmdb_matches)
             self.btn_tmdb_lookup.pack(side=LEFT, padx=(10, 0))
             Tooltip(self.btn_tmdb_lookup, "Search TMDB using manual title/year or the most recent disc-scan context.")
+            self.lbl_scan_status = ttk.Label(
+                r1,
+                textvariable=self.var_scan_status,
+                foreground=self._theme_colors.get("muted", "#444"),
+            )
+            self.lbl_scan_status.pack(side=LEFT, padx=(10, 0))
 
             self.tmdb_row = ttk.Frame(self.manual_frame)
             self.tmdb_row.pack(fill=X, pady=(6, 0))
@@ -572,6 +579,7 @@ if TK_AVAILABLE:
             self.multi_title_rows_wrap = ttk.Frame(self.multi_title_frame)
             self.multi_title_rows_wrap.pack(fill=X, pady=(4, 0))
             self._refresh_multi_title_panel()
+            self._refresh_tmdb_lookup_state()
 
             self.artist_row = ttk.Frame(self.manual_frame)
             self.artist_row.pack(fill=X, pady=(6, 0))
@@ -1117,7 +1125,6 @@ if TK_AVAILABLE:
                     self.season_row.pack(fill=X, pady=(6, 0))
                 self.artist_row.pack_forget()
                 try:
-                    self.btn_tmdb_lookup.configure(state="normal")
                     self.btn_scan_disc.configure(state="normal")
                 except Exception:
                     pass
@@ -1139,7 +1146,6 @@ if TK_AVAILABLE:
                     pass
                 try:
                     self.tmdb_row.pack_forget()
-                    self.btn_tmdb_lookup.configure(state="disabled")
                     self.btn_scan_disc.configure(state="disabled")
                 except Exception:
                     pass
@@ -1155,7 +1161,6 @@ if TK_AVAILABLE:
                     pass
                 try:
                     self.tmdb_row.pack_forget()
-                    self.btn_tmdb_lookup.configure(state="disabled")
                     self.btn_scan_disc.configure(state="disabled")
                 except Exception:
                     pass
@@ -1174,7 +1179,6 @@ if TK_AVAILABLE:
                 self.audiobook_row.pack_forget()
                 self.audiobook_row2.pack_forget()
                 try:
-                    self.btn_tmdb_lookup.configure(state="normal")
                     self.btn_scan_disc.configure(state="normal")
                 except Exception:
                     pass
@@ -1192,6 +1196,7 @@ if TK_AVAILABLE:
             except Exception:
                 pass
             self._refresh_multi_title_panel()
+            self._refresh_tmdb_lookup_state()
 
         def _refresh_multi_title_panel(self) -> None:
             if not hasattr(self, "multi_title_frame"):
@@ -1204,6 +1209,31 @@ if TK_AVAILABLE:
                     self.multi_title_frame.pack(fill=X, pady=(6, 0))
             else:
                 self.multi_title_frame.pack_forget()
+            self._refresh_tmdb_lookup_state()
+
+        def _scanned_title_count(self) -> int:
+            scanned = self._last_disc_scan_state.get("scanned_titles")
+            if not isinstance(scanned, list):
+                return 0
+            return len([r for r in scanned if isinstance(r, dict)])
+
+        def _refresh_scan_status_indicator(self) -> None:
+            count = self._scanned_title_count()
+            if count <= 0:
+                self.var_scan_status.set("Not scanned")
+            elif count == 1:
+                self.var_scan_status.set("Scanned: 1 source title")
+            else:
+                self.var_scan_status.set(f"Scanned: {count} source titles")
+
+        def _refresh_tmdb_lookup_state(self) -> None:
+            kind = (self.var_kind.get() or "").strip().lower()
+            if kind in {"music", "audiobook"}:
+                self.btn_tmdb_lookup.configure(state="disabled")
+                return
+            requires_scan = bool(self.var_multi_movie_disc.get()) and kind == "movie"
+            has_scan_result = self._scanned_title_count() > 0
+            self.btn_tmdb_lookup.configure(state=("normal" if (not requires_scan or has_scan_result) else "disabled"))
 
         def _estimate_source_quality(self, duration_s: int, chapters: int) -> tuple[str, bool]:
             if duration_s >= 3000 and chapters >= 8:
@@ -1362,16 +1392,25 @@ print(json.dumps(rows))'''
                     "manual_title": (self.var_title.get() or "").strip(),
                     "manual_year": (self.var_year.get() or "").strip(),
                 }
+                detected_count = self._scanned_title_count()
+                self._refresh_scan_status_indicator()
+                self._refresh_tmdb_lookup_state()
 
                 is_multi_movie = bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie"
                 if is_multi_movie:
                     self._populate_multi_rows_from_scan(scanned, self.var_title.get().strip(), self.var_year.get().strip())
                     self._render_multi_title_rows()
-                    self._append_log(f"(Info) Disc scan complete. Found {len(scanned)} source title row(s).\n")
+                    self._append_log(f"(Info) Disc scan success: detected {detected_count} source title row(s).\n")
                 else:
                     hint_preview = "; ".join(scan_hints[:3]) if scan_hints else "no hints available"
-                    self._append_log(f"(Info) Disc scan complete for TMDB context ({hint_preview}).\n")
+                    self._append_log(
+                        f"(Info) Disc scan success: detected {detected_count} source title row(s) for TMDB context ({hint_preview}).\n"
+                    )
             except Exception as e:
+                self._last_disc_scan_state = {}
+                self._refresh_scan_status_indicator()
+                self._refresh_tmdb_lookup_state()
+                self._append_log(f"(Error) Disc scan failed: detected 0 source title row(s). Reason: {e}\n")
                 messagebox.showerror("Disc Scan", str(e))
 
         def _collect_multi_title_rows_for_persist(self) -> list[dict[str, Any]]:
@@ -1501,6 +1540,7 @@ print(json.dumps(rows))'''
 
                 is_multi_movie = bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie"
                 if is_multi_movie:
+                    self._append_log("(Info) TMDB lookup source context: using scan-populated multi-movie rows.\n")
                     if not self._multi_title_rows:
                         scanned_rows = self._last_disc_scan_state.get("scanned_titles")
                         if isinstance(scanned_rows, list) and scanned_rows:
@@ -1547,6 +1587,10 @@ print(json.dumps(rows))'''
                     year,
                     (self.var_kind.get() or "movie").strip().lower(),
                 )
+                if query:
+                    self._append_log(f"(Info) TMDB lookup source context: using manual fields (title='{query}', year='{year or 'n/a'}').\n")
+                else:
+                    self._append_log("(Info) TMDB lookup source context: using scan hints (disc suggestion mode).\n")
                 self._tmdb_matches = self._normalize_tmdb_results(payload.get("results"))
 
                 labels = [self._build_tmdb_match_label(m) for m in self._tmdb_matches]
@@ -1605,6 +1649,8 @@ print(json.dumps(rows))'''
             self.var_title.set("")
             self.var_year.set("")
             self._last_disc_scan_state = {}
+            self._refresh_scan_status_indicator()
+            self._refresh_tmdb_lookup_state()
             self._multi_title_rows = []
             self._render_multi_title_rows()
 

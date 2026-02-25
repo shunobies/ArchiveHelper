@@ -192,6 +192,7 @@ if TK_AVAILABLE:
             self.var_tmdb_api_key = StringVar(value="")
             self.var_tmdb_match = StringVar(value="")
             self._tmdb_matches: list[dict[str, str]] = []
+            self._last_disc_scan_state: dict[str, Any] = {}
             self.var_multi_movie_disc = BooleanVar(value=False)
             self._multi_title_rows: list[dict[str, Any]] = []
             self._multi_title_widgets: list[dict[str, Any]] = []
@@ -528,9 +529,12 @@ if TK_AVAILABLE:
             ent_year = ttk.Entry(r1, textvariable=self.var_year, width=6)
             ent_year.pack(side=LEFT, padx=5)
             Tooltip(ent_year, "4-digit release year (example: 2008).")
-            self.btn_tmdb_lookup = ttk.Button(r1, text="Scan Disc + TMDB", command=self._lookup_tmdb_matches)
+            self.btn_scan_disc = ttk.Button(r1, text="Scan Disc", command=self._scan_disc_clicked)
+            self.btn_scan_disc.pack(side=LEFT, padx=(10, 0))
+            Tooltip(self.btn_scan_disc, "Probe the inserted disc on the server and populate source-title scan hints.")
+            self.btn_tmdb_lookup = ttk.Button(r1, text="TMDB Lookup", command=self._lookup_tmdb_matches)
             self.btn_tmdb_lookup.pack(side=LEFT, padx=(10, 0))
-            Tooltip(self.btn_tmdb_lookup, "Probe the inserted disc on the server, then search TMDB for likely matches.")
+            Tooltip(self.btn_tmdb_lookup, "Search TMDB using manual title/year or the most recent disc-scan context.")
 
             self.tmdb_row = ttk.Frame(self.manual_frame)
             self.tmdb_row.pack(fill=X, pady=(6, 0))
@@ -1114,6 +1118,7 @@ if TK_AVAILABLE:
                 self.artist_row.pack_forget()
                 try:
                     self.btn_tmdb_lookup.configure(state="normal")
+                    self.btn_scan_disc.configure(state="normal")
                 except Exception:
                     pass
             elif kind == "music":
@@ -1135,6 +1140,7 @@ if TK_AVAILABLE:
                 try:
                     self.tmdb_row.pack_forget()
                     self.btn_tmdb_lookup.configure(state="disabled")
+                    self.btn_scan_disc.configure(state="disabled")
                 except Exception:
                     pass
                 self.multi_movie_toggle_row.pack_forget()
@@ -1150,6 +1156,7 @@ if TK_AVAILABLE:
                 try:
                     self.tmdb_row.pack_forget()
                     self.btn_tmdb_lookup.configure(state="disabled")
+                    self.btn_scan_disc.configure(state="disabled")
                 except Exception:
                     pass
                 self.multi_movie_toggle_row.pack_forget()
@@ -1168,6 +1175,7 @@ if TK_AVAILABLE:
                 self.audiobook_row2.pack_forget()
                 try:
                     self.btn_tmdb_lookup.configure(state="normal")
+                    self.btn_scan_disc.configure(state="normal")
                 except Exception:
                     pass
 
@@ -1296,6 +1304,76 @@ print(json.dumps(rows))'''
                     }
                 )
 
+        def _build_scan_hints_from_titles(self, scanned: list[dict[str, Any]]) -> list[str]:
+            if not scanned:
+                return []
+            hints: list[str] = [f"source_titles={len(scanned)}"]
+            longest = max(scanned, key=lambda r: int(r.get("duration_s", 0) or 0))
+            longest_idx = int(longest.get("source_title_index", 0) or 0)
+            longest_dur = int(longest.get("duration_s", 0) or 0)
+            hh = longest_dur // 3600
+            mm = (longest_dur % 3600) // 60
+            ss = longest_dur % 60
+            hints.append(f"longest=title {longest_idx} ({hh:02d}:{mm:02d}:{ss:02d})")
+            return hints
+
+        def _populate_multi_rows_from_scan(self, scanned: list[dict[str, Any]], fallback_title: str, fallback_year: str) -> None:
+            current_rows = self._collect_multi_title_rows_for_persist()
+            current_by_idx = {
+                int(r.get("source_title_index", 0) or 0): r
+                for r in current_rows
+                if isinstance(r, dict)
+            }
+            self._multi_title_rows = []
+            for item in scanned:
+                source_idx = int(item.get("source_title_index", 0) or 0)
+                existing = current_by_idx.get(source_idx, {})
+                dur_s = int(item.get("duration_s", 0) or 0)
+                chapters = int(item.get("chapters", 0) or 0)
+                hh = dur_s // 3600
+                mm = (dur_s % 3600) // 60
+                ss = dur_s % 60
+                quality, default_selected = self._estimate_source_quality(dur_s, chapters)
+                self._multi_title_rows.append(
+                    {
+                        "source_title_index": source_idx,
+                        "duration": f"{hh:02d}:{mm:02d}:{ss:02d}",
+                        "chapters": str(chapters),
+                        "quality": quality,
+                        "selected": bool(existing.get("selected", default_selected)),
+                        "movie_title": str(existing.get("movie_title") or fallback_title),
+                        "year": str(existing.get("year") or fallback_year),
+                        "tmdb_id": str(existing.get("tmdb_id", "")),
+                        "tmdb_label": str(existing.get("tmdb_label", "")),
+                        "tmdb_matches": [dict(m) for m in (existing.get("tmdb_matches") or []) if isinstance(m, dict)],
+                    }
+                )
+
+        def _scan_disc_clicked(self) -> None:
+            try:
+                cfg = self._validate()
+                self._persist_state()
+                remote_script = self._ensure_remote_script(cfg.target, cfg.port, cfg.keyfile, cfg.remote_script)
+                scanned = self._scan_disc_source_titles(cfg, remote_script)
+                scan_hints = self._build_scan_hints_from_titles(scanned)
+                self._last_disc_scan_state = {
+                    "scanned_titles": [dict(r) for r in scanned if isinstance(r, dict)],
+                    "hints": list(scan_hints),
+                    "manual_title": (self.var_title.get() or "").strip(),
+                    "manual_year": (self.var_year.get() or "").strip(),
+                }
+
+                is_multi_movie = bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie"
+                if is_multi_movie:
+                    self._populate_multi_rows_from_scan(scanned, self.var_title.get().strip(), self.var_year.get().strip())
+                    self._render_multi_title_rows()
+                    self._append_log(f"(Info) Disc scan complete. Found {len(scanned)} source title row(s).\n")
+                else:
+                    hint_preview = "; ".join(scan_hints[:3]) if scan_hints else "no hints available"
+                    self._append_log(f"(Info) Disc scan complete for TMDB context ({hint_preview}).\n")
+            except Exception as e:
+                messagebox.showerror("Disc Scan", str(e))
+
         def _collect_multi_title_rows_for_persist(self) -> list[dict[str, Any]]:
             if self._multi_title_widgets:
                 rows: list[dict[str, Any]] = []
@@ -1423,37 +1501,13 @@ print(json.dumps(rows))'''
 
                 is_multi_movie = bool(self.var_multi_movie_disc.get()) and (self.var_kind.get() or "").strip().lower() == "movie"
                 if is_multi_movie:
-                    current_rows = self._collect_multi_title_rows_for_persist()
-                    current_by_idx = {
-                        int(r.get("source_title_index", 0) or 0): r
-                        for r in current_rows
-                        if isinstance(r, dict)
-                    }
-                    scanned = self._scan_disc_source_titles(cfg, remote_script)
-                    self._multi_title_rows = []
-                    for item in scanned:
-                        source_idx = int(item.get("source_title_index", 0) or 0)
-                        existing = current_by_idx.get(source_idx, {})
-                        dur_s = int(item.get("duration_s", 0) or 0)
-                        chapters = int(item.get("chapters", 0) or 0)
-                        hh = dur_s // 3600
-                        mm = (dur_s % 3600) // 60
-                        ss = dur_s % 60
-                        quality, default_selected = self._estimate_source_quality(dur_s, chapters)
-                        self._multi_title_rows.append(
-                            {
-                                "source_title_index": source_idx,
-                                "duration": f"{hh:02d}:{mm:02d}:{ss:02d}",
-                                "chapters": str(chapters),
-                                "quality": quality,
-                                "selected": bool(existing.get("selected", default_selected)),
-                                "movie_title": str(existing.get("movie_title") or self.var_title.get().strip()),
-                                "year": str(existing.get("year") or self.var_year.get().strip()),
-                                "tmdb_id": str(existing.get("tmdb_id", "")),
-                                "tmdb_label": str(existing.get("tmdb_label", "")),
-                                "tmdb_matches": [dict(m) for m in (existing.get("tmdb_matches") or []) if isinstance(m, dict)],
-                            }
-                        )
+                    if not self._multi_title_rows:
+                        scanned_rows = self._last_disc_scan_state.get("scanned_titles")
+                        if isinstance(scanned_rows, list) and scanned_rows:
+                            self._populate_multi_rows_from_scan(scanned_rows, self.var_title.get().strip(), self.var_year.get().strip())
+                            self._render_multi_title_rows()
+                    if not self._multi_title_rows:
+                        raise ValueError("No scanned source titles available. Click 'Scan Disc' first.")
 
                     rows_to_lookup = [r for r in self._multi_title_rows if bool(r.get("selected", False))]
                     if not rows_to_lookup:
@@ -1501,6 +1555,8 @@ print(json.dumps(rows))'''
                 self.var_tmdb_match.set(labels[0])
 
                 hints = payload.get("hints") if isinstance(payload, dict) else None
+                if not (isinstance(hints, list) and hints):
+                    hints = self._last_disc_scan_state.get("hints")
                 if isinstance(hints, list) and hints:
                     self._append_log("(Info) Disc hints: " + "; ".join(str(x) for x in hints[:3]) + "\n")
 
@@ -1548,6 +1604,7 @@ print(json.dumps(rows))'''
             self.var_tmdb_match.set("")
             self.var_title.set("")
             self.var_year.set("")
+            self._last_disc_scan_state = {}
             self._multi_title_rows = []
             self._render_multi_title_rows()
 

@@ -79,6 +79,12 @@ from archive_helper_gui.tailer import reader_loop as tailer_reader_loop
 from archive_helper_gui.tailer import start_tail as tailer_start_tail
 from archive_helper_gui.tailer import stop_tail as tailer_stop_tail
 from archive_helper_gui.tooltip import Tooltip
+from archive_helper_gui.ui_build import UiBuildController
+from archive_helper_gui.state_persistence import StatePersistenceController
+from archive_helper_gui.connection_runtime import ConnectionRuntimeController
+from archive_helper_gui.scan_tmdb import ScanTmdbController
+from archive_helper_gui.run_orchestration import RunOrchestrationController
+from archive_helper_gui.logging_progress import LoggingProgressController
 from archive_helper_gui.ssh_utils import (
     REMOTE_SCRIPT_RUN_PATH,
     EXEC_MODE_LOCAL_RIP_ENCODE,
@@ -182,6 +188,14 @@ if TK_AVAILABLE:
             self._done_emitted = False
             self._done_handled = False
             self._selected_epub_files: list[Path] = []
+
+            # Composed controllers for extracted cohesive responsibilities.
+            self.ui_build = UiBuildController(self)
+            self.state_persistence = StatePersistenceController(self)
+            self.connection_runtime = ConnectionRuntimeController(self)
+            self.scan_tmdb = ScanTmdbController(self)
+            self.run_orchestration = RunOrchestrationController(self)
+            self.logging_progress = LoggingProgressController(self)
 
             # Connection
             self.var_host = StringVar(value="")
@@ -916,7 +930,7 @@ if TK_AVAILABLE:
             port = (self.var_port.get() or "").strip() or "22"
             return f"{user}@{host}:{port}" if user else f"{host}:{port}"
 
-        def _load_persisted_state(self) -> None:
+        def _load_persisted_state_impl(self) -> None:
             if self.persistence.state_file_exists():
                 self._state_file_existed = True
 
@@ -999,7 +1013,7 @@ if TK_AVAILABLE:
             if pw:
                 self.var_password.set(pw)
 
-        def _persist_state(self) -> None:
+        def _persist_state_impl(self) -> None:
             data: dict[str, Any] = {
                 "host": self.var_host.get(),
                 "user": self.var_user.get(),
@@ -1476,7 +1490,7 @@ print(json.dumps(rows))'''
                 return {}
             return payload
 
-        def _build_v2_schedule_from_panel(self) -> list[ScheduleV2Selection]:
+        def _build_v2_schedule_from_panel_impl(self) -> list[ScheduleV2Selection]:
             rows = self._collect_multi_title_rows_for_persist()
             selected = [r for r in rows if bool(r.get("selected", False))]
             if not selected:
@@ -2231,10 +2245,10 @@ print(json.dumps(rows))'''
                 return len(parsed.rows_v1)
             return len(parsed.rows_v2)
 
-        def toggle_log(self) -> None:
+        def _toggle_log_impl(self) -> None:
             self._set_log_visible(not self.log_visible)
 
-        def _set_log_visible(self, visible: bool) -> None:
+        def _set_log_visible_impl(self, visible: bool) -> None:
             self.log_visible = visible
             if visible:
                 self.log_frame.pack(fill=BOTH, expand=True, pady=(10, 0))
@@ -2243,13 +2257,13 @@ print(json.dumps(rows))'''
                 self.log_frame.pack_forget()
                 self.btn_toggle_log.configure(text="Show Log")
 
-        def _append_log(self, line: str) -> None:
+        def _append_log_impl(self, line: str) -> None:
             self.log_text.configure(state="normal")
             self.log_text.insert(END, line)
             self._trim_log(max_lines=100)
             self.log_text.see(END)
 
-        def _trim_log(self, *, max_lines: int) -> None:
+        def _trim_log_impl(self, *, max_lines: int) -> None:
             """Keep the log textbox bounded to avoid long-run UI slowdowns."""
 
             try:
@@ -2291,7 +2305,7 @@ print(json.dumps(rows))'''
                 pass
             self.root.after(500, self._tick_elapsed)
 
-        def _poll_ui_queue(self) -> None:
+        def _poll_ui_queue_impl(self) -> None:
             try:
                 while True:
                     kind, payload = self.ui_queue.get_nowait()
@@ -2613,7 +2627,7 @@ print(json.dumps(rows))'''
                 password=password,
             )
 
-        def _parse_for_progress(self, text_chunk: str) -> None:
+        def _parse_for_progress_impl(self, text_chunk: str) -> None:
             parse_for_progress(self, text_chunk)
 
         def _on_return_key(self, _event=None) -> None:
@@ -2848,7 +2862,7 @@ print(json.dumps(rows))'''
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-        def _validate(self) -> ConnectionInfo:
+        def _validate_impl(self) -> ConnectionInfo:
             target = ssh_target(self.var_user.get(), self.var_host.get())
             if not target:
                 raise ValueError("Host is required.")
@@ -3154,7 +3168,7 @@ print(json.dumps(rows))'''
                     )
                 return abs_path
 
-        def start(self) -> None:
+        def start_impl(self) -> None:
             if self.state.running:
                 return
 
@@ -3521,7 +3535,7 @@ print(json.dumps(rows))'''
                 )
             return remote_csv
 
-        def _start_remote_job(
+        def _start_remote_job_impl(
             self,
             cfg: ConnectionInfo,
             remote_script: str,
@@ -4118,7 +4132,7 @@ print(json.dumps(rows))'''
             else:
                 self.var_eta.set(f"ETA {mins}m {secs:02d}s")
 
-        def stop(self) -> None:
+        def stop_impl(self) -> None:
             if self._replay_mode and self.state.running:
                 self._replay_stop.set()
                 return
@@ -4205,7 +4219,7 @@ print(json.dumps(rows))'''
 
             self._on_done("Stopped")
 
-        def start_replay(self, log_path: str) -> None:
+        def start_replay_impl(self, log_path: str) -> None:
             if self.state.running:
                 return
 
@@ -4245,6 +4259,56 @@ print(json.dumps(rows))'''
 
             self.reader_thread = threading.Thread(target=_replay, daemon=True)
             self.reader_thread.start()
+
+
+        # Facade delegates (Tk callbacks/public command methods).
+        def _load_persisted_state(self) -> None:
+            self.state_persistence.load()
+
+        def _persist_state(self) -> None:
+            self.state_persistence.persist()
+
+        def _is_setup_complete(self) -> bool:
+            return self.ui_build.is_setup_complete()
+
+        def _apply_setup_gate(self) -> None:
+            self.ui_build.apply_setup_gate()
+
+        def _build_v2_schedule_from_panel(self) -> list[ScheduleV2Selection]:
+            return self.scan_tmdb.build_v2_schedule_from_panel()
+
+        def _validate(self) -> ConnectionInfo:
+            return self.connection_runtime.validate()
+
+        def toggle_log(self) -> None:
+            self.logging_progress.toggle_log()
+
+        def _set_log_visible(self, visible: bool) -> None:
+            self.logging_progress.set_log_visible(visible)
+
+        def _append_log(self, line: str) -> None:
+            self.logging_progress.append_log(line)
+
+        def _trim_log(self, *, max_lines: int) -> None:
+            self.logging_progress.trim_log(max_lines=max_lines)
+
+        def _poll_ui_queue(self) -> None:
+            self.logging_progress.poll_ui_queue()
+
+        def _parse_for_progress(self, text_chunk: str) -> None:
+            self.logging_progress.parse_for_progress(text_chunk)
+
+        def start(self) -> None:
+            self.run_orchestration.start()
+
+        def _start_remote_job(self, *args: Any, **kwargs: Any) -> Any:
+            return self.run_orchestration.start_remote_job(*args, **kwargs)
+
+        def stop(self) -> None:
+            self.run_orchestration.stop()
+
+        def start_replay(self, log_path: str) -> None:
+            self.run_orchestration.start_replay(log_path)
 
 
 def main() -> int:
